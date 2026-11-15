@@ -21,7 +21,7 @@ import {
   saveCustomization,
 } from "./server/db";
 import { chat as brainChat } from "./server/anthropic";
-import { chat as geminiChat } from "./server/gemini";
+import { chat as geminiChat, chatStream as geminiChatStream } from "./server/gemini";
 import { systemPromptFor } from "./server/personas";
 import { voiceById } from "./shared/voices";
 import {
@@ -86,6 +86,80 @@ function accountIdFrom(req: Request, body: any): string {
 
 function isValidAccountId(id: string): boolean {
   return /^[A-Za-z0-9][A-Za-z0-9_-]{7,127}$/.test(id);
+}
+
+// Plain words for a brain failure, shared by the chat endpoints.
+function brainErrorMessage(error: string): string {
+  return error === "brain_unreachable" || error === "brain_error"
+    ? "Something went wrong on my end. Try that again in a moment."
+    : "The brain isn't answering right now. Try that again in a moment.";
+}
+
+// Everything both chat endpoints check before the brain is called:
+// the account, the Photon, ownership, the monthly meter, and that a brain
+// is connected. Returns the error response to send, or the pieces the
+// brain call needs.
+async function prepareChat(
+  req: Request,
+  body: any,
+): Promise<
+  | { error: Response }
+  | {
+      error?: undefined;
+      accountId: string;
+      photon: string;
+      message: string;
+      system: string;
+      history: { role: "user" | "assistant"; content: string }[];
+    }
+> {
+  const accountId = accountIdFrom(req, body);
+  if (!isValidAccountId(accountId)) return { error: bad("accountId required", 400) };
+  const photon = String(body.photon || "");
+  const message = String(body.message || "").trim();
+  if (!photonByName(photon)) return { error: bad("unknown photon", 400) };
+  if (!message) return { error: bad("message required", 400) };
+  if (message.length > 4000) return { error: bad("message too long", 400) };
+
+  if (!ownsPhoton(accountId, photon)) {
+    return {
+      error: json({
+        ok: false,
+        error: "not_owned",
+        message: `You don't own ${photon} yet. You can buy ${photon} in the Store, or redeem a code in Upkeep.`,
+      }),
+    };
+  }
+  const a = getOrCreateAccount(accountId);
+  if (!isUnlimited(a) && a.meter_used >= 300) {
+    return {
+      error: json({
+        ok: false,
+        error: "meter_exhausted",
+        message:
+          "You've used your 300 chats for this month. Upkeep gives you unlimited chat for $29 a month, or your allowance resets next month.",
+      }),
+    };
+  }
+  if (!brainConnected()) {
+    return {
+      error: json({
+        ok: false,
+        error: "brain_not_connected",
+        message:
+          "The brain isn't connected yet, so I can't answer that one. Your message wasn't saved and it didn't use any of your chats.",
+      }),
+    };
+  }
+  const history = getThread(accountId, photon).map((m) => ({
+    role: m.role,
+    content: m.content,
+  }));
+  // The Photon's saved customization (if any) names the Face and sets how
+  // it talks. No customization row means chat behaves exactly as before.
+  const c = getCustomization(accountId, photon);
+  const system = systemPromptFor(photon, c?.faceName || a.custom_name || photon, c);
+  return { accountId, photon, message, system, history };
 }
 
 // --- State ---
@@ -244,46 +318,9 @@ async function handleApi(req: Request, path: string): Promise<Response> {
   // POST /api/chat — server-side gating, meter, then the brain.
   if (path === "/api/chat" && method === "POST") {
     const body = await readBody(req);
-    const accountId = accountIdFrom(req, body);
-    if (!isValidAccountId(accountId)) return bad("accountId required", 400);
-    const photon = String(body.photon || "");
-    const message = String(body.message || "").trim();
-    if (!photonByName(photon)) return bad("unknown photon", 400);
-    if (!message) return bad("message required", 400);
-    if (message.length > 4000) return bad("message too long", 400);
-
-    if (!ownsPhoton(accountId, photon)) {
-      return json({
-        ok: false,
-        error: "not_owned",
-        message: `You don't own ${photon} yet. You can buy ${photon} in the Store, or redeem a code in Upkeep.`,
-      });
-    }
-    const a = getOrCreateAccount(accountId);
-    if (!isUnlimited(a) && a.meter_used >= 300) {
-      return json({
-        ok: false,
-        error: "meter_exhausted",
-        message:
-          "You've used your 300 chats for this month. Upkeep gives you unlimited chat for $29 a month, or your allowance resets next month.",
-      });
-    }
-    if (!brainConnected()) {
-      return json({
-        ok: false,
-        error: "brain_not_connected",
-        message:
-          "The brain isn't connected yet, so I can't answer that one. Your message wasn't saved and it didn't use any of your chats.",
-      });
-    }
-    const history = getThread(accountId, photon).map((m) => ({
-      role: m.role,
-      content: m.content,
-    }));
-    // The Photon's saved customization (if any) names the Face and sets how
-    // it talks. No customization row means chat behaves exactly as before.
-    const c = getCustomization(accountId, photon);
-    const system = systemPromptFor(photon, c?.faceName || a.custom_name || photon, c);
+    const prep = await prepareChat(req, body);
+    if (prep.error) return prep.error;
+    const { accountId, photon, message, system, history } = prep;
     // Anthropic takes precedence; Gemini is only the free bridge when no
     // Anthropic key is set. Gating and the meter already ran above and wrap
     // this call either way.
@@ -292,17 +329,86 @@ async function handleApi(req: Request, path: string): Promise<Response> {
         ? await brainChat(system, history, message)
         : await geminiChat(system, history, message);
     if (!result.ok) {
-      const msg =
-        result.error === "brain_unreachable" || result.error === "brain_error"
-          ? "Something went wrong on my end. Try that again in a moment."
-          : "The brain isn't answering right now. Try that again in a moment.";
-      return json({ ok: false, error: result.error, message: msg });
+      return json({ ok: false, error: result.error, message: brainErrorMessage(result.error) });
     }
     addMessage(accountId, photon, "user", message);
     addMessage(accountId, photon, "assistant", result.reply);
     incrementMeter(accountId);
     const after = getOrCreateAccount(accountId);
     return json({ ok: true, reply: result.reply, meter: meterState(after) });
+  }
+
+  // POST /api/chat/stream — the same chat, streamed. The reply arrives as
+  // server-sent events, {"delta": "..."} as each piece lands, then
+  // {"done": true, "reply": "...", "meter": {...}}. The thread and the
+  // meter are only touched once the whole reply is in, exactly like
+  // /api/chat, so a failed stream saves nothing and charges nothing.
+  // Anthropic has no streaming client here, so it answers in one delta.
+  if (path === "/api/chat/stream" && method === "POST") {
+    const body = await readBody(req);
+    const prep = await prepareChat(req, body);
+    if (prep.error) return prep.error;
+    const { accountId, photon, message, system, history } = prep;
+    const stream = new ReadableStream({
+      async start(controller) {
+        const enc = new TextEncoder();
+        let closed = false;
+        const send = (obj: unknown) => {
+          if (closed) return;
+          try {
+            controller.enqueue(enc.encode(`data: ${JSON.stringify(obj)}\n\n`));
+          } catch {
+            closed = true;
+          }
+        };
+        let full = "";
+        try {
+          if (brainProvider() === "anthropic") {
+            const result = await brainChat(system, history, message);
+            if (!result.ok) {
+              send({ error: result.error, message: brainErrorMessage(result.error) });
+              return;
+            }
+            full = result.reply;
+            send({ delta: full });
+          } else {
+            const result = await geminiChatStream(system, history, message, (d) => {
+              full += d;
+              send({ delta: d });
+            });
+            if (!result.ok) {
+              send({ error: result.error, message: brainErrorMessage(result.error) });
+              return;
+            }
+            full = result.reply;
+          }
+          addMessage(accountId, photon, "user", message);
+          addMessage(accountId, photon, "assistant", full);
+          incrementMeter(accountId);
+          const after = getOrCreateAccount(accountId);
+          send({ done: true, reply: full, meter: meterState(after) });
+        } catch (e) {
+          console.error("chat stream failed:", e);
+          send({ error: "brain_unreachable", message: brainErrorMessage("brain_unreachable") });
+        } finally {
+          if (!closed) {
+            closed = true;
+            try {
+              controller.close();
+            } catch {
+              // Already closed; nothing left to do.
+            }
+          }
+        }
+      },
+    });
+    return new Response(stream, {
+      headers: {
+        "content-type": "text/event-stream; charset=utf-8",
+        "cache-control": "no-cache",
+        connection: "keep-alive",
+      },
+    });
   }
 
   // POST /api/voice — the gate only. Live audio is not wired (no ElevenLabs).

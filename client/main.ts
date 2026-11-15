@@ -160,17 +160,21 @@ function renderChatThread(): string {
   const face = faceNameOf(p);
   const portrait = portraitNameOf(p);
   const customized = !!(state as any)?.customizations?.[p.name];
-  const botMsg = (text: string) =>
-    `<div class="msg bot">${portraitHtml(portrait, 26)}<div><p>${esc(text)}</p></div></div>`;
+  // A streaming reply shows three dots until the first words land.
+  const botMsg = (text: string, streaming = false) =>
+    `<div class="msg bot${streaming ? " streaming" : ""}">${portraitHtml(portrait, 26)}<div><p>${text ? esc(text) : '<span class="typing"><span></span><span></span><span></span></span>'}</p></div></div>`;
   const msgs = threadMessages.length
     ? threadMessages
         .map((m: any) =>
           m.role === "user"
             ? `<div class="msg user"><p>${esc(m.content)}</p></div>`
-            : botMsg(m.content),
+            : botMsg(m.content, !!m.streaming),
         )
         .join("")
-    : botMsg(`Howdy, neighbor! ${face} is on the line. Ask a real question, or start with what you need.`);
+    // Empty thread: the Photon introduces itself, who it is and what it
+    // was built for, instead of a generic greeting. Display only, never
+    // saved into the thread.
+    : botMsg(p.intro.replaceAll("{name}", face));
   return `
   <section class="thread">
     <div class="thread-head">
@@ -378,6 +382,24 @@ function showChatError(msg: string) {
   }
 }
 
+// The live streaming bubble: the <p> inside the last bot message, so
+// tokens can be appended without re-rendering the thread (a re-render
+// would rebuild the composer and eat anything the owner is typing).
+function streamingBubbleText(): HTMLElement | null {
+  const box = document.getElementById("messages");
+  const p = box?.querySelector(".msg.bot.streaming p");
+  return p as HTMLElement | null;
+}
+
+function appendStreamingText(text: string) {
+  const p = streamingBubbleText();
+  if (!p) return;
+  const dots = p.querySelector(".typing");
+  if (dots) dots.remove();
+  p.appendChild(document.createTextNode(text));
+  scrollMessages();
+}
+
 async function sendChat(text: string) {
   const input = document.getElementById("chat-input") as HTMLInputElement | null;
   if (input) input.value = "";
@@ -387,18 +409,68 @@ async function sendChat(text: string) {
   threadMessages = [...threadMessages, { role: "user", content: text }];
   render();
   scrollMessages();
-  const r = await api.chat(activePhoton || "", text);
-  if (r && r.ok) {
-    threadMessages = [...threadMessages, { role: "assistant", content: r.reply }];
-    if (r.meter && state) state.meter = r.meter;
+  // The reply bubble appears at once with three dots, so the app never
+  // looks dead while the brain thinks. Tokens fill it in as they arrive.
+  const streaming = { role: "assistant", content: "", streaming: true };
+  threadMessages = [...threadMessages, streaming];
+  render();
+  scrollMessages();
+  let gotText = "";
+  let doneEv: any = null;
+  let streamErr: any = null;
+  let transportFailed = false;
+  try {
+    await api.chatStream(activePhoton || "", text, (ev) => {
+      if (ev.delta) {
+        gotText += ev.delta;
+        streaming.content = gotText;
+        appendStreamingText(ev.delta);
+      }
+      if (ev.done) doneEv = ev;
+      if (ev.error) streamErr = ev;
+    });
+  } catch {
+    transportFailed = true;
+  }
+  // Fold whatever arrived into the thread and render once, so the bubble
+  // is a normal message from here on.
+  threadMessages = threadMessages.filter((m) => m !== streaming);
+  if (doneEv) {
+    threadMessages = [...threadMessages, { role: "assistant", content: doneEv.reply || gotText }];
+    if (doneEv.meter && state) state.meter = doneEv.meter;
     render();
     scrollMessages();
-  } else {
-    // The message was not saved and the meter was not touched. Show why.
+    return;
+  }
+  if (gotText) {
+    // A partial reply is better than none: show what arrived, plus why it stopped.
+    threadMessages = [...threadMessages, { role: "assistant", content: gotText }];
+    render();
+    showChatError(streamErr?.message || "The reply stopped partway. Try that again in a moment.");
+    scrollMessages();
+    return;
+  }
+  if (transportFailed) {
+    // The stream never reached the server at all: one try on the plain
+    // endpoint, which does not need streaming to work.
+    const r = await api.chat(activePhoton || "", text);
+    if (r && r.ok) {
+      threadMessages = [...threadMessages, { role: "assistant", content: r.reply }];
+      if (r.meter && state) state.meter = r.meter;
+      render();
+      scrollMessages();
+      return;
+    }
     threadMessages = threadMessages.slice(0, -1);
     render();
     showChatError(r?.message || "Something went wrong. Try that again in a moment.");
+    return;
   }
+  // The brain answered with an error and nothing arrived. The message was
+  // not saved and the meter was not touched. Show why.
+  threadMessages = threadMessages.slice(0, -1);
+  render();
+  showChatError(streamErr?.message || "Something went wrong. Try that again in a moment.");
 }
 
 async function callPhoton(name: string) {

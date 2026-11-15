@@ -52,6 +52,68 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ accountId: getAccountId(), photon, message }),
     }),
+  // Streaming chat: the reply arrives as server-sent events, one
+  // {"delta": "..."} per piece, then {"done": true, ...} at the end.
+  // onEvent fires for every event. Throws only when the request itself
+  // fails to reach the server (the caller falls back to chat() then);
+  // a brain error arrives as an { error, message } event instead.
+  chatStream: async (
+    photon: string,
+    message: string,
+    onEvent: (ev: {
+      delta?: string;
+      done?: boolean;
+      reply?: string;
+      meter?: any;
+      error?: string;
+      message?: string;
+    }) => void,
+  ): Promise<void> => {
+    const res = await fetch("/api/chat/stream", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-account-id": getAccountId(),
+      },
+      body: JSON.stringify({ accountId: getAccountId(), photon, message }),
+    });
+    const ctype = res.headers.get("content-type") || "";
+    if (!ctype.includes("text/event-stream")) {
+      // Not a stream: a gating error in plain JSON, or a proxy that
+      // swallowed the stream. Surface it as one error event.
+      const r = await res.json().catch(() => null);
+      onEvent({
+        error: r?.error || "bad_response",
+        message: r?.message || "Something went wrong. Try that again in a moment.",
+      });
+      return;
+    }
+    if (!res.body) {
+      onEvent({ error: "bad_response", message: "Something went wrong. Try that again in a moment." });
+      return;
+    }
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = "";
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      let idx: number;
+      while ((idx = buf.indexOf("\n")) >= 0) {
+        const line = buf.slice(0, idx).trim();
+        buf = buf.slice(idx + 1);
+        if (!line.startsWith("data:")) continue;
+        const payload = line.slice(5).trim();
+        if (!payload) continue;
+        try {
+          onEvent(JSON.parse(payload));
+        } catch {
+          // A torn line is skipped; the next event still parses.
+        }
+      }
+    }
+  },
   voice: (photon: string) =>
     req("/api/voice", { method: "POST", body: JSON.stringify({ accountId: getAccountId(), photon }) }),
   inboxes: () => req(`/api/inboxes?accountId=${encodeURIComponent(getAccountId())}`),
