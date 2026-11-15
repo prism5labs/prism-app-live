@@ -9,7 +9,7 @@ export const config = {
   // Anthropic: the chat brain. No key means the app serves the shell and
   // history, and new replies say the brain is not connected. Never commit a key.
   anthropicApiKey: process.env.ANTHROPIC_API_KEY || "",
-  anthropicModel: process.env.ANTHROPIC_MODEL || "claude-sonnet-4-5",
+  anthropicModel: process.env.ANTHROPIC_MODEL || "claude-sonnet-5-5",
   anthropicBaseUrl: process.env.ANTHROPIC_BASE_URL || "https://api.anthropic.com",
   // Google Gemini: a temporary free bridge brain. The free tier needs no
   // card (key from Google AI Studio) and is only used when no Anthropic
