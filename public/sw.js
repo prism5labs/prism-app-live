@@ -1,6 +1,9 @@
 // Prism 5 service worker. Cache-first for the app shell and static assets,
 // network-first for the API (chat, state, and inboxes must always be fresh).
-const CACHE = "prism5-v1";
+// CACHE v2: bumped Nov 15, 2026 for the V2 Direction B redesign, so existing
+// installs fetch the new look (and the new Prism portrait) instead of the
+// old cached shell.
+const CACHE = "prism5-v2";
 const SHELL = ["/", "/index.html", "/styles.css", "/main.js", "/manifest.json"];
 
 self.addEventListener("install", (event) => {

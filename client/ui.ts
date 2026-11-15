@@ -1,8 +1,9 @@
 // Logo and portrait helpers. The logo is the Triangle/Pyramid mark
 // (confirmed Nov 13, with the extra line that makes it read as a pyramid).
 // Photon portraits live at public/photons/<Name>.png (the twelve 1950s
-// superhero portraits, plus the teal crystalline Prism). The tile below is
-// only a fallback for a Photon with no portrait file yet.
+// superhero portraits; Prism is the 1950s superhero picture from the Labs
+// website, swapped in Nov 15, 2026, replacing the teal crystalline figure).
+// The tile below is only a fallback for a Photon with no portrait file yet.
 
 export const TRIANGLE_SVG = `<svg viewBox="0 0 100 100" aria-hidden="true"><path d="M50 12 L92 88 L8 88 Z" fill="none" stroke="currentColor" stroke-width="7" stroke-linejoin="round"/><path d="M28 62 L72 62" stroke="currentColor" stroke-width="6" stroke-linecap="round"/><circle cx="50" cy="78" r="5" fill="currentColor"/></svg>`;
 

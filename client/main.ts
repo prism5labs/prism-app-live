@@ -2,7 +2,7 @@
 // No provider or model names appear anywhere in the visible copy.
 
 import { api, getAccountId } from "./api";
-import { logoHtml, portraitHtml } from "./ui";
+import { portraitHtml } from "./ui";
 import { SUPERNOVA, SATELLITE, UPKEEP, PRODUCTS, CATEGORIES, photonBuyUrl } from "../src/shared/catalog";
 import { TIER_COPY, UPKEEP_COPY } from "../src/shared/tiers";
 import { PHOTONS } from "../src/shared/photons";
@@ -19,6 +19,15 @@ let storeOpen: Record<string, boolean> = { photons: true, sparks: false, plugs: 
 let threadMessages: any[] = [];
 let threadLoading = false;
 let toastTimer: number | null = null;
+
+const SEND_SVG = `<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 20V6M6 11l6-6 6 6" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+
+const NAV_ICONS: Record<Tab, string> = {
+  chat: `<svg viewBox="0 0 24 24" fill="none"><path d="M21 12a8 8 0 0 1-8 8H4l2-3a8 8 0 1 1 15-5Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>`,
+  inboxes: `<svg viewBox="0 0 24 24" fill="none"><path d="M3 13h5l2 3h4l2-3h5M4 6h16a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>`,
+  store: `<svg viewBox="0 0 24 24" fill="none"><path d="M4 7h16l-1.5 12a1 1 0 0 1-1 .9h-11a1 1 0 0 1-1-.9L4 7Z M8 10V6a4 4 0 0 1 8 0v4" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>`,
+  upkeep: `<svg viewBox="0 0 24 24" fill="none"><path d="M12 3l2.2 5.3L20 9l-4 4 1 5.7L12 16l-5 2.7L8 13 4 9l5.8-.7L12 3Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>`,
+};
 
 const view = () => document.getElementById("view") as HTMLElement;
 const nav = () => document.getElementById("nav") as HTMLElement;
@@ -71,28 +80,26 @@ function photonCard(p: any, size = 220): string {
 // ---------- Chat front page ----------
 function renderChatFront(): string {
   const owned = (state?.photons || []).filter((p: any) => p.owned);
-  const displayName = state?.displayName || "Prism 5";
   const customName = state?.customName || "";
   const ownedHtml =
     owned.length > 0
       ? `<div class="photon-grid">${owned.map((p: any) => photonCard(p)).join("")}</div>`
-      : `<div class="empty-panel">
-          <div class="empty-mark">${logoHtml(26)}</div>
-          <p class="empty-title">Nothing to talk to yet.</p>
+      : `<div class="card empty-panel">
+          <div class="card-head"><img class="mark" src="/brand/gem.jpg" alt=""><h2>Nothing to talk to yet.</h2></div>
           <p>There is no one to talk to here yet. A Launch is what gives this app a personality. Grab a Spark and run it, or pick up a Photon, and you will have someone on the line.</p>
-          <div class="row">
-            <button class="btn primary" data-action="goto" data-tab="store">Visit the Store</button>
-            <button class="btn" data-action="goto" data-tab="upkeep">Redeem a code</button>
-          </div>
+          <button class="btn store-outline store-btn" data-action="goto" data-tab="store">Visit the Store</button>
+          <div class="redeem-row"><button class="btn" data-action="goto" data-tab="upkeep">Redeem a code</button></div>
         </div>`;
   return `
   <section class="front">
-    <div class="hero">
-    <div class="logo-plate">${logoHtml(84)}</div>
-    <h1 class="app-name">${esc(displayName)}</h1>
-    <p class="app-sub">Prism 5 Labs</p>
-    <p class="greeting">Howdy, <span class="greeting-accent">neighbor!</span></p>
-    <p class="front-lede">One assistant that does it all, and becomes a second you. Pick a Photon and start talking.</p>
+    <div class="sputnik-hero">
+      <img class="sp-img" src="/brand/sputnik.jpg" alt="Sputnik emblem — gold crystal and orbit rings on deep teal, PRISM 5 LABS in gold">
+      <span class="round-portrait-wrap">${portraitHtml("Prism", 104)}</span>
+    </div>
+    <div class="front-body">
+      <h3 class="greeting">Howdy, <span class="greeting-accent">neighbor!</span></h3>
+      <p class="tagline">Truly Atomic AI Assistants</p>
+      <p class="front-lede">One assistant that does it all, and becomes a second you. Pick a Photon and start talking.</p>
     </div>
     ${ownedHtml}
     <div class="card make-yours">
@@ -104,7 +111,9 @@ function renderChatFront(): string {
         ${customName ? `<button class="btn" type="button" data-action="clear-name">Clear</button>` : ""}
       </form>
     </div>
-    <p class="fine">${esc(meterLine())}. Upkeep is $29 a month for unlimited chat, updates, priority support, and live voice calls.</p>
+    <div class="meter">${esc(meterLine())}${meterBar()}</div>
+    <p class="fine">Upkeep is $29 a month for unlimited chat, updates, priority support, and live voice calls.</p>
+    <div class="mission-strip">Let us handle the noise so you can focus on what you want and need to do.</div>
   </section>`;
 }
 
@@ -112,32 +121,34 @@ function renderChatFront(): string {
 function renderChatThread(): string {
   const p = PHOTONS.find((x) => x.name === activePhoton);
   if (!p) return renderChatFront();
+  const botMsg = (text: string) =>
+    `<div class="msg bot">${portraitHtml(p.name, 26)}<div><p>${esc(text)}</p></div></div>`;
   const msgs = threadMessages.length
     ? threadMessages
-        .map(
-          (m: any) =>
-            `<div class="bubble ${m.role === "user" ? "mine" : "theirs"}"><p>${esc(m.content)}</p></div>`,
+        .map((m: any) =>
+          m.role === "user"
+            ? `<div class="msg user"><p>${esc(m.content)}</p></div>`
+            : botMsg(m.content),
         )
         .join("")
-    : `<div class="bubble theirs"><p>Howdy, neighbor! ${esc(p.name)} is on the line. Ask a real question, or start with what you need.</p></div>`;
+    : botMsg(`Howdy, neighbor! ${p.name} is on the line. Ask a real question, or start with what you need.`);
   return `
   <section class="thread">
-    <div class="thread-head thread-hero">
-      <div class="thread-head-row">
-        <button class="btn small" data-action="back-to-front">← All Photons</button>
-        <button class="btn small call" data-action="call" data-photon="${esc(p.name)}">Call · Upkeep</button>
-      </div>
-      ${portraitHtml(p.name, 220)}
+    <div class="thread-head">
+      <button class="back-btn" data-action="back-to-front">← All Photons</button>
+      ${portraitHtml(p.name, 38)}
       <div class="thread-title">
         <h2>${esc(p.name)}</h2>
-        <p>${esc(p.focus)}</p>
       </div>
+      <button class="btn small call" data-action="call" data-photon="${esc(p.name)}">Call · Upkeep</button>
+      <p class="thread-focus">${esc(p.focus)}</p>
     </div>
+    <div class="switchboard-strip"><img src="/brand/switchboard.jpg" alt=""><p><b>On Switchboard.</b> This Launch stays in touch with the rest of the Lab — first of its kind.</p></div>
     <div class="messages" id="messages">${msgs}</div>
     <div id="chat-error" class="chat-error" hidden></div>
     <form id="chat-form" class="composer">
       <input id="chat-input" type="text" placeholder="Ask ${esc(p.name)} anything…" autocomplete="off" aria-label="Message">
-      <button class="btn cherry" type="submit">${logoHtml(15)}Send</button>
+      <button class="send" type="submit" aria-label="Send message">${SEND_SVG}</button>
     </form>
     <p class="fine">${esc(meterLine())}</p>
   </section>`;
@@ -252,6 +263,7 @@ function renderInboxes(): string {
   <section>
     <h1 class="page-title">Inboxes</h1>
     <p class="page-lede">Your three Gmail accounts, side by side. Drafts you save here land in that account's Gmail drafts.</p>
+    <div class="switchboard-strip"><img src="/brand/switchboard.jpg" alt=""><p><b>On Switchboard.</b> Inboxes is where Switchboard lives — every Launch in the Lab, one board.</p></div>
     ${state?.inboxError ? `<p class="chat-error">${esc(state.inboxError)}</p>` : ""}
     <div class="inbox-grid">${cards}</div>
   </section>`;
@@ -296,7 +308,7 @@ function renderStore(): string {
     const owned = allOwned || ownedPhotons.includes(p.name);
     return `<div class="card product-card photon-store">
       ${portraitHtml(p.name, 220)}
-      <h3>${esc(p.name)}</h3>
+      <h3 class="photon-name">${esc(p.name)}</h3>
       <p>${esc(p.tagline)}</p>
       <p class="fine">${esc(p.focus)} And so much more.</p>
       <p class="price">$499.00 <span class="fine">($514.00 at checkout)</span></p>
@@ -309,8 +321,8 @@ function renderStore(): string {
 
   return `
   <section>
-    <h1 class="page-title">Store</h1>
-    <p class="page-lede">Buy a Launch once and it is yours forever. Checkout shows the full total, including the standard 3% processing fee.</p>
+    <div class="store-head"><img src="/brand/starburst.jpg" alt=""><div><h1 class="page-title">Store</h1><p>Buy a Launch once and it is yours forever. Checkout shows the full total, including the standard 3% processing fee.</p></div></div>
+    <div class="chrome-thin"></div>
 
     <div class="store-jump" aria-label="Jump to a section">
       <a href="#store-supernova">Supernova</a>
@@ -320,33 +332,18 @@ function renderStore(): string {
       <a href="#store-sparks-plugs">Sparks &amp; Plugs</a>
     </div>
 
-    <div class="card tier-card tier-hero" id="store-supernova">
-      <h2>Supernova</h2>
-      <p>${esc(TIER_COPY.supernova.body)}</p>
-      <p class="fine">${esc(TIER_COPY.supernova.hours)}</p>
-      <p class="price">$499.00 <span class="fine">($514.00 at checkout)</span></p>
-      <div class="row">${buyButton(SUPERNOVA.url, "$514.00", allOwned || ownedProducts.includes("supernova"))}</div>
-      <p class="fine">Or pay monthly:</p>
-      <div class="row">
-        <a class="btn" href="${esc(SUPERNOVA.monthly.url)}" target="_blank" rel="noopener">$49/mo</a>
-        <a class="btn" href="${esc(SUPERNOVA.twoYear.url)}" target="_blank" rel="noopener">$39/mo · 2-year</a>
-        <a class="btn" href="${esc(SUPERNOVA.annual.url)}" target="_blank" rel="noopener">$539/yr</a>
-      </div>
-    </div>
+    <h2 class="section-title">Launches</h2>
+    <div class="poster-row" id="store-supernova"><img src="/brand/poster-supernova.jpg" alt="Supernova poster — $499 one-time, the whole front office"><div class="pr-txt"><b>Supernova</b><span class="desc">${esc(TIER_COPY.supernova.body)}</span><span class="desc">${esc(TIER_COPY.supernova.hours)}</span><span class="price">$499.00</span><span class="at">$514.00 at checkout</span>${buyButton(SUPERNOVA.url, "$514.00", allOwned || ownedProducts.includes("supernova"))}<p class="fine">Or pay monthly:</p><div class="row monthly-row">
+        <a class="btn small" href="${esc(SUPERNOVA.monthly.url)}" target="_blank" rel="noopener">$49/mo</a>
+        <a class="btn small" href="${esc(SUPERNOVA.twoYear.url)}" target="_blank" rel="noopener">$39/mo · 2-year</a>
+        <a class="btn small" href="${esc(SUPERNOVA.annual.url)}" target="_blank" rel="noopener">$539/yr</a>
+      </div></div></div>
 
-    <div class="card tier-card" id="store-satellite">
-      <h2>Satellite</h2>
-      <p>${esc(TIER_COPY.satellite.body)}</p>
-      <p class="fine">${esc(TIER_COPY.satellite.hours)}</p>
-      <p class="price">$99.00 <span class="fine">($101.97 at checkout)</span></p>
-      <div class="row">${buyButton(SATELLITE.url, "$101.97", allOwned || ownedProducts.includes("satellite"))}</div>
-      <p class="fine">Or pay monthly:</p>
-      <div class="row">
-        <a class="btn" href="${esc(SATELLITE.monthly.url)}" target="_blank" rel="noopener">$33/mo</a>
-        <a class="btn" href="${esc(SATELLITE.twoYear.url)}" target="_blank" rel="noopener">$26/mo · 2-year</a>
-        <a class="btn" href="${esc(SATELLITE.annual.url)}" target="_blank" rel="noopener">$363/yr</a>
-      </div>
-    </div>
+    <div class="poster-row" id="store-satellite"><img src="/brand/poster-satellite.jpg" alt="Satellite poster — $99 one-time, one Brain, one Face, one job duty"><div class="pr-txt"><b>Satellite</b><span class="desc">${esc(TIER_COPY.satellite.body)}</span><span class="desc">${esc(TIER_COPY.satellite.hours)}</span><span class="price">$99.00</span><span class="at">$101.97 at checkout</span>${buyButton(SATELLITE.url, "$101.97", allOwned || ownedProducts.includes("satellite"))}<p class="fine">Or pay monthly:</p><div class="row monthly-row">
+        <a class="btn small" href="${esc(SATELLITE.monthly.url)}" target="_blank" rel="noopener">$33/mo</a>
+        <a class="btn small" href="${esc(SATELLITE.twoYear.url)}" target="_blank" rel="noopener">$26/mo · 2-year</a>
+        <a class="btn small" href="${esc(SATELLITE.annual.url)}" target="_blank" rel="noopener">$363/yr</a>
+      </div></div></div>
 
     <details class="store-group" id="store-photons" ${storeOpen.photons ? "open" : ""}>
       <summary><span class="summary-title">Meet the Photons</span><span class="fine">12 Supernovas · tap to hide</span></summary>
@@ -354,12 +351,7 @@ function renderStore(): string {
       <div class="product-grid">${photonCards}</div>
     </details>
 
-    <div class="card tier-card" id="store-upkeep">
-      <h2>Upkeep</h2>
-      <p>${esc(UPKEEP_COPY.body)}</p>
-      <p class="price">$29.00/month <span class="fine">($29.87 at checkout)</span></p>
-      <div class="row">${buyButton(UPKEEP.url, "$29.87", state?.upkeep === true)}</div>
-    </div>
+    <div class="card upkeep-card" id="store-upkeep"><img src="/brand/starburst.jpg" alt=""><div><h2>Upkeep</h2><p>${esc(UPKEEP_COPY.body)}</p><p class="price">$29.00/month <span class="fine">($29.87 at checkout)</span></p><div class="row">${buyButton(UPKEEP.url, "$29.87", state?.upkeep === true)}</div></div></div>
 
     <h2 class="section-title" id="store-sparks-plugs">Sparks &amp; Plugs</h2>
     <p class="page-lede">One job each. A Spark is a single button for one job, push it and it does the thing. A Plug is a Spark that runs on its own.</p>
@@ -370,6 +362,7 @@ function renderStore(): string {
     <details class="store-group" id="store-sparks" ${storeOpen.sparks ? "open" : ""}>
       <summary><span class="summary-title">Sparks</span><span class="fine">${sparkCount} · one button, one job · tap to browse</span></summary>
       <p class="page-lede">${esc(TIER_COPY.spark.body)} ${esc(TIER_COPY.spark.hours)}</p>
+      <div class="addon-row featured"><div><b>Personality Builder</b><span>Spark · Personal $19 · Business $25</span><span class="pb-desc">The extra attribute that builds a personality for your interface — for a Spark or Plug that doesn't come with one.</span></div><div class="price">$19–$25</div></div>
       ${kindGroups("Spark")}
     </details>
     <details class="store-group" id="store-plugs" ${storeOpen.plugs ? "open" : ""}>
@@ -377,6 +370,7 @@ function renderStore(): string {
       <p class="page-lede">${esc(TIER_COPY.plug.body)} ${esc(TIER_COPY.plug.hours)}</p>
       ${kindGroups("Plug")}
     </details>
+    <div class="store-foot">Let us handle the noise so you can focus on what you want and need to do.<br>© 2026 Prism 5 Labs · Green Bay, Wisconsin</div>
   </section>`;
 }
 
@@ -418,7 +412,9 @@ function renderUpkeep(): string {
       <div class="row"><button class="btn primary" data-action="goto" data-tab="store">Go to the Store</button></div>
     </div>
 
-    <div class="card">
+    <div class="card upkeep-card">
+      <img src="/brand/starburst.jpg" alt="">
+      <div>
       <h2>Upkeep — $29 a month</h2>
       <ul class="included-list">${UPKEEP_COPY.included.map((i) => `<li>${esc(i)}</li>`).join("")}</ul>
       ${
@@ -427,6 +423,7 @@ function renderUpkeep(): string {
           : `<a class="btn primary" href="${esc(UPKEEP.url)}" target="_blank" rel="noopener">Buy Upkeep — $29.87</a>`
       }
       <p class="fine">Upkeep is never required to use what you bought.</p>
+      </div>
     </div>
   </section>`;
 }
@@ -442,9 +439,11 @@ function renderNav() {
   nav().innerHTML = tabs
     .map(
       (t) =>
-        `<button class="nav-btn ${tab === t.id ? "active" : ""}" data-action="goto" data-tab="${t.id}">${t.label}</button>`,
+        `<button class="nav-btn ${tab === t.id ? "active" : ""}" data-action="goto" data-tab="${t.id}">${NAV_ICONS[t.id]}${t.label}</button>`,
     )
     .join("");
+  const headerName = document.getElementById("app-header-name");
+  if (headerName) headerName.textContent = state?.displayName || "Prism 5";
 }
 
 function render() {

@@ -1,25 +1,27 @@
-/* Prism 5 — diner palette C, premium diner look.
-   Cream, teal, cherry, butter, ink. Patua One headlines, Libre Franklin
-   body, IBM Plex Mono labels. The brand should be unmistakable on every
-   tab: deep teal hero panels, the gold triangle mark everywhere it matters,
-   butter glow, generous rounded corners (24px), true pill nav. */
+/* Prism 5 — Direction B, "Atomic Clean" (V2 redesign, Nov 15, 2026).
+   The same real brand art as Direction A, hung quietly: cream gallery
+   ground, sputnik emblem banner, gem signature, posters as thumbnails.
+   Patua One display, Nunito body. No atomic badge anywhere (Nov 15 ruling);
+   the Starburst is the seal. No EST. 1955 (invented date, left out). */
 
 :root {
   --cream: #FFF3DC;
   --teal: #0F5257;
-  --teal-dark: #0A3A3E;
+  --teal-deep: #0A3A3E;
   --cherry: #D62828;
   --cherry-dark: #B01E1E;
   --butter: #F4C95D;
-  --butter-soft: #F8D67F;
   --ink: #2E2620;
-  --ink-soft: #5C5148;
+  --ink-soft: #5C5142;
+  --muted: #6B5D4A;
+  --muted-2: #7A6A52;
   --card: #FFFDF6;
-  --line: #E8D9B8;
-  --radius: 24px;
-  --shadow: 0 2px 10px rgba(46, 38, 32, 0.10);
-  --shadow-lift: 0 10px 24px rgba(46, 38, 32, 0.14);
-  --shadow-teal: 0 14px 34px rgba(10, 58, 62, 0.35);
+  --line: #E9DCBC;
+  --card-line: #E4D3AC;
+  --field-line: #D9C48C;
+  --teal-soft: #DDEBE7;
+  --meter-track: #EBDCB4;
+  --radius: 16px;
 }
 
 * { box-sizing: border-box; }
@@ -27,11 +29,9 @@
 html, body { margin: 0; padding: 0; }
 
 body {
-  background:
-    radial-gradient(1200px 380px at 50% -120px, rgba(244, 201, 93, 0.38), transparent 62%),
-    var(--cream);
+  background: var(--cream);
   color: var(--ink);
-  font-family: "Libre Franklin", -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-family: "Nunito", -apple-system, "Segoe UI", Roboto, sans-serif;
   font-size: 16px;
   line-height: 1.5;
   min-height: 100vh;
@@ -53,37 +53,38 @@ h4 { font-size: 15px; }
 p { margin: 0 0 10px; }
 a { color: var(--teal); }
 
-/* ---------- Sticky brand header: deep teal, gold triangle, diner strip ---------- */
+/* ---------- Sticky brand header: gallery style, gem signature ---------- */
 .app-top { position: sticky; top: 0; z-index: 40; }
 .app-header {
-  background: var(--teal);
-  color: var(--cream);
+  background: var(--card);
+  color: var(--teal);
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 10px 16px;
-  box-shadow: 0 4px 16px rgba(10, 58, 62, 0.35);
+  gap: 9px;
+  padding: 14px 18px 4px;
 }
-.app-header-mark { width: 26px; height: 26px; color: var(--butter); flex: none; }
-.app-header-mark svg { width: 100%; height: 100%; display: block; }
+.app-header-mark { width: 30px; height: 34px; object-fit: cover; border-radius: 7px; flex: none; }
 .app-header-name {
   font-family: "Patua One", Georgia, serif;
-  font-size: 20px;
-  letter-spacing: 0.5px;
+  font-size: 1.18rem;
+  font-weight: 400;
+  color: var(--teal);
   line-height: 1;
 }
 .app-header-tag {
   margin-left: auto;
-  font-family: "IBM Plex Mono", ui-monospace, monospace;
-  font-size: 11px;
-  letter-spacing: 1.5px;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: rgba(255, 243, 220, 0.7);
+  color: #9A8A6C;
+  text-align: right;
   white-space: nowrap;
 }
-.diner-strip {
-  height: 5px;
-  background: repeating-linear-gradient(90deg, var(--butter) 0 14px, var(--cherry) 14px 28px);
+.chrome-thin {
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #C9CDD1 20%, #8E959B 50%, #C9CDD1 80%, transparent);
+  margin: 8px 20px 0;
 }
 @media (max-width: 420px) { .app-header-tag { display: none; } }
 
@@ -93,58 +94,55 @@ a { color: var(--teal); }
   padding: 20px 16px 120px;
 }
 
-/* Page titles carry the mark: butter underline plus a small cherry triangle. */
-.page-title {
-  display: inline-block;
-  border-bottom: 3px solid var(--butter);
-  padding-bottom: 4px;
-}
-.page-title::after {
-  content: "";
-  display: inline-block;
-  width: 18px;
-  height: 18px;
-  margin-left: 10px;
-  vertical-align: -2px;
-  background: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20100%20100'%3E%3Cpath%20d='M50%2012%20L92%2088%20L8%2088%20Z'%20fill='none'%20stroke='%23D62828'%20stroke-width='7'%20stroke-linejoin='round'/%3E%3Cpath%20d='M28%2062%20L72%2062'%20stroke='%23D62828'%20stroke-width='6'%20stroke-linecap='round'/%3E%3C/svg%3E") no-repeat center / contain;
-}
+/* Page titles: plain Patua, ink. Section titles: small caps Nunito. */
+.page-title { color: var(--ink); }
 .page-lede { color: var(--ink-soft); font-size: 15px; }
-.section-title { margin-top: 28px; border-bottom: 2px solid var(--line); padding-bottom: 6px; }
+.section-title {
+  margin: 18px 0 10px;
+  font-family: "Nunito", sans-serif;
+  font-weight: 800;
+  font-size: 0.8rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
 .fine { color: var(--ink-soft); font-size: 13px; }
 .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
 
-/* Buttons: generous pills. */
+/* Buttons: light pills, Nunito 800. */
 .btn {
   display: inline-block;
-  background: var(--card);
+  background: #fff;
   color: var(--teal);
-  border: 2px solid var(--teal);
+  border: 1.5px solid var(--teal);
   border-radius: 999px;
   padding: 10px 18px;
-  font-family: "IBM Plex Mono", ui-monospace, monospace;
-  font-size: 14px;
-  font-weight: 600;
+  font-family: "Nunito", sans-serif;
+  font-size: 0.9rem;
+  font-weight: 800;
   text-decoration: none;
   cursor: pointer;
-  transition: background 0.15s, transform 0.15s, box-shadow 0.15s;
+  transition: background 0.15s, transform 0.15s;
 }
-.btn:hover { background: var(--butter); }
+.btn:hover { background: var(--teal-soft); }
 .btn:active { transform: scale(0.97); }
-.btn.primary { background: var(--teal); color: var(--cream); }
-.btn.primary:hover { background: var(--teal-dark); }
-.btn.cherry { background: var(--cherry); border-color: var(--cherry); color: var(--cream); }
+.btn.primary { background: var(--teal); color: #fff; border-color: var(--teal); }
+.btn.primary:hover { background: var(--teal-deep); }
+.btn.cherry { background: var(--cherry); border-color: var(--cherry); color: #fff; }
 .btn.cherry:hover { background: var(--cherry-dark); }
+.btn.store-outline { background: transparent; color: var(--cherry); border: 1.5px solid var(--cherry); }
+.btn.store-outline:hover { background: #FDECEC; }
 .btn.small { padding: 6px 12px; font-size: 13px; }
 .btn:disabled { opacity: 0.5; cursor: default; }
 .btn .logo-mark { display: inline-block; vertical-align: -2px; margin-right: 5px; }
 
 input, textarea {
-  font-family: "Libre Franklin", sans-serif;
+  font-family: "Nunito", sans-serif;
   font-size: 16px;
   color: var(--ink);
   background: #fff;
-  border: 2px solid var(--line);
-  border-radius: var(--radius);
+  border: 1.5px solid var(--field-line);
+  border-radius: 12px;
   padding: 10px 14px;
   flex: 1 1 200px;
   min-width: 0;
@@ -152,89 +150,73 @@ input, textarea {
 input:focus, textarea:focus { outline: 2px solid var(--teal); outline-offset: 1px; }
 textarea { width: 100%; resize: vertical; }
 
-/* Cards and panels: generously rounded, warm white, butter top edge. */
+/* Cards: light paper, hairline border, no shadow. */
 .card {
   background: var(--card);
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  box-shadow: var(--shadow);
-  padding: 18px;
+  padding: 14px 16px;
   margin: 0 0 16px;
 }
+.card h2, .card h3 {
+  font-family: "Nunito", sans-serif;
+  font-weight: 800;
+  font-size: 0.95rem;
+  color: var(--teal);
+}
+.card-head { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
+.card-head img.mark { width: 34px; height: 38px; object-fit: cover; border-radius: 8px; flex: none; }
+.card-head h2, .card-head h3 { margin: 0; }
 
-/* Front page. */
+/* ---------- Front page: sputnik banner, medallion portrait ---------- */
 .front { text-align: center; }
-/* Deep-teal hero: the brand, front and center. Huge two-tone headline,
-   butter-glow logo plate, a faint oversized triangle watermark. */
-.hero {
-  background: linear-gradient(160deg, var(--teal) 0%, var(--teal-dark) 100%);
-  border-radius: 32px;
-  padding: 30px 20px 26px;
-  margin: 6px 0 20px;
-  box-shadow: var(--shadow-teal);
-  position: relative;
-  overflow: hidden;
+.sputnik-hero { position: relative; margin: 16px 16px 0; }
+.sputnik-hero .sp-img {
+  width: 100%;
+  height: 172px;
+  object-fit: cover;
+  object-position: center 22%;
+  display: block;
+  border-radius: 18px;
 }
-.hero::before {
-  content: "";
+.round-portrait-wrap {
   position: absolute;
-  right: -34px;
-  bottom: -44px;
-  width: 190px;
-  height: 190px;
-  background: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20100%20100'%3E%3Cpath%20d='M50%2012%20L92%2088%20L8%2088%20Z'%20fill='none'%20stroke='%23F4C95D'%20stroke-width='7'%20stroke-linejoin='round'/%3E%3Cpath%20d='M28%2062%20L72%2062'%20stroke='%23F4C95D'%20stroke-width='6'%20stroke-linecap='round'/%3E%3C/svg%3E") no-repeat center / contain;
-  opacity: 0.14;
-  transform: rotate(8deg);
+  left: 50%;
+  bottom: -38px;
+  transform: translateX(-50%);
 }
-.hero > * { position: relative; z-index: 1; }
-.hero .logo-plate {
-  background: rgba(255, 243, 220, 0.10);
-  border: 2px solid rgba(244, 201, 93, 0.65);
-  box-shadow: 0 0 0 6px rgba(244, 201, 93, 0.14), 0 10px 26px rgba(0, 0, 0, 0.30);
+.round-portrait-wrap .portrait {
+  border-radius: 50%;
+  border: 3px solid var(--cream);
+  box-shadow: 0 0 0 2px var(--teal), 0 10px 22px rgba(46, 38, 32, 0.22);
 }
-.hero .app-name { color: var(--cream); font-size: 42px; }
-.hero .app-sub { color: rgba(255, 243, 220, 0.72); }
-.hero .greeting { color: var(--cream); font-size: 30px; }
-.greeting-accent { color: var(--butter); }
-.hero .front-lede { color: rgba(255, 243, 220, 0.88); }
-.logo-plate {
-  width: 132px;
-  height: 132px;
-  margin: 8px auto 14px;
-  background: var(--teal);
-  border-radius: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: var(--shadow);
+.front-body { padding: 48px 24px 0; text-align: center; }
+.greeting { font-family: "Patua One", Georgia, serif; font-size: 1.6rem; color: var(--ink); margin: 0 0 2px; }
+.greeting-accent { color: var(--ink); }
+.tagline { margin: 0; font-size: 0.88rem; font-weight: 700; color: var(--muted-2); }
+.front-lede { max-width: 480px; margin: 10px auto 0; color: var(--ink-soft); font-size: 0.95rem; }
+.make-yours { text-align: left; margin-top: 16px; }
+.make-yours p { font-size: 0.83rem; color: var(--ink-soft); }
+.empty-panel { text-align: left; }
+.empty-panel p { font-size: 0.83rem; color: var(--ink-soft); }
+.empty-panel .store-btn { width: 100%; font-size: 1rem; padding: 13px; margin-top: 4px; }
+.empty-panel .redeem-row { display: flex; gap: 8px; margin-top: 10px; }
+.meter { font-size: 0.78rem; font-weight: 700; color: var(--muted-2); text-align: center; margin-top: 14px; }
+.meter-bar { height: 7px; border-radius: 99px; background: var(--meter-track); overflow: hidden; margin-top: 5px; }
+.meter-fill { display: block; height: 100%; background: var(--teal); border-radius: 99px; }
+.mission-strip {
+  background: var(--teal-deep);
+  color: #FFF3DC;
+  text-align: center;
+  font-size: 0.74rem;
+  font-weight: 700;
+  line-height: 1.45;
+  padding: 10px 16px;
+  border-radius: 12px;
+  margin-top: 16px;
 }
-.logo-plate .logo-mark { display: block; width: 84px; height: 84px; }
-.logo-plate .logo-mark svg { width: 100%; height: 100%; display: block; }
-.app-name { font-size: 38px; margin-bottom: 0; }
-.app-sub {
-  font-family: "IBM Plex Mono", ui-monospace, monospace;
-  color: var(--ink-soft);
-  font-size: 13px;
-  letter-spacing: 2px;
-  text-transform: uppercase;
-  margin-bottom: 18px;
-}
-.greeting { font-family: "Patua One", Georgia, serif; font-size: 22px; color: var(--cherry); margin-bottom: 6px; }
-.front-lede { max-width: 480px; margin: 0 auto 20px; color: var(--ink-soft); }
-.make-yours { text-align: left; margin-top: 22px; }
-.empty-panel {
-  border: 2px dashed var(--butter);
-  border-radius: var(--radius);
-  padding: 22px 18px;
-  margin: 0 0 16px;
-  background: var(--card);
-}
-.empty-mark { color: var(--cherry); margin-bottom: 4px; }
-.empty-mark .logo-mark { display: inline-block; }
-.empty-title { font-family: "Patua One", Georgia, serif; font-size: 20px; color: var(--teal); margin-bottom: 6px; }
 
-/* Photon grid: arched portraits with a butter glow, like framed photos
-   on the diner wall. */
+/* Photon grid: simple gallery cards, portraits carry the 1950s. */
 .photon-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
@@ -245,105 +227,120 @@ textarea { width: 100%; resize: vertical; }
   background: var(--card);
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  box-shadow: var(--shadow);
   padding: 14px 10px;
   cursor: pointer;
   text-align: center;
   font-family: inherit;
-  transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s;
+  transition: transform 0.15s, border-color 0.15s;
 }
-.photon-card:hover { border-color: var(--cherry); transform: translateY(-2px); box-shadow: var(--shadow-lift); }
+.photon-card:hover { border-color: var(--teal); transform: translateY(-2px); }
 .photon-card:disabled { opacity: 0.55; cursor: default; }
 .photon-card .portrait {
   display: block;
   margin: 0 auto 8px;
-  border-radius: 999px 999px 20px 20px;
-  border: 3px solid var(--teal);
-  box-shadow: 0 8px 20px rgba(244, 201, 93, 0.55);
+  border-radius: 16px;
 }
-.photon-name { display: block; font-family: "Patua One", Georgia, serif; font-size: 17px; color: var(--teal); }
+.photon-name { display: block; font-family: "Nunito", sans-serif; font-weight: 800; font-size: 0.92rem; color: var(--ink); }
 .photon-tag { display: block; font-size: 12px; color: var(--ink-soft); line-height: 1.35; margin-top: 4px; }
 .portrait { display: inline-block; border-radius: 24px; overflow: hidden; flex: none; }
 .portrait img, .portrait svg { display: block; width: 100%; height: 100%; object-fit: cover; }
 
-/* Chat thread: the diner counter. The head is a deep-teal panel with the
-   Photon large in an arched, butter-ringed frame; the messages sit on a
-   defined counter panel; Send is cherry with the triangle mark. */
+/* ---------- Chat thread: gallery-quiet, Claude-style replies ---------- */
 .thread-head {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin-bottom: 14px;
   flex-wrap: wrap;
-}
-.thread-hero {
-  background: linear-gradient(160deg, var(--teal), var(--teal-dark));
-  border-radius: var(--radius);
-  padding: 14px;
-  box-shadow: var(--shadow-teal);
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
+  row-gap: 2px;
   gap: 10px;
+  padding: 12px 16px 10px;
+  border-bottom: 2px solid;
+  border-image: linear-gradient(90deg, transparent, #B9BDC2, #7E858C, #B9BDC2, transparent) 1;
 }
-.thread-head-row {
+.thread-head .portrait {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1.5px var(--teal);
+}
+.thread-head .back-btn {
+  background: none;
+  border: none;
+  color: var(--teal);
+  font-family: "Nunito", sans-serif;
+  font-size: 0.9rem;
+  font-weight: 800;
+  cursor: pointer;
+  padding: 6px;
+  flex: none;
+}
+.thread-head .btn.call { margin-left: auto; }
+.thread-title { flex: 1 1 100px; min-width: 0; }
+.thread-title h2 {
+  font-family: "Nunito", sans-serif;
+  font-weight: 800;
+  font-size: 0.95rem;
+  color: var(--ink);
+  margin-bottom: 0;
+}
+.thread-focus { flex: 1 1 100%; margin: 0; font-size: 0.72rem; color: var(--muted-2); font-weight: 700; }
+.switchboard-strip {
   display: flex;
-  justify-content: space-between;
-  width: 100%;
+  align-items: center;
+  gap: 10px;
+  background: none;
+  border-bottom: 1px solid #EFE3C2;
+  padding: 7px 12px;
 }
-.thread-hero h2 { color: var(--cream); }
-.thread-hero p { color: rgba(255, 243, 220, 0.82); }
-.thread-hero .portrait {
-  border: 3px solid var(--butter);
-  border-radius: 999px 999px 18px 18px;
-  box-shadow: 0 6px 18px rgba(244, 201, 93, 0.45);
-}
-.thread-hero .btn.call { background: var(--butter); border-color: var(--butter); color: var(--ink); }
-.thread-hero .btn.call:hover { background: var(--butter-soft); }
-.thread-hero .btn.small:not(.call) {
-  background: transparent;
-  border-color: rgba(255, 243, 220, 0.6);
-  color: var(--cream);
-}
-.thread-hero .btn.small:not(.call):hover { background: rgba(255, 243, 220, 0.15); }
-.thread-title { flex: 1 1 140px; min-width: 0; }
-.thread-title h2 { margin-bottom: 0; }
-.thread-title p { margin: 0; font-size: 13px; color: var(--ink-soft); }
+.switchboard-strip img { width: 40px; height: 44px; object-fit: cover; object-position: top; border-radius: 7px; flex: none; }
+.switchboard-strip p { margin: 0; font-size: 0.7rem; font-weight: 700; color: var(--muted-2); line-height: 1.35; }
+.switchboard-strip p b { color: var(--teal); }
 .messages {
   display: flex;
   flex-direction: column;
   gap: 10px;
   max-height: 55vh;
   overflow-y: auto;
-  padding: 14px 10px;
+  padding: 16px 14px;
   margin-bottom: 12px;
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
 }
-.bubble {
-  max-width: 82%;
-  padding: 12px 16px;
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
-}
-.bubble p { margin: 0; white-space: pre-wrap; word-break: break-word; }
-.bubble.mine {
+.msg { max-width: 88%; font-size: 0.9rem; line-height: 1.45; }
+.msg p { margin: 0; white-space: pre-wrap; word-break: break-word; }
+.msg.user {
   align-self: flex-end;
-  background: var(--teal);
-  color: var(--cream);
-  border-bottom-right-radius: 6px;
-  box-shadow: 0 2px 8px rgba(15, 82, 87, 0.25);
+  background: var(--teal-soft);
+  color: var(--ink);
+  border-radius: 18px 18px 4px 18px;
+  padding: 10px 13px;
 }
-.bubble.theirs {
+.msg.bot {
   align-self: flex-start;
-  background: #FFFDF6;
-  border: 1px solid var(--line);
-  border-bottom-left-radius: 6px;
+  display: flex;
+  gap: 9px;
+  padding: 2px 2px 2px 0;
 }
-.composer { display: flex; gap: 10px; }
-.composer input { border-radius: 999px; border-color: var(--teal); }
+.msg.bot .portrait {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  flex: none;
+  margin-top: 2px;
+}
+.composer { display: flex; gap: 8px; align-items: center; }
+.composer input { border-radius: 999px; }
+.composer .send {
+  border: none;
+  cursor: pointer;
+  border-radius: 50%;
+  width: 44px;
+  height: 44px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--teal);
+  color: #fff;
+}
+.composer .send svg { width: 19px; height: 19px; }
 .chat-error {
   background: #FDECEC;
   border: 1px solid var(--cherry);
@@ -354,86 +351,110 @@ textarea { width: 100%; resize: vertical; }
   font-size: 14px;
 }
 
-/* Store. */
-.tier-card h2 { font-size: 26px; }
-/* Supernova is the hero product: deep teal card, cream copy, butter price,
-   cherry buy button. */
-.tier-hero {
-  background: linear-gradient(160deg, var(--teal), var(--teal-dark));
-  border: 1px solid var(--teal-dark);
-  box-shadow: var(--shadow-teal);
+/* ---------- Store: posters as thumbnails, plain buying text ---------- */
+.store-head { padding: 16px 18px 2px; display: flex; align-items: center; gap: 10px; }
+.store-head img { width: 40px; height: 37px; object-fit: cover; border-radius: 10px; flex: none; }
+.store-head h1 { margin: 0; font-size: 1.35rem; color: var(--ink); }
+.store-head p { margin: 2px 0 0; font-size: 0.83rem; color: var(--ink-soft); font-weight: 600; }
+.poster-row {
+  display: flex;
+  gap: 12px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 10px;
+  margin-bottom: 10px;
+  align-items: flex-start;
 }
-.tier-hero h2 { color: var(--cream); }
-.tier-hero p { color: rgba(255, 243, 220, 0.88); }
-.tier-hero .fine { color: rgba(255, 243, 220, 0.65); }
-.tier-hero .price { color: var(--butter); }
-.tier-hero .btn.primary { background: var(--cherry); border-color: var(--cherry); color: var(--cream); }
-.tier-hero .btn.primary:hover { background: var(--cherry-dark); }
-.tier-hero .btn:not(.primary) {
-  background: transparent;
-  border-color: rgba(255, 243, 220, 0.6);
-  color: var(--cream);
+.poster-row img { width: 86px; height: 176px; object-fit: cover; object-position: top; border-radius: 10px; flex: none; }
+.poster-row .pr-txt { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.poster-row b { font-weight: 800; font-size: 0.95rem; }
+.poster-row .desc { font-size: 0.76rem; color: var(--ink-soft); margin: 2px 0 6px; line-height: 1.4; }
+.poster-row .price { font-weight: 800; font-size: 0.92rem; }
+.poster-row .at { font-size: 0.66rem; color: var(--muted-2); font-weight: 700; }
+.poster-row .btn { margin-top: auto; align-self: flex-start; }
+.poster-row .owned-badge { align-self: flex-start; }
+.poster-row .monthly-row { margin-top: 8px; }
+.poster-row .monthly-row .btn { margin-top: 0; }
+.price { font-family: "Nunito", sans-serif; font-weight: 800; font-size: 17px; color: var(--ink); }
+.price .fine { font-family: "Nunito", sans-serif; font-size: 13px; font-weight: 600; }
+.kind {
+  font-family: "Nunito", sans-serif;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--ink-soft);
 }
-.tier-hero .btn:not(.primary):hover { background: rgba(255, 243, 220, 0.15); }
-.price { font-family: "Patua One", Georgia, serif; font-size: 20px; color: var(--teal); }
-.price .fine { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 13px; }
-.kind { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 12px; letter-spacing: 1px; text-transform: uppercase; color: var(--ink-soft); }
 .product-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
   gap: 12px;
   margin-bottom: 8px;
 }
-.product-card { transition: transform 0.15s, box-shadow 0.15s; border-top: 3px solid var(--butter); }
-.product-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-lift); }
+.product-card { transition: transform 0.15s; }
+.product-card:hover { transform: translateY(-2px); }
 .product-card h3 { margin-bottom: 2px; }
 .product-card .portrait {
   display: block;
   margin: 0 auto 8px;
-  border-radius: 999px 999px 18px 18px;
-  border: 3px solid var(--teal);
+  border-radius: 16px;
 }
+/* Photon store cards: portrait fills the card top, name plain ink. */
+.photon-store { padding: 0 0 12px; overflow: hidden; text-align: center; }
+.photon-store .portrait {
+  width: 100% !important;
+  height: auto !important;
+  aspect-ratio: 1 / 1;
+  border-radius: 16px 16px 0 0;
+  margin: 0 0 8px;
+  display: block;
+}
+.photon-store .portrait img { object-position: top; }
+.photon-store h3 { margin-bottom: 2px; }
+.photon-store .photon-name { font-family: "Nunito", sans-serif; font-weight: 800; font-size: 0.92rem; color: var(--ink); }
+.photon-store p { padding: 0 12px; }
+.photon-store .price { padding: 0 12px; }
 .owned-badge {
   display: inline-block;
   background: var(--butter);
   color: var(--ink);
   border-radius: 999px;
   padding: 8px 14px;
-  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-family: "Nunito", sans-serif;
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 800;
 }
 .toggle { display: flex; gap: 8px; margin: 0 0 18px; }
 .toggle-btn {
   flex: 1;
   background: var(--card);
-  border: 2px solid var(--teal);
+  border: 1.5px solid var(--teal);
   color: var(--teal);
   border-radius: 999px;
   padding: 10px;
-  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-family: "Nunito", sans-serif;
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 800;
   cursor: pointer;
 }
-.toggle-btn.active { background: var(--teal); color: var(--cream); }
+.toggle-btn.active { background: var(--teal); color: #fff; }
 
-/* Store: jump chips and collapsible groups, so the page reads top to bottom
-   instead of one endless list. */
+/* Store: jump chips and collapsible groups. */
 .store-jump { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 18px; }
 .store-jump a {
   display: inline-block;
-  background: var(--card);
-  border: 2px solid var(--teal);
+  background: #fff;
+  border: 1.5px solid var(--teal);
   color: var(--teal);
   border-radius: 999px;
   padding: 7px 14px;
-  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-family: "Nunito", sans-serif;
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 800;
   text-decoration: none;
 }
-.store-jump a:hover { background: var(--butter); }
+.store-jump a:hover { background: var(--teal-soft); }
 .store-group { margin-bottom: 16px; }
 .store-group summary {
   cursor: pointer;
@@ -446,73 +467,100 @@ textarea { width: 100%; resize: vertical; }
 }
 .store-group summary::-webkit-details-marker { display: none; }
 .store-group summary .summary-title {
-  font-family: "Patua One", Georgia, serif;
-  font-size: 22px;
-  color: var(--teal);
+  font-family: "Nunito", sans-serif;
+  font-weight: 800;
+  font-size: 0.85rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink);
 }
 .store-group summary .summary-title::before { content: "▸ "; color: var(--cherry); }
 .store-group[open] summary .summary-title::before { content: "▾ "; }
 .cat-title {
-  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-family: "Nunito", sans-serif;
   font-size: 13px;
+  font-weight: 800;
   letter-spacing: 1px;
   text-transform: uppercase;
   color: var(--ink-soft);
   margin: 16px 0 8px;
 }
 
+/* Personality Builder: featured row, first in Sparks & Plugs. No checkout
+   link exists for it yet (Stripe links not created), so it shows price only. */
+.addon-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px 14px;
+  margin-bottom: 8px;
+}
+.addon-row.featured { border: 1.5px solid var(--cherry); background: #FFF8EA; }
+.addon-row b { font-size: 0.9rem; display: block; }
+.addon-row span { font-size: 0.72rem; color: var(--muted-2); font-weight: 700; }
+.addon-row .pb-desc { display: block; margin-top: 3px; line-height: 1.4; }
+.addon-row .price { font-weight: 800; white-space: nowrap; }
+
+/* Upkeep card: paper with a butter frame, Starburst seal. */
+.upkeep-card { border: 1.5px solid var(--butter); display: flex; gap: 12px; align-items: flex-start; }
+.upkeep-card img { width: 56px; height: 51px; object-fit: cover; border-radius: 12px; flex: none; }
+.upkeep-card b { font-family: "Nunito", sans-serif; font-weight: 800; font-size: 1.05rem; }
+.upkeep-card .price { font-size: 1.2rem; font-weight: 800; }
+.upkeep-card p { font-size: 0.82rem; margin: 5px 0 0; }
+.store-foot { text-align: center; font-size: 0.72rem; color: var(--muted-2); font-weight: 700; padding: 14px 10px 4px; }
+
 /* Inboxes. */
 .inbox-grid { display: grid; gap: 12px; }
 @media (min-width: 640px) { .inbox-grid { grid-template-columns: repeat(3, 1fr); } }
-.inbox-card { border-top: 3px solid var(--butter); }
 .inbox-card h3 { margin-bottom: 4px; }
 .inbox-msg { border-top: 1px solid var(--line); padding: 10px 0; }
-.inbox-subject { font-weight: 600; margin-bottom: 2px; }
+.inbox-subject { font-weight: 800; margin-bottom: 2px; }
 .inbox-meta { font-size: 12px; color: var(--ink-soft); margin-bottom: 4px; }
 .inbox-snippet { font-size: 14px; color: var(--ink-soft); }
 .draft-form { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
 .draft-form input, .draft-form textarea { flex: none; width: 100%; }
 
 /* Upkeep. */
-.meter-line { font-family: "IBM Plex Mono", ui-monospace, monospace; font-weight: 600; color: var(--teal); }
-.meter-bar { height: 14px; background: var(--teal-dark); border: 2px solid var(--teal); border-radius: 999px; overflow: hidden; margin: 8px 0; }
-.meter-fill { height: 100%; background: linear-gradient(90deg, var(--butter), var(--butter-soft)); border-radius: 999px; }
+.meter-line { font-family: "Nunito", sans-serif; font-weight: 800; color: var(--teal); }
 .owned-list, .included-list { margin: 0 0 12px; padding-left: 20px; }
 .owned-list li, .included-list li { margin-bottom: 4px; }
 
-/* Bottom nav: one diner counter bar, deep teal, butter active pill. */
+/* Bottom nav: gallery tab bar, paper with a hairline top edge. */
 .nav {
   position: fixed;
-  left: 50%;
-  transform: translateX(-50%);
-  bottom: 12px;
-  width: min(680px, calc(100% - 24px));
+  left: 0;
+  right: 0;
+  bottom: 0;
   display: flex;
-  gap: 6px;
-  justify-content: center;
-  padding: 6px;
-  padding-bottom: calc(6px + env(safe-area-inset-bottom));
-  background: var(--teal);
-  border: 2px solid rgba(244, 201, 93, 0.35);
-  border-radius: 999px;
-  box-shadow: 0 10px 28px rgba(10, 58, 62, 0.4);
+  gap: 4px;
+  background: var(--card);
+  border-top: 1px solid #E7D9B8;
+  padding: 8px 10px calc(10px + env(safe-area-inset-bottom));
   z-index: 40;
 }
 .nav-btn {
   flex: 1;
-  max-width: 160px;
-  background: transparent;
+  background: none;
   border: none;
-  color: rgba(255, 243, 220, 0.78);
-  border-radius: 999px;
-  padding: 11px 8px;
-  font-family: "IBM Plex Mono", ui-monospace, monospace;
-  font-size: 14px;
-  font-weight: 600;
   cursor: pointer;
-  transition: background 0.15s, color 0.15s;
+  font-family: "Nunito", sans-serif;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  color: #8A7B63;
+  padding: 6px 2px;
+  border-radius: 12px;
+  min-height: 44px;
 }
-.nav-btn.active { background: var(--butter); color: var(--ink); box-shadow: var(--shadow); }
+.nav-btn svg { width: 21px; height: 21px; }
+.nav-btn.active { color: var(--teal); }
 
 /* Toast. */
 .toast {
