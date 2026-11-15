@@ -77,6 +77,7 @@ function renderChatFront(): string {
     owned.length > 0
       ? `<div class="photon-grid">${owned.map((p: any) => photonCard(p)).join("")}</div>`
       : `<div class="empty-panel">
+          <div class="empty-mark">${logoHtml(26)}</div>
           <p class="empty-title">Your counter's empty.</p>
           <p>You don't own any Photons yet. Buy one in the Store, or redeem a code below.</p>
           <div class="row">
@@ -86,11 +87,13 @@ function renderChatFront(): string {
         </div>`;
   return `
   <section class="front">
+    <div class="hero">
     <div class="logo-plate">${logoHtml(84)}</div>
     <h1 class="app-name">${esc(displayName)}</h1>
     <p class="app-sub">Prism 5 Labs</p>
-    <p class="greeting">Howdy, neighbor!</p>
+    <p class="greeting">Howdy, <span class="greeting-accent">neighbor!</span></p>
     <p class="front-lede">One assistant that does it all, and becomes a second you. Pick a Photon and start talking.</p>
+    </div>
     ${ownedHtml}
     <div class="card make-yours">
       <h2>Make it yours</h2>
@@ -119,7 +122,7 @@ function renderChatThread(): string {
     : `<div class="bubble theirs"><p>Howdy, neighbor! ${esc(p.name)} is on the line. Ask a real question, or start with what you need.</p></div>`;
   return `
   <section class="thread">
-    <div class="thread-head">
+    <div class="thread-head thread-hero">
       <button class="btn small" data-action="back-to-front">← All Photons</button>
       ${portraitHtml(p.name, 56)}
       <div class="thread-title">
@@ -132,7 +135,7 @@ function renderChatThread(): string {
     <div id="chat-error" class="chat-error" hidden></div>
     <form id="chat-form" class="composer">
       <input id="chat-input" type="text" placeholder="Ask ${esc(p.name)} anything…" autocomplete="off" aria-label="Message">
-      <button class="btn primary" type="submit">Send</button>
+      <button class="btn cherry" type="submit">${logoHtml(15)}Send</button>
     </form>
     <p class="fine">${esc(meterLine())}</p>
   </section>`;
@@ -315,7 +318,7 @@ function renderStore(): string {
       <a href="#store-sparks-plugs">Sparks &amp; Plugs</a>
     </div>
 
-    <div class="card tier-card" id="store-supernova">
+    <div class="card tier-card tier-hero" id="store-supernova">
       <h2>Supernova</h2>
       <p>${esc(TIER_COPY.supernova.body)}</p>
       <p class="fine">${esc(TIER_COPY.supernova.hours)}</p>
