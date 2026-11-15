@@ -5,6 +5,15 @@ import { JSDOM } from "jsdom";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
+// The redeem code under test. Read from the environment only: no code value
+// lives in this repo. Run with FREE_CODE set to the current code, and the
+// server on :3100 started with the same value.
+const FREE_CODE = process.env.FREE_CODE || "";
+if (!FREE_CODE) {
+  console.log("FREE_CODE is not set. Re-run with FREE_CODE set to the current code.");
+  process.exit(1);
+}
+
 const BASE = "http://localhost:3100";
 const ROOT = join(import.meta.dir, "..");
 
@@ -90,7 +99,7 @@ await waitFor(() => !!window.document.querySelector("#redeem-form"));
 check("upkeep shows redeem box", !!window.document.querySelector("#redeem-form"));
 check("upkeep shows meter", text("#view").includes("0 of 300 chats used this month"));
 const input = window.document.querySelector("#redeem-input") as HTMLInputElement;
-input.value = "2164039998";
+input.value = FREE_CODE;
 const form = window.document.querySelector("#redeem-form") as HTMLFormElement;
 form.dispatchEvent(new window.Event("submit", { bubbles: true, cancelable: true }));
 // Wait on the meter line itself, not the word "Unlimited chat" (which also

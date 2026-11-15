@@ -11,7 +11,8 @@ services:
       # Enables live chat replies. Without it the app serves the shell and
       # chat history, and new replies answer "brain not connected".
       # ANTHROPIC_MODEL: optional, default claude-sonnet-4-5.
-      # FREE_CODE: optional, overrides the friends-and-family redeem code.
+      # FREE_CODE: the friends-and-family redeem code. No default; when
+      # unset, no free code works. Set in the Render dashboard, never here.
       # GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET / GOOGLE_REDIRECT_URI:
       # optional, enable Gmail sign-in on the Inboxes tab. Without them the
       # tab reports honestly that no accounts are connected.

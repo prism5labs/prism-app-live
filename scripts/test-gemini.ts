@@ -14,7 +14,14 @@ import { rm } from "node:fs/promises";
 
 const APP_PORT = 3103;
 const DATA_DIR = "/tmp/prism-gemini-test";
-const FREE_CODE = "2164039998";
+// The redeem code under test. Read from the environment only: no code value
+// lives in this repo. Run with FREE_CODE set to the current code; the app
+// server spawned below inherits it from process.env.
+const FREE_CODE = process.env.FREE_CODE || "";
+if (!FREE_CODE) {
+  console.log("FREE_CODE is not set. Re-run with FREE_CODE set to the current code.");
+  process.exit(1);
+}
 
 let failures = 0;
 function check(name: string, cond: boolean, extra?: string) {

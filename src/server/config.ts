@@ -19,10 +19,11 @@ export const config = {
   geminiModel: process.env.GEMINI_MODEL || "gemini-3.8-flash",
   geminiBaseUrl:
     process.env.GEMINI_BASE_URL || "https://generativelanguage.googleapis.com",
-  // Friends-and-family free code, checked server-side only. Env override lets
-  // the code rotate without a code change. The default is the code already
-  // recorded in the order log (Nov 15, 2026).
-  freeCode: process.env.FREE_CODE || "2164039998",
+  // Friends-and-family free code, checked server-side only. There is no
+  // default and no code value lives in this repo: set FREE_CODE in the
+  // Render dashboard (the value itself is handed out by Neil, never
+  // committed). When it is unset, no free code works.
+  freeCode: process.env.FREE_CODE || "",
   // Google OAuth for the Inboxes tab (Gmail read + drafts). Without these the
   // Inboxes tab reports honestly that no accounts are connected.
   googleClientId: process.env.GOOGLE_CLIENT_ID || "",
