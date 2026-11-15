@@ -570,8 +570,35 @@ document.addEventListener("submit", async (e) => {
   }
 });
 
+// ---------- Keyboard-aware composer dock ----------
+// When the on-screen keyboard opens, the visual viewport shrinks but the
+// layout viewport does not (iOS Safari and older Android). Measure the gap
+// and lift the fixed composer dock above the keyboard. Android Chrome with
+// interactive-widget=resizes-content resizes the layout viewport instead,
+// in which case the gap is ~0 and nothing changes.
+function setupKeyboardDock(): void {
+  const vv = window.visualViewport;
+  if (vv) {
+    const update = () => {
+      const kb = Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop));
+      document.documentElement.style.setProperty("--kb", kb + "px");
+    };
+    vv.addEventListener("resize", update);
+    vv.addEventListener("scroll", update);
+    update();
+  }
+  document.addEventListener("focusin", (e) => {
+    if ((e.target as HTMLElement)?.id === "chat-input") {
+      window.setTimeout(() => {
+        document.getElementById("messages")?.scrollTo({ top: 999999, behavior: "smooth" });
+      }, 350);
+    }
+  });
+}
+
 // ---------- Boot ----------
 (async function init() {
+  setupKeyboardDock();
   const params = new URLSearchParams(location.search);
   const t = params.get("tab");
   if (t === "inboxes" || t === "store" || t === "upkeep" || t === "chat") tab = t as Tab;

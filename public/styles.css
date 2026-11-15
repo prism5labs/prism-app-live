@@ -349,12 +349,13 @@ textarea { width: 100%; resize: vertical; }
   position: fixed;
   left: 50%;
   transform: translateX(-50%);
-  bottom: calc(70px + env(safe-area-inset-bottom));
+  bottom: calc(70px + env(safe-area-inset-bottom) + var(--kb, 0px));
   width: min(688px, calc(100% - 32px));
   background: var(--cream);
   border-top: 1px solid var(--line);
   padding: 8px 0 10px;
   z-index: 30;
+  transition: bottom 0.2s ease-out;
 }
 .composer-dock .chat-error { margin-bottom: 8px; }
 .thread-meter {
@@ -374,6 +375,24 @@ textarea { width: 100%; resize: vertical; }
   margin-bottom: 12px;
   font-size: 14px;
 }
+
+/* ---------- Brand in motion: the gallery breathes, slowly ---------- */
+@media (prefers-reduced-motion: no-preference) {
+  .app-header-mark { animation: gem-bob 5s ease-in-out infinite, gem-glow 5s ease-in-out infinite; }
+  .chrome-thin { background-size: 200% 100%; animation: chrome-shimmer 9s linear infinite; }
+  .thread-head .portrait { animation: ring-breathe 4s ease-in-out infinite; }
+  .round-portrait-wrap .portrait { animation: medallion-float 6s ease-in-out infinite; }
+  .switchboard-strip img { animation: poster-glow 5s ease-in-out infinite; }
+  .sputnik-hero { overflow: hidden; border-radius: 18px; }
+  .sputnik-hero .sp-img { animation: sputnik-drift 24s ease-in-out infinite alternate; }
+}
+@keyframes gem-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-2px); } }
+@keyframes gem-glow { 0%, 100% { box-shadow: 0 0 0 0 rgba(244, 201, 93, 0); } 50% { box-shadow: 0 0 12px 2px rgba(244, 201, 93, 0.55); } }
+@keyframes chrome-shimmer { 0% { background-position: 0% 0; } 100% { background-position: 200% 0; } }
+@keyframes ring-breathe { 0%, 100% { box-shadow: 0 0 0 1.5px var(--teal); } 50% { box-shadow: 0 0 0 1.5px var(--teal), 0 0 14px 2px rgba(244, 201, 93, 0.6); } }
+@keyframes medallion-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+@keyframes poster-glow { 0%, 100% { box-shadow: none; } 50% { box-shadow: 0 0 12px rgba(244, 201, 93, 0.5); } }
+@keyframes sputnik-drift { from { transform: scale(1); } to { transform: scale(1.06) translateX(-4px); } }
 
 /* ---------- Store: posters as thumbnails, plain buying text ---------- */
 .store-head { padding: 16px 18px 2px; display: flex; align-items: center; gap: 10px; }
