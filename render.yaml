@@ -4,6 +4,9 @@ services:
     runtime: docker
     dockerfilePath: ./Dockerfile
     plan: free
+    domains:
+      - prism5labs.com
+      - www.prism5labs.com
     envVars:
       - key: NODE_ENV
         value: production
