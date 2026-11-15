@@ -184,15 +184,17 @@ function renderChatThread(): string {
         <h2>${esc(face)}</h2>
         ${customized ? `<span class="thread-voice">Voice: ${esc(voiceNameOf(p.name))}</span>` : ""}
       </div>
-      <button class="btn small" data-action="customize" data-photon="${esc(p.name)}">Customize</button>
-      <button class="btn small call" data-action="call" data-photon="${esc(p.name)}">Call · Upkeep</button>
-      <button class="btn small" data-action="report-prism" data-photon="${esc(p.name)}">Report to Prism 5</button>
-      <p class="thread-focus">${esc(p.focus)}</p>
+      <details class="thread-menu">
+        <summary aria-label="More options">···</summary>
+        <div class="thread-menu-list">
+          <button class="btn small" data-action="customize" data-photon="${esc(p.name)}">Customize</button>
+          <button class="btn small call" data-action="call" data-photon="${esc(p.name)}">Call · Upkeep</button>
+          <button class="btn small" data-action="report-prism" data-photon="${esc(p.name)}">Report to Prism 5</button>
+        </div>
+      </details>
     </div>
-    <div class="switchboard-strip"><img src="/brand/switchboard.jpg" alt=""><p><b>On Switchboard.</b> This Launch stays in touch with the rest of the Lab — first of its kind.</p></div>
     <div class="messages" id="messages">${msgs}</div>
     <div class="composer-dock">
-      <div class="thread-meter">${esc(meterLine())}${meterBar()}</div>
       <div id="chat-error" class="chat-error" hidden></div>
       <form id="chat-form" class="composer">
         <input id="chat-input" type="text" placeholder="Ask ${esc(face)} anything…" autocomplete="off" aria-label="Message">
@@ -435,7 +437,12 @@ async function reportToPrism(photon: string) {
 
 async function sendChat(text: string) {
   const input = document.getElementById("chat-input") as HTMLInputElement | null;
-  if (input) input.value = "";
+  // The keyboard goes away after sending, so the reply is readable
+  // instead of hidden behind the text box.
+  if (input) {
+    input.value = "";
+    input.blur();
+  }
   const err = document.getElementById("chat-error") as HTMLElement | null;
   if (err) err.hidden = true;
   // Optimistic: show the user's message right away.
@@ -789,8 +796,9 @@ function render() {
   else if (tab === "inboxes") v.innerHTML = renderInboxes();
   else if (tab === "store") v.innerHTML = renderStore();
   else v.innerHTML = renderUpkeep();
-  const input = document.getElementById("chat-input") as HTMLInputElement | null;
-  if (input) input.focus();
+  // The chat input is never focused for the user: focusing it after
+  // every render keeps the keyboard up and can scroll the messages
+  // around. The owner taps it when they want to write.
 }
 
 async function refreshState() {
