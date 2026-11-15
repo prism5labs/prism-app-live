@@ -9,6 +9,9 @@ Drop a real portrait PNG here, one per Photon, named exactly:
 Square, at least 256x256. The app uses the PNG when it exists and falls
 back to a generated placeholder tile (initial + triangle) when it does not.
 
-The builder version's 1950s superhero portraits are artifact assets and
-cannot be copied into this repo. Supply the portraits from the Labs site
-assets (or generate new ones in the same style) and drop them here.
+All twelve are in place (Nov 15, 2026): Prism.png is the teal crystalline
+prism (prism-canonical); the other eleven are the 1950s superhero portraits
+copied from the builder app's assets
+(ts-spaces/prism-app-live/client/src/assets/photon-<name>.jpg), converted
+to PNG. If a portrait is ever replaced, drop the new file here with the
+same name and redeploy.

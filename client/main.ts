@@ -13,6 +13,9 @@ let state: any = null;
 let tab: Tab = "chat";
 let activePhoton: string | null = null;
 let storeVariant: "personal" | "business" = "personal";
+// Which Store sections are open. Remembered across re-renders, so the
+// Personal/Business toggle doesn't collapse what the user opened.
+let storeOpen: Record<string, boolean> = { photons: true, sparks: false, plugs: false };
 let threadMessages: any[] = [];
 let threadLoading = false;
 let toastTimer: number | null = null;
@@ -255,6 +258,30 @@ function buyButton(url: string, label: string, owned: boolean): string {
   return `<a class="btn primary" href="${esc(url)}" target="_blank" rel="noopener">Buy — ${esc(label)}</a>`;
 }
 
+function productCard(p: (typeof PRODUCTS)[number]): string {
+  const v = storeVariant === "personal" ? p.personal : p.business;
+  const owned = state?.freeCode === true || (state?.ownedProducts || []).includes(p.slug);
+  return `<div class="card product-card">
+    <h3>${esc(p.name)}</h3>
+    <p class="kind">${esc(p.kind)}</p>
+    <p>${esc(p.description)}</p>
+    <p class="price">${esc(v.price)} <span class="fine">(${esc(v.total)} at checkout)</span></p>
+    ${buyButton(v.url + "?client_reference_id=" + p.slug + "-" + storeVariant, v.total, owned)}
+  </div>`;
+}
+
+// One kind (Spark or Plug), grouped by its categories. Categories with no
+// products of that kind are skipped.
+function kindGroups(kind: "Spark" | "Plug"): string {
+  return CATEGORIES.map((cat) => {
+    const items = PRODUCTS.filter((p) => p.category === cat && p.kind === kind);
+    if (!items.length) return "";
+    return `<h3 class="cat-title">${esc(cat)}</h3><div class="product-grid">${items
+      .map((p) => productCard(p))
+      .join("")}</div>`;
+  }).join("");
+}
+
 function renderStore(): string {
   const ownedProducts: string[] = state?.ownedProducts || [];
   const ownedPhotons: string[] = state?.ownedPhotons || [];
@@ -272,30 +299,23 @@ function renderStore(): string {
     </div>`;
   }).join("");
 
-  const groups = CATEGORIES.map(
-    (cat) => `<h2 class="section-title">${esc(cat)}</h2><div class="product-grid">${PRODUCTS.filter(
-      (p) => p.category === cat,
-    )
-      .map((p) => {
-        const v = variant === "personal" ? p.personal : p.business;
-        const owned = allOwned || ownedProducts.includes(p.slug);
-        return `<div class="card product-card">
-          <h3>${esc(p.name)}</h3>
-          <p class="kind">${esc(p.kind)}</p>
-          <p>${esc(p.description)}</p>
-          <p class="price">${esc(v.price)} <span class="fine">(${esc(v.total)} at checkout)</span></p>
-          ${buyButton(v.url + "?client_reference_id=" + p.slug + "-" + variant, v.total, owned)}
-        </div>`;
-      })
-      .join("")}</div>`,
-  ).join("");
+  const sparkCount = PRODUCTS.filter((p) => p.kind === "Spark").length;
+  const plugCount = PRODUCTS.filter((p) => p.kind === "Plug").length;
 
   return `
   <section>
     <h1 class="page-title">Store</h1>
     <p class="page-lede">Buy a Launch once and it is yours forever. Checkout shows the full total, including the standard 3% processing fee.</p>
 
-    <div class="card tier-card">
+    <div class="store-jump" aria-label="Jump to a section">
+      <a href="#store-supernova">Supernova</a>
+      <a href="#store-satellite">Satellite</a>
+      <a href="#store-photons">Photons</a>
+      <a href="#store-upkeep">Upkeep</a>
+      <a href="#store-sparks-plugs">Sparks &amp; Plugs</a>
+    </div>
+
+    <div class="card tier-card" id="store-supernova">
       <h2>Supernova</h2>
       <p>${esc(TIER_COPY.supernova.body)}</p>
       <p class="fine">${esc(TIER_COPY.supernova.hours)}</p>
@@ -309,7 +329,7 @@ function renderStore(): string {
       </div>
     </div>
 
-    <div class="card tier-card">
+    <div class="card tier-card" id="store-satellite">
       <h2>Satellite</h2>
       <p>${esc(TIER_COPY.satellite.body)}</p>
       <p class="fine">${esc(TIER_COPY.satellite.hours)}</p>
@@ -323,24 +343,35 @@ function renderStore(): string {
       </div>
     </div>
 
-    <h2 class="section-title">Meet the Photons</h2>
-    <p class="page-lede">Each Photon is a Supernova on its own. Buy one and it drops into your app, ready to talk.</p>
-    <div class="product-grid">${photonCards}</div>
+    <details class="store-group" id="store-photons" ${storeOpen.photons ? "open" : ""}>
+      <summary><span class="summary-title">Meet the Photons</span><span class="fine">12 Supernovas · tap to hide</span></summary>
+      <p class="page-lede">Each Photon is a Supernova on its own. Buy one and it drops into your app, ready to talk.</p>
+      <div class="product-grid">${photonCards}</div>
+    </details>
 
-    <div class="card tier-card">
+    <div class="card tier-card" id="store-upkeep">
       <h2>Upkeep</h2>
       <p>${esc(UPKEEP_COPY.body)}</p>
       <p class="price">$29.00/month <span class="fine">($29.87 at checkout)</span></p>
       <div class="row">${buyButton(UPKEEP.url, "$29.87", state?.upkeep === true)}</div>
     </div>
 
-    <h2 class="section-title">Sparks &amp; Plugs</h2>
-    <p class="page-lede">One job each. A Spark is a single button for one job, push it and it does the thing. A Plug is a Spark that runs on its own. ${esc(TIER_COPY.spark.body)} ${esc(TIER_COPY.plug.body)}</p>
+    <h2 class="section-title" id="store-sparks-plugs">Sparks &amp; Plugs</h2>
+    <p class="page-lede">One job each. A Spark is a single button for one job, push it and it does the thing. A Plug is a Spark that runs on its own.</p>
     <div class="toggle" role="group" aria-label="Personal or Business">
       <button class="toggle-btn ${variant === "personal" ? "active" : ""}" data-action="variant" data-variant="personal">Personal</button>
       <button class="toggle-btn ${variant === "business" ? "active" : ""}" data-action="variant" data-variant="business">Business</button>
     </div>
-    ${groups}
+    <details class="store-group" id="store-sparks" ${storeOpen.sparks ? "open" : ""}>
+      <summary><span class="summary-title">Sparks</span><span class="fine">${sparkCount} · one button, one job · tap to browse</span></summary>
+      <p class="page-lede">${esc(TIER_COPY.spark.body)} ${esc(TIER_COPY.spark.hours)}</p>
+      ${kindGroups("Spark")}
+    </details>
+    <details class="store-group" id="store-plugs" ${storeOpen.plugs ? "open" : ""}>
+      <summary><span class="summary-title">Plugs</span><span class="fine">${plugCount} · runs on its own · tap to browse</span></summary>
+      <p class="page-lede">${esc(TIER_COPY.plug.body)} ${esc(TIER_COPY.plug.hours)}</p>
+      ${kindGroups("Plug")}
+    </details>
   </section>`;
 }
 
@@ -436,6 +467,19 @@ async function loadInboxes() {
 }
 
 // ---------- Events (delegation) ----------
+// Remember which Store sections the user opened. The toggle event doesn't
+// bubble, so listen in the capture phase on the document.
+document.addEventListener(
+  "toggle",
+  (e) => {
+    const d = e.target as HTMLDetailsElement;
+    if (d && d.tagName === "DETAILS" && d.id.startsWith("store-")) {
+      storeOpen[d.id.slice("store-".length)] = d.open;
+    }
+  },
+  true,
+);
+
 document.addEventListener("click", (e) => {
   const t = (e.target as HTMLElement).closest("[data-action]") as HTMLElement | null;
   if (!t) return;
