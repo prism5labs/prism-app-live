@@ -6,8 +6,38 @@ import { portraitHtml } from "./ui";
 import { SUPERNOVA, SATELLITE, UPKEEP, PRODUCTS, CATEGORIES, photonBuyUrl } from "../src/shared/catalog";
 import { TIER_COPY, UPKEEP_COPY } from "../src/shared/tiers";
 import { PHOTONS } from "../src/shared/photons";
+import { VOICES, TUNING_QUESTIONS, LOOK_SETS, voiceById, tuningStyle } from "../src/shared/voices";
 
 type Tab = "chat" | "inboxes" | "store" | "upkeep";
+
+// Per-Photon customization, saved on the server (state.customizations).
+// Null row means the owner has not started customizing that Photon yet.
+type Customization = {
+  faceName: string | null;
+  voice: string;
+  tuning: Record<string, boolean> | null;
+  lookSet: string | null;
+  portrait: string | null;
+  step: number;
+  done: boolean;
+};
+
+function customFor(photon: string): Customization {
+  const c = (state as any)?.customizations?.[photon];
+  return c || { faceName: null, voice: "house", tuning: null, lookSet: null, portrait: null, step: 0, done: false };
+}
+
+function faceNameOf(p: any): string {
+  return customFor(p.name).faceName || p.name;
+}
+
+function portraitNameOf(p: any): string {
+  return customFor(p.name).portrait || p.name;
+}
+
+function voiceNameOf(photon: string): string {
+  return voiceById(customFor(photon).voice).name;
+}
 
 let state: any = null;
 let tab: Tab = "chat";
@@ -19,6 +49,12 @@ let storeOpen: Record<string, boolean> = { photons: true, sparks: false, plugs: 
 let threadMessages: any[] = [];
 let threadLoading = false;
 let toastTimer: number | null = null;
+// Customization wizard: which Photon is being customized, which step,
+// and the design-your-own tuning draft (answered yes/no, saved on Save).
+let customizePhoton: string | null = null;
+let customizeStep: number = 1;
+let customizeDesign = false;
+let customizeTuning: Record<string, boolean> = {};
 
 const SEND_SVG = `<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 20V6M6 11l6-6 6 6" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 
@@ -71,8 +107,8 @@ function photonCard(p: any, size = 220): string {
   return `<button class="photon-card" data-action="open-photon" data-photon="${esc(p.name)}" ${
     owned ? "" : "disabled"
   }>
-    ${portraitHtml(p.name, size)}
-    <span class="photon-name">${esc(p.name)}</span>
+    ${portraitHtml(portraitNameOf(p), size)}
+    <span class="photon-name">${esc(faceNameOf(p))}</span>
     <span class="photon-tag">${esc(p.tagline)}</span>
   </button>`;
 }
@@ -121,8 +157,11 @@ function renderChatFront(): string {
 function renderChatThread(): string {
   const p = PHOTONS.find((x) => x.name === activePhoton);
   if (!p) return renderChatFront();
+  const face = faceNameOf(p);
+  const portrait = portraitNameOf(p);
+  const customized = !!(state as any)?.customizations?.[p.name];
   const botMsg = (text: string) =>
-    `<div class="msg bot">${portraitHtml(p.name, 26)}<div><p>${esc(text)}</p></div></div>`;
+    `<div class="msg bot">${portraitHtml(portrait, 26)}<div><p>${esc(text)}</p></div></div>`;
   const msgs = threadMessages.length
     ? threadMessages
         .map((m: any) =>
@@ -131,15 +170,17 @@ function renderChatThread(): string {
             : botMsg(m.content),
         )
         .join("")
-    : botMsg(`Howdy, neighbor! ${p.name} is on the line. Ask a real question, or start with what you need.`);
+    : botMsg(`Howdy, neighbor! ${face} is on the line. Ask a real question, or start with what you need.`);
   return `
   <section class="thread">
     <div class="thread-head">
       <button class="back-btn" data-action="back-to-front">← All Photons</button>
-      ${portraitHtml(p.name, 38)}
+      ${portraitHtml(portrait, 38)}
       <div class="thread-title">
-        <h2>${esc(p.name)}</h2>
+        <h2>${esc(face)}</h2>
+        ${customized ? `<span class="thread-voice">Voice: ${esc(voiceNameOf(p.name))}</span>` : ""}
       </div>
+      <button class="btn small" data-action="customize" data-photon="${esc(p.name)}">Customize</button>
       <button class="btn small call" data-action="call" data-photon="${esc(p.name)}">Call · Upkeep</button>
       <p class="thread-focus">${esc(p.focus)}</p>
     </div>
@@ -149,15 +190,167 @@ function renderChatThread(): string {
       <div class="thread-meter">${esc(meterLine())}${meterBar()}</div>
       <div id="chat-error" class="chat-error" hidden></div>
       <form id="chat-form" class="composer">
-        <input id="chat-input" type="text" placeholder="Ask ${esc(p.name)} anything…" autocomplete="off" aria-label="Message">
+        <input id="chat-input" type="text" placeholder="Ask ${esc(face)} anything…" autocomplete="off" aria-label="Message">
         <button class="send" type="submit" aria-label="Send message">${SEND_SVG}</button>
       </form>
     </div>
   </section>`;
 }
 
+// ---------- Customization wizard ----------
+// Mirrors the install steps: 1 name, 2 voice, 3 look. Every step
+// skippable, progress saved per Photon, never blocks chatting.
+async function saveCustom(patch: Record<string, unknown>): Promise<boolean> {
+  if (!customizePhoton) return false;
+  const r = await api.customizeSave(customizePhoton, patch);
+  if (r && r.ok && r.customization) {
+    if (!state.customizations) state.customizations = {};
+    state.customizations[customizePhoton] = r.customization;
+    return true;
+  }
+  toast("That didn't save. Try again.", "err");
+  return false;
+}
+
+function finishCustom() {
+  const name = customizePhoton || "";
+  customizePhoton = null;
+  customizeDesign = false;
+  if (name) openThread(name);
+  else render();
+}
+
+function renderCustomName(p: any, c: Customization): string {
+  return `
+  <div class="card">
+    <h3>Step 1 — One name for your Face</h3>
+    <p>One name, like the install. It replaces "${esc(p.name)}" in chat for this Photon only.</p>
+    <form id="custom-name-form" class="row">
+      <input id="custom-name-input" type="text" maxlength="40" placeholder="${esc(p.name)}" value="${esc(c.faceName || "")}" aria-label="Face name">
+      <button class="btn primary" type="submit">Save name &amp; continue</button>
+    </form>
+    <p class="fine">Leave it blank to keep ${esc(p.name)}.</p>
+    <button class="btn" data-action="custom-skip-step">Skip this step</button>
+  </div>`;
+}
+
+function renderCustomVoice(p: any, c: Customization): string {
+  const face = c.faceName || p.name;
+  if (customizeDesign) {
+    const answered = TUNING_QUESTIONS.filter((q) => q.key in customizeTuning).length;
+    const rows = TUNING_QUESTIONS.map((q) => {
+      const v = customizeTuning[q.key];
+      return `<div class="tune-row">
+        <p>${esc(q.question)}</p>
+        <button class="tune-yn ${v === true ? "on" : ""}" data-action="custom-tune" data-q="${q.key}" data-v="yes">${esc(q.yes)}</button>
+        <button class="tune-yn ${v === false ? "on" : ""}" data-action="custom-tune" data-q="${q.key}" data-v="no">${esc(q.no)}</button>
+      </div>`;
+    }).join("");
+    const readback =
+      answered === TUNING_QUESTIONS.length
+        ? `<p class="fine">Your tuned voice: ${esc(tuningStyle(customizeTuning as any))}</p>`
+        : `<p class="fine">Answer all seven, then read it back and save it.</p>`;
+    return `
+    <div class="card">
+      <h3>Step 2 — Design your own voice</h3>
+      <p>Seven plain yes-or-no questions. No long forms.</p>
+      ${rows}
+      ${readback}
+      <div class="row">
+        <button class="btn primary" data-action="custom-tune-save">Save voice &amp; continue</button>
+        <button class="btn" data-action="custom-design-back">Back to voices</button>
+      </div>
+    </div>`;
+  }
+  const opts = VOICES.map((v) => {
+    const sel = c.voice === v.id;
+    return `<button class="voice-opt ${sel ? "selected" : ""}" data-action="custom-voice" data-voice="${esc(v.id)}">
+      <b>${esc(v.name)}${v.id === "house" ? " · Default" : ""}${sel ? " ✓" : ""}</b>
+      <span>${esc(v.blurb)}</span>
+    </button>`;
+  }).join("");
+  return `
+  <div class="card">
+    <h3>Step 2 — Pick a voice</h3>
+    <p>This is how ${esc(face)} talks in chat. The house voice is the default. Live voice calls are an Upkeep extra, and the call line itself is still being built.</p>
+    ${opts}
+    <button class="btn" data-action="custom-skip-step">Skip this step</button>
+  </div>`;
+}
+
+function renderCustomLook(p: any, c: Customization): string {
+  const face = c.faceName || p.name;
+  const currentPortrait = c.portrait || p.name;
+  const portraits = PHOTONS.map(
+    (x) => `
+    <button class="portrait-pick ${currentPortrait === x.name ? "selected" : ""}" data-action="custom-portrait" data-portrait="${esc(x.name)}" aria-label="Use the ${esc(x.name)} portrait">
+      ${portraitHtml(x.name, 64)}
+      <span>${esc(x.name)}</span>
+    </button>`,
+  ).join("");
+  const sets = LOOK_SETS.map(
+    (s) => `
+    <button class="look-pick ${c.lookSet === s.id ? "selected" : ""}" data-action="custom-look" data-look="${esc(s.id)}">
+      <b>${esc(s.name)}${c.lookSet === s.id ? " ✓" : ""}</b>
+      <span>${esc(s.blurb)}</span>
+    </button>`,
+  ).join("");
+  return `
+  <div class="card">
+    <h3>Step 3 — Pick a face and a look</h3>
+    <p>Which portrait ${esc(face)} wears in chat, and the colors and style around it.</p>
+    <div class="portrait-grid">${portraits}</div>
+    ${sets}
+    <div class="row">
+      <button class="btn primary" data-action="custom-finish">Save &amp; start chatting</button>
+      <button class="btn" data-action="custom-skip-step">Skip this step</button>
+    </div>
+  </div>`;
+}
+
+function renderCustomize(): string {
+  const p = PHOTONS.find((x) => x.name === customizePhoton);
+  if (!p) return renderChatFront();
+  const c = customFor(p.name);
+  const face = c.faceName || p.name;
+  const tabs = [1, 2, 3]
+    .map((n) => {
+      const label = n === 1 ? "Name" : n === 2 ? "Voice" : "Look";
+      const cls = n === customizeStep ? "active" : c.step >= n ? "done" : "";
+      return `<button class="custom-step-tab ${cls}" data-action="custom-step" data-step="${n}">${n}. ${label}${c.step >= n && n !== customizeStep ? " ✓" : ""}</button>`;
+    })
+    .join("");
+  return `
+  <section class="customize">
+    <button class="back-btn" data-action="custom-back">← ${c.done ? "Back to chat" : "All Photons"}</button>
+    <h2 class="page-title">Make ${esc(face)} yours</h2>
+    <p class="page-lede">Three quick steps, like the install. Skip any of them. Nothing here blocks chatting, and you can come back and change all of this later.</p>
+    <div class="custom-steps">${tabs}</div>
+    ${customizeStep === 1 ? renderCustomName(p, c) : customizeStep === 2 ? renderCustomVoice(p, c) : renderCustomLook(p, c)}
+    <button class="btn custom-skip-all" data-action="custom-skip-all">Skip all — start chatting</button>
+  </section>`;
+}
+
 async function openPhoton(name: string) {
   activePhoton = name;
+  const c = customFor(name);
+  if (!c.done) {
+    // First time with this Photon: offer the customization steps, like
+    // the install. Skipping everything drops straight into chat, and
+    // progress is saved so the owner picks up where they left off.
+    customizePhoton = name;
+    customizeStep = Math.min(3, (c.step || 0) + 1);
+    customizeDesign = false;
+    customizeTuning = {};
+    render();
+    return;
+  }
+  openThread(name);
+}
+
+async function openThread(name: string) {
+  activePhoton = name;
+  customizePhoton = null;
   threadMessages = [];
   threadLoading = true;
   render();
@@ -451,7 +644,7 @@ function renderNav() {
 function render() {
   renderNav();
   const v = view();
-  if (tab === "chat") v.innerHTML = activePhoton ? renderChatThread() : renderChatFront();
+  if (tab === "chat") v.innerHTML = customizePhoton ? renderCustomize() : activePhoton ? renderChatThread() : renderChatFront();
   else if (tab === "inboxes") v.innerHTML = renderInboxes();
   else if (tab === "store") v.innerHTML = renderStore();
   else v.innerHTML = renderUpkeep();
@@ -493,6 +686,7 @@ document.addEventListener("click", (e) => {
   if (action === "goto") {
     tab = t.dataset.tab as Tab;
     activePhoton = null;
+    customizePhoton = null;
     if (tab === "inboxes") loadInboxes().then(render);
     render();
   } else if (action === "open-photon") {
@@ -500,9 +694,90 @@ document.addEventListener("click", (e) => {
     if (name) openPhoton(name);
   } else if (action === "back-to-front") {
     activePhoton = null;
+    customizePhoton = null;
     render();
   } else if (action === "call") {
     callPhoton(t.dataset.photon || "");
+  } else if (action === "customize") {
+    const name = t.dataset.photon || "";
+    if (name) {
+      customizePhoton = name;
+      customizeStep = 1;
+      customizeDesign = false;
+      customizeTuning = {};
+      render();
+    }
+  } else if (action === "custom-back") {
+    const name = customizePhoton || "";
+    if (name && customFor(name).done) openThread(name);
+    else {
+      customizePhoton = null;
+      activePhoton = null;
+      render();
+    }
+  } else if (action === "custom-step") {
+    customizeStep = Math.max(1, Math.min(3, parseInt(t.dataset.step || "1", 10) || 1));
+    customizeDesign = false;
+    render();
+  } else if (action === "custom-skip-step") {
+    const step = customizeStep;
+    saveCustom({ step }).then((ok) => {
+      if (!ok) return;
+      if (step < 3) {
+        customizeStep = step + 1;
+        customizeDesign = false;
+        render();
+      } else finishCustom();
+    });
+  } else if (action === "custom-skip-all") {
+    saveCustom({ done: true }).then((ok) => {
+      if (ok) finishCustom();
+    });
+  } else if (action === "custom-voice") {
+    const voice = t.dataset.voice || "house";
+    if (voice === "custom") {
+      const c = customFor(customizePhoton || "");
+      customizeTuning = { ...(c.tuning || {}) };
+      customizeDesign = true;
+      render();
+      return;
+    }
+    saveCustom({ voice, step: 2 }).then((ok) => {
+      if (!ok) return;
+      customizeStep = 3;
+      customizeDesign = false;
+      render();
+    });
+  } else if (action === "custom-design-back") {
+    customizeDesign = false;
+    render();
+  } else if (action === "custom-tune") {
+    customizeTuning[t.dataset.q as string] = t.dataset.v === "yes";
+    render();
+  } else if (action === "custom-tune-save") {
+    const missing = TUNING_QUESTIONS.filter((q) => !(q.key in customizeTuning));
+    if (missing.length) {
+      toast("Answer all seven questions first.", "err");
+      return;
+    }
+    saveCustom({ voice: "custom", tuning: customizeTuning, step: 2 }).then((ok) => {
+      if (!ok) return;
+      customizeStep = 3;
+      customizeDesign = false;
+      render();
+    });
+  } else if (action === "custom-portrait") {
+    saveCustom({ portrait: t.dataset.portrait || "" }).then((ok) => {
+      if (ok) render();
+    });
+  } else if (action === "custom-look") {
+    saveCustom({ lookSet: t.dataset.look || "" }).then((ok) => {
+      if (ok) render();
+    });
+  } else if (action === "custom-finish") {
+    saveCustom({ done: true, step: 3 }).then((ok) => {
+      if (ok) finishCustom();
+    });
   } else if (action === "variant") {
     storeVariant = (t.dataset.variant as "personal" | "business") || "personal";
     render();
@@ -530,6 +805,17 @@ document.addEventListener("submit", async (e) => {
       toast(name ? `Your assistant is ${name} now.` : "Name cleared. You're back to Prism 5.");
     } else {
       toast("That didn't save. Try again.", "err");
+    }
+  } else if (form.id === "custom-name-form") {
+    e.preventDefault();
+    const input = document.getElementById("custom-name-input") as HTMLInputElement;
+    const name = input.value.trim();
+    const ok = await saveCustom({ faceName: name, step: 1 });
+    if (ok) {
+      customizeStep = 2;
+      customizeDesign = false;
+      render();
+      toast(name ? `Your Face is ${name} now.` : "Name kept as it was.");
     }
   } else if (form.id === "chat-form") {
     e.preventDefault();

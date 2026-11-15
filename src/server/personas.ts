@@ -17,6 +17,43 @@
 // - Never name the provider, the model, or any API in a reply. Just answer.
 
 import { PHOTONS, photonByName } from "../shared/photons";
+import { voiceById, tuningStyle } from "../shared/voices";
+import type { Customization as DbCustomization } from "./db";
+
+// The voice style block for a Photon the owner has customized. Null when
+// there is no customization row: chat behavior is unchanged until the
+// owner picks a voice in the app.
+export function voiceStyleFor(c: DbCustomization | null): string | null {
+  if (!c) return null;
+  if (c.voice === "custom" && c.tuning) return tuningStyle(c.tuning as any);
+  return voiceById(c.voice).style || null;
+}
+
+export function systemPromptFor(
+  photonName: string,
+  ownerDisplayName: string,
+  c?: DbCustomization | null,
+): string {
+  const photon = photonByName(photonName);
+  if (!photon) return PRISM_PERSONA;
+  const style = voiceStyleFor(c || null);
+  if (photon.name === "Prism") {
+    // The house voice already is the Prism persona; only steer it when the
+    // owner picked something else, and only name a renamed Face.
+    let out = PRISM_PERSONA;
+    if (c?.faceName && c.faceName !== "Prism") {
+      out += `\n\nThe owner calls you ${c.faceName}. Use that name for yourself.`;
+    }
+    if (style && c?.voice !== "house") out += `\n\nHow you talk: ${style}`;
+    return out;
+  }
+  const ownerLine = ownerDisplayName
+    ? `The owner calls you by the name ${ownerDisplayName}.`
+    : "";
+  let out = `${PHOTON_RULE}\n\n${photon.persona}\n${ownerLine}`;
+  if (style) out += `\n\nHow you talk: ${style}`;
+  return out;
+}
 
 export const PRISM_PERSONA = `You are Prism 5, the first of the Photons and the Original, a Launch from Prism 5 Labs. You are the owner's second self: you learn their voice, habits, and judgment through use, and you take the noise so they can focus on what matters.
 
@@ -33,16 +70,6 @@ const PHOTON_RULE = `You are a full Supernova, one of the Photons of Prism 5 Lab
 How you talk: plain speech, humor turned up, quick, playful, a little snarky, never long-winded. Be genuinely helpful, not performatively helpful. Never open with "Great question!" or "I'd be happy to help!" Just help. Have opinions. Never use em-dashes or double dashes; use commas and plain punctuation instead. Never name the provider, the model, or any API in a reply. Just answer.
 
 How you work: be resourceful before asking. Present one thing at a time, decide it, move on. Never send, book, charge, file, or cancel anything on your own. Drafts wait for the owner's yes. Never invent facts.`;
-
-export function systemPromptFor(photonName: string, ownerDisplayName: string): string {
-  const photon = photonByName(photonName);
-  if (!photon) return PRISM_PERSONA;
-  if (photon.name === "Prism") return PRISM_PERSONA;
-  const ownerLine = ownerDisplayName
-    ? `The owner calls you by the name ${ownerDisplayName}.`
-    : "";
-  return `${PHOTON_RULE}\n\n${photon.persona}\n${ownerLine}`;
-}
 
 export function photonNames(): string[] {
   return PHOTONS.map((p) => p.name);

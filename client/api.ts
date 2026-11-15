@@ -60,4 +60,15 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ accountId: getAccountId(), label, to, subject, body }),
     }),
+  // Per-Photon customization (name, voice, look). Progress saved per
+  // Photon so the owner picks up where they left off.
+  customizeGet: (photon: string) =>
+    req(
+      `/api/customize?accountId=${encodeURIComponent(getAccountId())}&photon=${encodeURIComponent(photon)}`,
+    ),
+  customizeSave: (photon: string, patch: Record<string, unknown>) =>
+    req("/api/customize", {
+      method: "POST",
+      body: JSON.stringify({ accountId: getAccountId(), photon, ...patch }),
+    }),
 };

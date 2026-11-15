@@ -283,6 +283,27 @@ textarea { width: 100%; resize: vertical; }
   margin-bottom: 0;
 }
 .thread-focus { flex: 1 1 100%; margin: 0; font-size: 0.72rem; color: var(--muted-2); font-weight: 700; }
+.thread-voice { display: block; font-size: 0.72rem; font-weight: 700; color: var(--muted-2); }
+
+/* Customization wizard: name, voice, look. Same gallery look as the rest. */
+.customize { max-width: 720px; margin: 0 auto; }
+.custom-steps { display: flex; gap: 8px; margin: 14px 0; }
+.custom-step-tab { flex: 1; border: 1.5px solid var(--field-line); background: #fff; border-radius: 10px; padding: 9px 6px; font-family: "Nunito", system-ui, sans-serif; font-weight: 800; font-size: 0.85rem; color: var(--ink-soft); cursor: pointer; }
+.custom-step-tab.active { background: var(--teal); border-color: var(--teal); color: #fff; }
+.custom-step-tab.done { border-color: var(--teal); color: var(--teal); }
+.voice-opt, .look-pick { display: block; width: 100%; text-align: left; background: #fff; border: 1.5px solid var(--field-line); border-radius: 12px; padding: 10px 14px; margin-bottom: 8px; cursor: pointer; font-family: "Nunito", system-ui, sans-serif; }
+.voice-opt b, .look-pick b { display: block; color: var(--ink); font-size: 0.95rem; font-weight: 800; }
+.voice-opt span, .look-pick span { display: block; font-size: 0.82rem; color: var(--ink-soft); margin-top: 2px; }
+.voice-opt.selected, .look-pick.selected { border-color: var(--teal); background: var(--teal-soft); }
+.tune-row { display: flex; align-items: center; gap: 8px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.tune-row p { flex: 1; margin: 0; font-weight: 700; font-size: 0.9rem; }
+.tune-yn { border: 1.5px solid var(--field-line); background: #fff; border-radius: 9px; padding: 7px 14px; font-family: "Nunito", system-ui, sans-serif; font-weight: 800; font-size: 0.85rem; color: var(--ink-soft); cursor: pointer; }
+.tune-yn.on { background: var(--teal); border-color: var(--teal); color: #fff; }
+.portrait-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 12px 0; }
+.portrait-pick { background: none; border: 2px solid transparent; border-radius: 14px; padding: 6px 4px; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.portrait-pick span { font-size: 0.72rem; font-weight: 800; color: var(--ink-soft); }
+.portrait-pick.selected { border-color: var(--teal); background: var(--teal-soft); }
+.custom-skip-all { margin-top: 14px; }
 .switchboard-strip {
   display: flex;
   align-items: center;

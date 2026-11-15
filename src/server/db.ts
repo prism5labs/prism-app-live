@@ -8,6 +8,10 @@ import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { config } from "./config";
 import { PHOTON_NAMES } from "../shared/photons";
+import { VOICES, LOOK_SETS } from "../shared/voices";
+
+const VOICE_IDS = new Set(VOICES.map((v) => v.id));
+const LOOK_SET_IDS = new Set(LOOK_SETS.map((s) => s.id));
 
 mkdirSync(config.dataDir, { recursive: true });
 const dbPath = join(config.dataDir, "app.db");
@@ -57,6 +61,19 @@ CREATE TABLE IF NOT EXISTS gmail_accounts (
   access_token TEXT,
   token_expiry INTEGER,
   PRIMARY KEY (account_id, label)
+);
+CREATE TABLE IF NOT EXISTS customizations (
+  account_id TEXT NOT NULL,
+  photon TEXT NOT NULL,
+  face_name TEXT,
+  voice TEXT NOT NULL DEFAULT 'house',
+  voice_tuning TEXT,
+  look_set TEXT,
+  portrait TEXT,
+  step INTEGER NOT NULL DEFAULT 0,
+  done INTEGER NOT NULL DEFAULT 0,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (account_id, photon)
 );
 `);
 
@@ -174,6 +191,122 @@ export function redeemFreeCode(accountId: string): void {
     `INSERT OR IGNORE INTO owned (account_id, kind, ref, created_at)
      SELECT ?, 'product', slug, ? FROM (SELECT 'supernova' AS slug UNION ALL SELECT 'satellite')`,
   ).run(accountId, now);
+}
+
+export type Customization = {
+  photon: string;
+  faceName: string | null;
+  voice: string;
+  tuning: Record<string, boolean> | null;
+  lookSet: string | null;
+  portrait: string | null;
+  step: number;
+  done: boolean;
+};
+
+function rowToCustomization(row: any): Customization {
+  let tuning: Record<string, boolean> | null = null;
+  if (row.voice_tuning) {
+    try {
+      tuning = JSON.parse(row.voice_tuning);
+    } catch {
+      tuning = null;
+    }
+  }
+  return {
+    photon: row.photon,
+    faceName: row.face_name || null,
+    voice: row.voice || "house",
+    tuning,
+    lookSet: row.look_set || null,
+    portrait: row.portrait || null,
+    step: row.step || 0,
+    done: row.done === 1,
+  };
+}
+
+// Null when the owner has never started customizing this Photon: chat
+// behavior is unchanged until they do.
+export function getCustomization(accountId: string, photon: string): Customization | null {
+  const row = db
+    .query(`SELECT * FROM customizations WHERE account_id = ? AND photon = ?`)
+    .get(accountId, photon) as any;
+  return row ? rowToCustomization(row) : null;
+}
+
+export function getCustomizations(accountId: string): Record<string, Customization> {
+  const rows = db
+    .query(`SELECT * FROM customizations WHERE account_id = ?`)
+    .all(accountId) as any[];
+  const out: Record<string, Customization> = {};
+  for (const row of rows) out[row.photon] = rowToCustomization(row);
+  return out;
+}
+
+export function saveCustomization(
+  accountId: string,
+  photon: string,
+  patch: {
+    faceName?: string | null;
+    voice?: string;
+    tuning?: Record<string, boolean> | null;
+    lookSet?: string | null;
+    portrait?: string | null;
+    step?: number;
+    done?: boolean;
+  },
+): Customization {
+  const now = new Date().toISOString();
+  const current = getCustomization(accountId, photon);
+  const faceName =
+    patch.faceName === undefined
+      ? (current?.faceName ?? null)
+      : patch.faceName === null
+        ? null
+        : String(patch.faceName).trim().slice(0, 40) || null;
+  const voice =
+    patch.voice !== undefined && VOICE_IDS.has(patch.voice) ? patch.voice : (current?.voice ?? "house");
+  const tuning = patch.tuning === undefined ? (current?.tuning ?? null) : patch.tuning;
+  const lookSet =
+    patch.lookSet === undefined
+      ? (current?.lookSet ?? null)
+      : patch.lookSet === null
+        ? null
+        : LOOK_SET_IDS.has(patch.lookSet)
+          ? patch.lookSet
+          : (current?.lookSet ?? null);
+  const portrait =
+    patch.portrait === undefined
+      ? (current?.portrait ?? null)
+      : patch.portrait === null
+        ? null
+        : PHOTON_NAMES.includes(patch.portrait)
+          ? patch.portrait
+          : (current?.portrait ?? null);
+  const step =
+    patch.step === undefined ? (current?.step ?? 0) : Math.max(0, Math.min(3, Math.floor(patch.step)));
+  const done = patch.done === undefined ? (current?.done ?? false) : !!patch.done;
+  db.query(
+    `INSERT INTO customizations (account_id, photon, face_name, voice, voice_tuning, look_set, portrait, step, done, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(account_id, photon) DO UPDATE SET
+       face_name = excluded.face_name, voice = excluded.voice,
+       voice_tuning = excluded.voice_tuning, look_set = excluded.look_set,
+       portrait = excluded.portrait, step = excluded.step,
+       done = excluded.done, updated_at = excluded.updated_at`,
+  ).run(
+    accountId,
+    photon,
+    faceName,
+    voice,
+    tuning ? JSON.stringify(tuning) : null,
+    lookSet,
+    portrait,
+    step,
+    done ? 1 : 0,
+    now,
+  );
+  return getCustomization(accountId, photon) as Customization;
 }
 
 export type ChatMessage = {

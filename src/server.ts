@@ -16,10 +16,14 @@ import {
   redeemFreeCode,
   setCustomName,
   isUnlimited,
+  getCustomization,
+  getCustomizations,
+  saveCustomization,
 } from "./server/db";
 import { chat as brainChat } from "./server/anthropic";
 import { chat as geminiChat } from "./server/gemini";
 import { systemPromptFor } from "./server/personas";
+import { voiceById } from "./shared/voices";
 import {
   PHOTONS,
   photonByName,
@@ -100,6 +104,7 @@ function stateFor(accountId: string) {
     freeCode: a.free_code,
     brain: brainConnected(),
     googleConfigured: googleConfigured(),
+    customizations: getCustomizations(accountId),
     photons: PHOTONS.map((p) => ({
       name: p.name,
       pronoun: p.pronoun,
@@ -161,6 +166,54 @@ async function handleApi(req: Request, path: string): Promise<Response> {
       });
     }
     return json({ ok: false, message: "That code doesn't match" });
+  }
+
+  // GET /api/customize?photon= — the saved customization for one Photon.
+  // POST /api/customize — save one step (or the whole flow) for one Photon.
+  // Progress is per Photon, so the owner picks up where they left off.
+  if (path === "/api/customize" && method === "GET") {
+    const url = new URL(req.url);
+    const photon = String(url.searchParams.get("photon") || "");
+    const accountId = accountIdFrom(req, {});
+    if (!isValidAccountId(accountId)) return bad("accountId required", 400);
+    if (!photonByName(photon)) return bad("unknown photon", 400);
+    if (!ownsPhoton(accountId, photon)) return bad("not_owned", 403);
+    const c = getCustomization(accountId, photon);
+    return json({
+      ok: true,
+      customization: c || {
+        photon,
+        faceName: null,
+        voice: "house",
+        tuning: null,
+        lookSet: null,
+        portrait: null,
+        step: 0,
+        done: false,
+      },
+    });
+  }
+  if (path === "/api/customize" && method === "POST") {
+    const body = await readBody(req);
+    const accountId = accountIdFrom(req, body);
+    if (!isValidAccountId(accountId)) return bad("accountId required", 400);
+    const photon = String(body.photon || "");
+    if (!photonByName(photon)) return bad("unknown photon", 400);
+    if (!ownsPhoton(accountId, photon)) return bad("not_owned", 403);
+    const c = saveCustomization(accountId, photon, {
+      faceName: body.faceName !== undefined ? body.faceName : undefined,
+      voice: typeof body.voice === "string" ? body.voice : undefined,
+      tuning:
+        body.tuning && typeof body.tuning === "object" && !Array.isArray(body.tuning)
+          ? body.tuning
+          : undefined,
+      lookSet: typeof body.lookSet === "string" || body.lookSet === null ? body.lookSet : undefined,
+      portrait:
+        typeof body.portrait === "string" || body.portrait === null ? body.portrait : undefined,
+      step: typeof body.step === "number" ? body.step : undefined,
+      done: typeof body.done === "boolean" ? body.done : undefined,
+    });
+    return json({ ok: true, customization: c });
   }
 
   // POST /api/custom-name — "Make it yours". Empty clears it.
@@ -227,7 +280,10 @@ async function handleApi(req: Request, path: string): Promise<Response> {
       role: m.role,
       content: m.content,
     }));
-    const system = systemPromptFor(photon, a.custom_name || "Prism 5");
+    // The Photon's saved customization (if any) names the Face and sets how
+    // it talks. No customization row means chat behaves exactly as before.
+    const c = getCustomization(accountId, photon);
+    const system = systemPromptFor(photon, c?.faceName || a.custom_name || photon, c);
     // Anthropic takes precedence; Gemini is only the free bridge when no
     // Anthropic key is set. Gating and the meter already ran above and wrap
     // this call either way.
@@ -272,9 +328,15 @@ async function handleApi(req: Request, path: string): Promise<Response> {
           "Live voice calls come with Upkeep, $29 a month. Upkeep also brings unlimited chat, Launch updates, and priority support.",
       });
     }
+    // The saved voice pick rides with the call gate, so the call UI can show
+    // the Photon's voice. The audio line itself is not wired yet.
+    const c = getCustomization(accountId, photon);
+    const voiceId = c?.voice || "house";
     return json({
       ok: true,
       status: "voice_pending",
+      voice: voiceId,
+      voiceName: voiceById(voiceId).name,
       message:
         "Live voice isn't wired up yet. The call button is here and the gate is on, but the voice line itself lands with the next build.",
     });
