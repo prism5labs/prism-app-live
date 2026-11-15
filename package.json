@@ -9,9 +9,8 @@
   "name": "prism-app-standalone",
   "private": true,
   "scripts": {
-    "build": "bun run build:client && bun run build:icons",
+    "build": "bun run build:client",
     "build:client": "bun build client/main.ts --outdir public --target browser --minify",
-    "build:icons": "bun scripts/make-icons.ts",
     "dev": "bun --watch src/server.ts",
     "gen-catalog": "bun scripts/gen-catalog.ts",
     "start": "bun src/server.ts",
