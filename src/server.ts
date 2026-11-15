@@ -353,14 +353,22 @@ async function handleApi(req: Request, path: string): Promise<Response> {
       async start(controller) {
         const enc = new TextEncoder();
         let closed = false;
-        const send = (obj: unknown) => {
+        const sendRaw = (text: string) => {
           if (closed) return;
           try {
-            controller.enqueue(enc.encode(`data: ${JSON.stringify(obj)}\n\n`));
+            controller.enqueue(enc.encode(text));
           } catch {
             closed = true;
           }
         };
+        const send = (obj: unknown) => sendRaw(`data: ${JSON.stringify(obj)}\n\n`);
+        // Heartbeat: the free Gemini bridge can sit silent for minutes
+        // before its first token, and an idle SSE connection is closed
+        // after ~10s (Bun's default idleTimeout, and proxies in front).
+        // A comment line every 5s keeps the stream alive while the brain
+        // thinks. SSE comments are ignored by the client parser.
+        sendRaw(": connected\n\n");
+        const heartbeat = setInterval(() => sendRaw(": ping\n\n"), 5000);
         let full = "";
         try {
           if (brainProvider() === "anthropic") {
@@ -391,6 +399,7 @@ async function handleApi(req: Request, path: string): Promise<Response> {
           console.error("chat stream failed:", e);
           send({ error: "brain_unreachable", message: brainErrorMessage("brain_unreachable") });
         } finally {
+          clearInterval(heartbeat);
           if (!closed) {
             closed = true;
             try {
@@ -567,6 +576,12 @@ async function serveStatic(req: Request, path: string): Promise<Response> {
 
 const server = Bun.serve({
   port: config.port,
+  // Chat replies can take minutes on the free bridge, and the stream
+  // endpoint holds its connection open that whole time. Bun's default
+  // 10s idle timeout would cut an SSE stream that sits quiet waiting
+  // for the first token, so raise it to the 255s maximum; the 5s
+  // heartbeat in the stream handler keeps it alive past that.
+  idleTimeout: 255,
   async fetch(req) {
     const url = new URL(req.url);
     const path = url.pathname;
