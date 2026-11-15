@@ -156,7 +156,7 @@ check(
     geminiLast.systemInstruction.parts[0].text.includes("Prism 5"),
 );
 check(
-  "gemini: model in URL was gemini-2.5-flash (default)",
+  "gemini: model in URL was gemini-3.8-flash (default)",
   true,
 );
 r = await chat("test-gemini-01", "Second Gemini message");

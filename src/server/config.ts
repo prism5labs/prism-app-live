@@ -16,7 +16,7 @@ export const config = {
   // key is set, so the app switches to Anthropic automatically once the
   // credits land and ANTHROPIC_API_KEY is set. Never commit a key.
   geminiApiKey: process.env.GEMINI_API_KEY || "",
-  geminiModel: process.env.GEMINI_MODEL || "gemini-2.5-flash",
+  geminiModel: process.env.GEMINI_MODEL || "gemini-3.8-flash",
   geminiBaseUrl:
     process.env.GEMINI_BASE_URL || "https://generativelanguage.googleapis.com",
   // Friends-and-family free code, checked server-side only. Env override lets

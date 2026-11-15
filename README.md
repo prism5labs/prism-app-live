@@ -103,7 +103,7 @@ the repo):
 | `ANTHROPIC_API_KEY` | Turns chat on. Without it the app serves the shell and history, and new replies say the brain is not connected. |
 | `ANTHROPIC_MODEL` | Optional. Default `claude-sonnet-4-5`. |
 | `GEMINI_API_KEY` | Optional. Free Google Gemini bridge (key from Google AI Studio, no card). Only used when no Anthropic key is set; the app switches to Anthropic automatically once its key lands. |
-| `GEMINI_MODEL` | Optional. Default `gemini-2.5-flash`. |
+| `GEMINI_MODEL` | Optional. Default `gemini-3.8-flash`. |
 | `FREE_CODE` | Optional. Overrides the friends-and-family redeem code (default `2164039998`). Rotate the code by changing this, no code change needed. |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI` | Optional. Enable Gmail sign-in on the Inboxes tab. Without them the tab reports honestly that no accounts are connected. |
 | `APP_URL` | Optional. Public base URL (used for the OAuth redirect). |

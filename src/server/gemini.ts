@@ -2,7 +2,7 @@
 // brain: only used when no ANTHROPIC_API_KEY is set, so the app switches
 // to Anthropic automatically once the credits land. The key comes from the
 // GEMINI_API_KEY env var (Google AI Studio, free tier, no card); the model
-// from GEMINI_MODEL (default gemini-2.5-flash). No provider or model names
+// from GEMINI_MODEL (default gemini-3.8-flash). No provider or model names
 // ever reach the visible copy.
 //
 // Free-tier note: Google may use free-tier data to improve its models, so
