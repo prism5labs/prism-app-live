@@ -122,6 +122,19 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ accountId: getAccountId(), label, to, subject, body }),
     }),
+  // Switchboard: email sends to approved contacts, and the friend-request
+  // flow that approves a new contact first.
+  contacts: () => req(`/api/contacts?accountId=${encodeURIComponent(getAccountId())}`),
+  requestContact: (photon: string, name: string, address: string) =>
+    req("/api/contacts/request", {
+      method: "POST",
+      body: JSON.stringify({ accountId: getAccountId(), photon, name, address }),
+    }),
+  switchboardSend: (photon: string, to: string, subject: string, body: string, name?: string) =>
+    req("/api/switchboard/send", {
+      method: "POST",
+      body: JSON.stringify({ accountId: getAccountId(), photon, to, subject, body, name }),
+    }),
   // Per-Photon customization (name, voice, look). Progress saved per
   // Photon so the owner picks up where they left off.
   customizeGet: (photon: string) =>

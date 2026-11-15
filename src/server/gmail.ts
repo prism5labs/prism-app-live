@@ -204,6 +204,61 @@ export async function saveDraft(
   return { ok: true, draftId: d.id };
 }
 
+// Send a real email from a connected Gmail account. Same MIME build as
+// saveDraft, but it goes out the door instead of into drafts.
+export async function sendEmail(
+  accountId: string,
+  label: GmailLabel,
+  to: string,
+  subject: string,
+  body: string,
+): Promise<{ ok: boolean; messageId?: string; error?: string }> {
+  const acct = getGmailAccount(accountId, label);
+  if (!acct) return { ok: false, error: "not_connected" };
+  const token = await freshAccessToken(accountId, label);
+  if (!token) return { ok: false, error: "token_failed" };
+  const mime = [
+    `To: ${to}`,
+    `Subject: ${subject}`,
+    `Content-Type: text/plain; charset="UTF-8"`,
+    "",
+    body,
+  ].join("\r\n");
+  const res = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "content-type": "application/json" },
+    body: JSON.stringify({ raw: toBase64Url(mime) }),
+  });
+  if (!res.ok) {
+    console.error("Gmail send failed:", res.status, (await res.text().catch(() => "")).slice(0, 200));
+    return { ok: false, error: "send_failed" };
+  }
+  const d = (await res.json()) as { id?: string };
+  return { ok: true, messageId: d.id };
+}
+
+// Send from whichever Gmail account is connected, preferring Personal,
+// then Labs contact, then Labs test. Returns which label sent it.
+export async function sendFromAny(
+  accountId: string,
+  to: string,
+  subject: string,
+  body: string,
+): Promise<{ ok: boolean; label?: GmailLabel; messageId?: string; error?: string }> {
+  const connected = getGmailAccounts(accountId);
+  if (!connected.length) return { ok: false, error: "not_connected" };
+  for (const label of GMAIL_LABELS) {
+    if (!connected.some((a) => a.label === label)) continue;
+    const r = await sendEmail(accountId, label, to, subject, body);
+    if (r.ok) return { ok: true, label, messageId: r.messageId };
+    // A token failure on one account is not worth trying the next with
+    // the same stale credentials; a hard send failure is worth one retry
+    // on the next connected account.
+    if (r.error === "token_failed") return { ok: false, error: "token_failed" };
+  }
+  return { ok: false, error: "send_failed" };
+}
+
 export function connectedLabels(accountId: string): { label: GmailLabel; email: string }[] {
   return getGmailAccounts(accountId).map((a) => ({
     label: a.label as GmailLabel,

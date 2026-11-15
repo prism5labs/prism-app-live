@@ -19,6 +19,13 @@ import {
   getCustomization,
   getCustomizations,
   saveCustomization,
+  listContacts,
+  getContactByAddress,
+  createContact,
+  getContactByToken,
+  setContactStatus,
+  markRequestSent,
+  type Contact,
 } from "./server/db";
 import { chat as brainChat } from "./server/anthropic";
 import { chat as geminiChat, chatStream as geminiChatStream } from "./server/gemini";
@@ -35,11 +42,56 @@ import {
   handleOAuthCallback,
   listInbox,
   saveDraft,
+  sendFromAny,
   connectedLabels,
   GMAIL_LABELS,
   GMAIL_LABEL_TITLES,
   type GmailLabel,
 } from "./server/gmail";
+
+// Switchboard is email. Reports to Prism 5 go to the Labs test inbox.
+export const PRISM_REPORT_ADDRESS = "prism5labstest@gmail.com";
+export const PRISM_REPORT_NAME = "Prism 5";
+
+function isEmail(s: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s);
+}
+
+// The connection request email: the friend request. The recipient taps
+// Approve or Decline, and the link flips this account's contact row.
+function contactRequestEmail(
+  origin: string,
+  accountId: string,
+  contact: Contact,
+): { subject: string; body: string } {
+  const approve = `${origin}/api/contacts/approve?accountId=${encodeURIComponent(accountId)}&contact=${encodeURIComponent(contact.id)}&token=${encodeURIComponent(contact.token)}`;
+  const decline = `${origin}/api/contacts/decline?accountId=${encodeURIComponent(accountId)}&contact=${encodeURIComponent(contact.id)}&token=${encodeURIComponent(contact.token)}`;
+  return {
+    subject: `Switchboard connection request: ${contact.photon} would like to send you reports`,
+    body: [
+      `Hi,`,
+      ``,
+      `${contact.photon}, a Launch from Prism 5 Labs running on its owner's phone, would like to connect with you on Switchboard so it can send you reports and messages by email.`,
+      ``,
+      `Approve this contact:`,
+      approve,
+      ``,
+      `Decline:`,
+      decline,
+      ``,
+      `Once you approve, ${contact.photon} can send to this inbox. If you decline, or just ignore this email, nothing is sent.`,
+      ``,
+      `— Prism 5 Labs Switchboard`,
+    ].join("\n"),
+  };
+}
+
+function decisionPage(title: string, line: string): Response {
+  return new Response(
+    `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${title}</title><style>body{font-family:Georgia,serif;background:#0f3d3e;color:#fdf6e3;text-align:center;padding:48px 20px}h1{font-size:28px}p{font-size:17px;line-height:1.5}</style></head><body><h1>${title}</h1><p>${line}</p></body></html>`,
+    { headers: { "content-type": "text/html; charset=utf-8" } },
+  );
+}
 
 const PUBLIC_DIR = join(import.meta.dir, "..", "public");
 
@@ -538,6 +590,179 @@ async function handleApi(req: Request, path: string): Promise<Response> {
     const r = await saveDraft(accountId, label as GmailLabel, to, subject, draftBody);
     if (!r.ok) return json({ ok: false, error: r.error || "draft_failed" });
     return json({ ok: true, draftId: r.draftId });
+  }
+
+  // GET /api/contacts — the Switchboard contact list for this account.
+  if (path === "/api/contacts" && method === "GET") {
+    const accountId = accountIdFrom(req, {});
+    if (!isValidAccountId(accountId)) return bad("accountId required", 400);
+    const contacts = listContacts(accountId).map((c) => ({
+      id: c.id,
+      photon: c.photon,
+      name: c.name,
+      address: c.address,
+      status: c.status,
+      createdAt: c.created_at,
+    }));
+    return json({
+      ok: true,
+      contacts,
+      prismReport: { name: PRISM_REPORT_NAME, address: PRISM_REPORT_ADDRESS },
+    });
+  }
+
+  // POST /api/contacts/request — ask a new contact to connect. Creates the
+  // pending contact and sends the friend-request email from the owner's
+  // connected Gmail. The recipient approves or declines by tapping a link.
+  if (path === "/api/contacts/request" && method === "POST") {
+    const body = await readBody(req);
+    const accountId = accountIdFrom(req, body);
+    if (!isValidAccountId(accountId)) return bad("accountId required", 400);
+    const photon = String(body.photon || "");
+    if (!photonByName(photon)) return bad("unknown photon", 400);
+    if (!ownsPhoton(accountId, photon)) return bad("not_owned", 403);
+    const address = String(body.address || "").trim().toLowerCase();
+    const name = String(body.name || "").trim().slice(0, 80) || address;
+    if (!isEmail(address)) return bad("a real email address is required", 400);
+    const existing = getContactByAddress(accountId, address);
+    if (existing && existing.status === "approved") {
+      return json({ ok: true, status: "approved", contactId: existing.id });
+    }
+    if (existing && existing.status === "declined") {
+      return json({ ok: false, error: "contact_declined" });
+    }
+    const contact = existing || createContact(accountId, photon, name, address);
+    if (contact.requestSentAt) {
+      return json({ ok: false, error: "already_requested", contactId: contact.id });
+    }
+    const origin = config.appUrl || new URL(req.url).origin;
+    const email = contactRequestEmail(origin, accountId, contact);
+    const sent = await sendFromAny(accountId, address, email.subject, email.body);
+    if (!sent.ok) {
+      return json({
+        ok: false,
+        error: sent.error === "not_connected" ? "gmail_not_connected" : "request_failed",
+      });
+    }
+    markRequestSent(accountId, contact.id);
+    return json({ ok: true, status: "pending", contactId: contact.id });
+  }
+
+  // GET /api/contacts/approve — the Approve link in a request email.
+  if (path === "/api/contacts/approve" && method === "GET") {
+    const accountId = url.searchParams.get("accountId") || "";
+    const contactId = url.searchParams.get("contact") || "";
+    const token = url.searchParams.get("token") || "";
+    const contact = getContactByToken(accountId, contactId, token);
+    if (!contact) {
+      return decisionPage(
+        "That link doesn't match.",
+        "This connection request may already have been decided, or the link is wrong. Nothing was changed.",
+      );
+    }
+    if (contact.status !== "pending") {
+      return decisionPage(
+        contact.status === "approved" ? "Already approved." : "Already declined.",
+        `${contact.photon} can ${contact.status === "approved" ? "send to this inbox" : "not send to this inbox"}.`,
+      );
+    }
+    setContactStatus(accountId, contactId, "approved");
+    return decisionPage(
+      "Connected.",
+      `${contact.photon} can now send you reports and messages on Switchboard.`,
+    );
+  }
+
+  // GET /api/contacts/decline — the Decline link in a request email.
+  if (path === "/api/contacts/decline" && method === "GET") {
+    const accountId = url.searchParams.get("accountId") || "";
+    const contactId = url.searchParams.get("contact") || "";
+    const token = url.searchParams.get("token") || "";
+    const contact = getContactByToken(accountId, contactId, token);
+    if (!contact) {
+      return decisionPage(
+        "That link doesn't match.",
+        "This connection request may already have been decided, or the link is wrong. Nothing was changed.",
+      );
+    }
+    if (contact.status !== "pending") {
+      return decisionPage(
+        contact.status === "approved" ? "Already approved." : "Already declined.",
+        `${contact.photon} can ${contact.status === "approved" ? "send to this inbox" : "not send to this inbox"}.`,
+      );
+    }
+    setContactStatus(accountId, contactId, "declined");
+    return decisionPage(
+      "Declined.",
+      `${contact.photon} cannot send to this inbox. Nothing was sent.`,
+    );
+  }
+
+  // POST /api/switchboard/send — send a report or message by email to a
+  // Switchboard contact. Only an approved contact receives anything. If
+  // there is no contact yet, the call files the connection request instead
+  // and says so; nothing is sent until the recipient approves.
+  if (path === "/api/switchboard/send" && method === "POST") {
+    const body = await readBody(req);
+    const accountId = accountIdFrom(req, body);
+    if (!isValidAccountId(accountId)) return bad("accountId required", 400);
+    const photon = String(body.photon || "");
+    if (!photonByName(photon)) return bad("unknown photon", 400);
+    if (!ownsPhoton(accountId, photon)) return bad("not_owned", 403);
+    const to = String(body.to || "").trim().toLowerCase();
+    const subject = String(body.subject || "").trim().slice(0, 200);
+    const messageBody = String(body.body || "");
+    if (!isEmail(to)) return bad("a real email address is required", 400);
+    if (!messageBody.trim()) return bad("body required", 400);
+    if (messageBody.length > 20000) return bad("body too long", 400);
+    const name = String(body.name || "").trim().slice(0, 80) || to;
+    const contact = getContactByAddress(accountId, to);
+    if (contact && contact.status === "declined") {
+      return json({ ok: false, error: "contact_declined" });
+    }
+    if (contact && contact.status === "pending") {
+      if (!contact.requestSentAt) {
+        const origin = config.appUrl || new URL(req.url).origin;
+        const email = contactRequestEmail(origin, accountId, contact);
+        const sent = await sendFromAny(accountId, to, email.subject, email.body);
+        if (!sent.ok) {
+          return json({
+            ok: false,
+            error: sent.error === "not_connected" ? "gmail_not_connected" : "request_failed",
+          });
+        }
+        markRequestSent(accountId, contact.id);
+        return json({ ok: false, error: "connection_requested", contactId: contact.id });
+      }
+      return json({ ok: false, error: "awaiting_approval", contactId: contact.id });
+    }
+    if (!contact) {
+      const fresh = createContact(accountId, photon, name, to);
+      const origin = config.appUrl || new URL(req.url).origin;
+      const email = contactRequestEmail(origin, accountId, fresh);
+      const sent = await sendFromAny(accountId, to, email.subject, email.body);
+      if (!sent.ok) {
+        return json({
+          ok: false,
+          error: sent.error === "not_connected" ? "gmail_not_connected" : "request_failed",
+        });
+      }
+      markRequestSent(accountId, fresh.id);
+      return json({ ok: false, error: "connection_requested", contactId: fresh.id });
+    }
+    const sent = await sendFromAny(
+      accountId,
+      to,
+      subject || `Report from ${photon}`,
+      messageBody,
+    );
+    if (!sent.ok) {
+      return json({
+        ok: false,
+        error: sent.error === "not_connected" ? "gmail_not_connected" : "send_failed",
+      });
+    }
+    return json({ ok: true, sent: true, messageId: sent.messageId, fromLabel: sent.label });
   }
 
   return bad("not found", 404);

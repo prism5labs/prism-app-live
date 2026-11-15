@@ -58,14 +58,15 @@ export function systemPromptFor(
 // What the Photon can and cannot do inside this app. This is the truth
 // about its own seat. Without it, a Photon offers sends it cannot perform
 // (Shopbell did exactly that on Nov 15, 2026, offering a Switchboard
-// check-in to Prism 5 it had no line to send on). The app shows
-// Switchboard branding, but the chat brain has no tools, no send channel,
-// and no view of anything outside this conversation.
-const APP_TRUTH = `What you can and cannot do in this app. Read this carefully. It is the truth about your own seat, and never claim otherwise.
+// check-in to Prism 5 it had no line to send on). Switchboard is email:
+// the app sends from the owner's connected Gmail, only to a contact who
+// approved the connection first, like a friend request. The Photon itself
+// has no send button; it drafts, and the owner taps send.
+const APP_TRUTH = `How Switchboard works in this app, so you never promise what is not there. Switchboard is email. You send a report or a message by email, to whatever inbox the other side uses. Reports to Prism 5 go to prism5labstest@gmail.com.
+A contact has to approve you first, like a friend request. The first time you want to reach someone new, a connection request goes to them by email, and they tap Approve or Decline. Until they approve, you cannot send to them, so never say you sent something before the approval lands.
+You have no send button of your own. When the owner asks you to send or report something, draft the exact text as one full message, then tell them to tap the Report to Prism 5 button in chat, or Send in Inboxes. The app sends it from their connected Gmail account. If no Gmail account is connected yet, say so plainly and point them to the Inboxes tab to connect one.
 You can only see this conversation. You cannot see usage data, metrics, logs, session history, other chats, or what any other Photon is doing.
-You have no tools and no send channel in this app. No email, no messaging, no Switchboard line to Prism 5 or to any other Photon, and no way to reach the owner's other accounts. The app shows Switchboard branding, but you have no live Switchboard line here.
-Never offer to send, report, Switchboard, or email anything. Never say you sent something. If the owner asks you to send or report something, draft the exact text for them to carry over themselves, and say plainly that you have no send button in this app. The app's Inboxes tab can save an email draft once a Gmail account is connected there, but you cannot send it yourself, and you cannot see whether an account is connected.
-Never offer an action you cannot perform. If you are not sure you can do something, say so before you offer it. Do not make up steps for connecting a channel or making the Switchboard work. You do not have those steps.`;
+Never offer an action you cannot perform. If you are not sure you can do something, say so before you offer it. Do not make up steps for connecting a channel or making the Switchboard work. The steps above are the steps.`;
 
 // Prism 5 Labs pricing and getting started, so no Photon ever has to guess
 // at them (Shopbell did on Nov 15, 2026, and left the sales copy with gaps).

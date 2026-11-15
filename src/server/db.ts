@@ -75,6 +75,25 @@ CREATE TABLE IF NOT EXISTS customizations (
   updated_at TEXT NOT NULL,
   PRIMARY KEY (account_id, photon)
 );
+-- Switchboard contacts (Nov 15, 2026): who a Photon may email. A contact
+-- starts pending: the recipient gets a connection request by email and taps
+-- Approve or Decline, like a friend request. Only an approved contact can
+-- receive a Switchboard send. The token is the unguessable part of the
+-- approve/decline links in the request email.
+CREATE TABLE IF NOT EXISTS contacts (
+  account_id TEXT NOT NULL,
+  id TEXT NOT NULL,
+  photon TEXT NOT NULL,
+  name TEXT NOT NULL,
+  address TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending',
+  token TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  request_sent_at TEXT,
+  decided_at TEXT,
+  PRIMARY KEY (account_id, id)
+);
+CREATE INDEX IF NOT EXISTS idx_contacts_address ON contacts (account_id, address);
 `);
 
 export const MONTH_LIMIT = 300;
@@ -390,4 +409,96 @@ export function updateGmailAccessToken(
   db.query(
     `UPDATE gmail_accounts SET access_token = ?, token_expiry = ? WHERE account_id = ? AND label = ?`,
   ).run(accessToken, tokenExpiry, accountId, label);
+}
+
+// --- Switchboard contacts ---
+export type Contact = {
+  id: string;
+  photon: string;
+  name: string;
+  address: string;
+  status: "pending" | "approved" | "declined";
+  token: string;
+  created_at: string;
+  requestSentAt: string | null;
+  decided_at: string | null;
+};
+
+function rowToContact(row: any): Contact {
+  return {
+    id: row.id,
+    photon: row.photon,
+    name: row.name,
+    address: row.address,
+    status: row.status,
+    token: row.token,
+    created_at: row.created_at,
+    requestSentAt: row.request_sent_at || null,
+    decided_at: row.decided_at,
+  };
+}
+
+export function listContacts(accountId: string): Contact[] {
+  const rows = db
+    .query(`SELECT * FROM contacts WHERE account_id = ? ORDER BY created_at ASC`)
+    .all(accountId) as any[];
+  return rows.map(rowToContact);
+}
+
+export function getContactByAddress(accountId: string, address: string): Contact | null {
+  const row = db
+    .query(`SELECT * FROM contacts WHERE account_id = ? AND lower(address) = lower(?)`)
+    .get(accountId, address) as any;
+  return row ? rowToContact(row) : null;
+}
+
+export function createContact(
+  accountId: string,
+  photon: string,
+  name: string,
+  address: string,
+): Contact {
+  const now = new Date().toISOString();
+  const id = `ct_${crypto.randomUUID().replace(/-/g, "").slice(0, 20)}`;
+  const token = crypto.randomUUID().replace(/-/g, "") + crypto.randomUUID().replace(/-/g, "");
+  db.query(
+    `INSERT INTO contacts (account_id, id, photon, name, address, status, token, created_at)
+     VALUES (?, ?, ?, ?, ?, 'pending', ?, ?)`,
+  ).run(accountId, id, photon, name, address, token, now);
+  return getContactByAddress(accountId, address) as Contact;
+}
+
+export function getContactByToken(
+  accountId: string,
+  id: string,
+  token: string,
+): Contact | null {
+  const row = db
+    .query(`SELECT * FROM contacts WHERE account_id = ? AND id = ? AND token = ?`)
+    .get(accountId, id, token) as any;
+  return row ? rowToContact(row) : null;
+}
+
+export function setContactStatus(
+  accountId: string,
+  id: string,
+  status: "approved" | "declined",
+): Contact | null {
+  const now = new Date().toISOString();
+  db.query(
+    `UPDATE contacts SET status = ?, decided_at = ? WHERE account_id = ? AND id = ?`,
+  ).run(status, now, accountId, id);
+  const row = db
+    .query(`SELECT * FROM contacts WHERE account_id = ? AND id = ?`)
+    .get(accountId, id) as any;
+  return row ? rowToContact(row) : null;
+}
+
+export function markRequestSent(accountId: string, id: string): void {
+  const now = new Date().toISOString();
+  db.query(`UPDATE contacts SET request_sent_at = ? WHERE account_id = ? AND id = ?`).run(
+    now,
+    accountId,
+    id,
+  );
 }

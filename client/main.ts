@@ -186,6 +186,7 @@ function renderChatThread(): string {
       </div>
       <button class="btn small" data-action="customize" data-photon="${esc(p.name)}">Customize</button>
       <button class="btn small call" data-action="call" data-photon="${esc(p.name)}">Call · Upkeep</button>
+      <button class="btn small" data-action="report-prism" data-photon="${esc(p.name)}">Report to Prism 5</button>
       <p class="thread-focus">${esc(p.focus)}</p>
     </div>
     <div class="switchboard-strip"><img src="/brand/switchboard.jpg" alt=""><p><b>On Switchboard.</b> This Launch stays in touch with the rest of the Lab — first of its kind.</p></div>
@@ -400,6 +401,38 @@ function appendStreamingText(text: string) {
   scrollMessages();
 }
 
+// Switchboard: send the Photon's latest reply to Prism 5 by email.
+// The Photon drafts the report in chat; this button is the send. If the
+// Prism 5 contact is not approved yet, the tap files the connection
+// request instead, and nothing is sent until Prism 5 approves it.
+async function reportToPrism(photon: string) {
+  const last = [...threadMessages]
+    .reverse()
+    .find((m: any) => m.role === "assistant" && !m.streaming && String(m.content || "").trim());
+  if (!last) {
+    toast("Ask me to write the report first, then tap this.", "err");
+    return;
+  }
+  const p = PHOTONS.find((x) => x.name === photon);
+  const face = p ? faceNameOf(p) : photon;
+  const r = await api.switchboardSend(
+    photon,
+    "prism5labstest@gmail.com",
+    `Report from ${face}`,
+    String(last.content),
+    "Prism 5",
+  );
+  if (r && r.ok) toast("Report sent to Prism 5.");
+  else if (r?.error === "connection_requested")
+    toast("Connection request sent to Prism 5. Once they approve it, you can send reports.");
+  else if (r?.error === "awaiting_approval")
+    toast("Still waiting on Prism 5 to approve the connection.");
+  else if (r?.error === "contact_declined") toast("Prism 5 declined the connection.");
+  else if (r?.error === "gmail_not_connected")
+    toast("Connect a Gmail account in Inboxes first, then send.", "err");
+  else toast("That didn't send. Try again.", "err");
+}
+
 async function sendChat(text: string) {
   const input = document.getElementById("chat-input") as HTMLInputElement | null;
   if (input) input.value = "";
@@ -487,6 +520,41 @@ async function callPhoton(name: string) {
 }
 
 // ---------- Inboxes ----------
+// Switchboard contacts: who this owner's Photons may email. A contact
+// starts pending and the recipient approves or declines by tapping a link
+// in the request email, like a friend request. Only approved contacts
+// receive sends.
+function renderSwitchboardContacts(): string {
+  const contacts = (state?.contacts || []) as any[];
+  const prism = contacts.find(
+    (c: any) => String(c.address || "").toLowerCase() === "prism5labstest@gmail.com",
+  );
+  const others = contacts.filter(
+    (c: any) => String(c.address || "").toLowerCase() !== "prism5labstest@gmail.com",
+  );
+  const statusWord = (s: string) =>
+    s === "approved" ? "Approved — can send" : s === "declined" ? "Declined" : "Waiting for approval";
+  const row = (c: any) =>
+    `<div class="inbox-msg"><p class="inbox-subject">${esc(c.name || c.address)}</p><p class="inbox-meta">${esc(c.address)} · ${esc(c.photon)} · ${statusWord(c.status)}</p></div>`;
+  const owned = (state?.ownedPhotons || []) as string[];
+  const photonOpts = (owned.length ? owned : ["Prism"])
+    .map((n: string) => `<option value="${esc(n)}">${esc(n)}</option>`)
+    .join("");
+  return `<div class="card">
+    <h3>Switchboard contacts</h3>
+    <p class="fine">Switchboard is email. A Photon can only send to a contact who approved the connection first, like a friend request.</p>
+    ${prism ? row(prism) : `<p class="fine">Prism 5 (prism5labstest@gmail.com) — no connection yet. Ask a Photon to write a report, then tap Report to Prism 5 in chat.</p>`}
+    ${others.map(row).join("")}
+    <form class="contact-form">
+      <h4>Request a connection</h4>
+      <input name="name" type="text" placeholder="Name" required>
+      <input name="address" type="email" placeholder="Email address" required>
+      <select name="photon" aria-label="Photon">${photonOpts}</select>
+      <button class="btn primary" type="submit">Send connection request</button>
+    </form>
+  </div>`;
+}
+
 function renderInboxes(): string {
   const accounts = (state?.inboxAccounts || []) as any[];
   const configured = state?.googleConfigured;
@@ -531,6 +599,7 @@ function renderInboxes(): string {
     <h1 class="page-title">Inboxes</h1>
     <p class="page-lede">Your three Gmail accounts, side by side. Drafts you save here land in that account's Gmail drafts.</p>
     <div class="switchboard-strip"><img src="/brand/switchboard.jpg" alt=""><p><b>On Switchboard.</b> Inboxes is where Switchboard lives — every Launch in the Lab, one board.</p></div>
+    ${renderSwitchboardContacts()}
     ${state?.inboxError ? `<p class="chat-error">${esc(state.inboxError)}</p>` : ""}
     <div class="inbox-grid">${cards}</div>
   </section>`;
@@ -735,6 +804,8 @@ async function loadInboxes() {
     state.inboxAccounts = r.accounts;
     state.googleConfigured = r.googleConfigured;
   }
+  const c = await api.contacts();
+  if (c && c.ok) state.contacts = c.contacts || [];
 }
 
 // ---------- Events (delegation) ----------
@@ -770,6 +841,8 @@ document.addEventListener("click", (e) => {
     render();
   } else if (action === "call") {
     callPhoton(t.dataset.photon || "");
+  } else if (action === "report-prism") {
+    reportToPrism(t.dataset.photon || "");
   } else if (action === "customize") {
     const name = t.dataset.photon || "";
     if (name) {
@@ -924,6 +997,31 @@ document.addEventListener("submit", async (e) => {
       form.reset();
     } else {
       toast("That draft didn't save. Check the account is connected.", "err");
+    }
+  } else if (form.classList.contains("contact-form")) {
+    e.preventDefault();
+    const fd = new FormData(form);
+    const name = String(fd.get("name") || "");
+    const address = String(fd.get("address") || "");
+    const photon = String(fd.get("photon") || "Prism");
+    const r = await api.requestContact(photon, name, address);
+    if (r && r.ok) {
+      toast(
+        r.status === "approved"
+          ? "Already connected — you can send to them."
+          : "Connection request sent. They tap Approve or Decline in the email.",
+      );
+      form.reset();
+      await loadInboxes();
+      render();
+    } else if (r?.error === "already_requested") {
+      toast("Request already sent — still waiting on their approval.");
+    } else if (r?.error === "contact_declined") {
+      toast("That contact was declined.", "err");
+    } else if (r?.error === "gmail_not_connected") {
+      toast("Connect a Gmail account in Inboxes first.", "err");
+    } else {
+      toast("That request didn't send. Try again.", "err");
     }
   }
 });
