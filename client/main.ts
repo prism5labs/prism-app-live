@@ -57,7 +57,7 @@ function meterBar(): string {
   return `<div class="meter-bar"><div class="meter-fill" style="width:${pct}%"></div></div>`;
 }
 
-function photonCard(p: any, size = 72): string {
+function photonCard(p: any, size = 220): string {
   const owned = p.owned;
   return `<button class="photon-card" data-action="open-photon" data-photon="${esc(p.name)}" ${
     owned ? "" : "disabled"
@@ -123,13 +123,15 @@ function renderChatThread(): string {
   return `
   <section class="thread">
     <div class="thread-head thread-hero">
-      <button class="btn small" data-action="back-to-front">← All Photons</button>
-      ${portraitHtml(p.name, 56)}
+      <div class="thread-head-row">
+        <button class="btn small" data-action="back-to-front">← All Photons</button>
+        <button class="btn small call" data-action="call" data-photon="${esc(p.name)}">Call · Upkeep</button>
+      </div>
+      ${portraitHtml(p.name, 220)}
       <div class="thread-title">
         <h2>${esc(p.name)}</h2>
         <p>${esc(p.focus)}</p>
       </div>
-      <button class="btn small call" data-action="call" data-photon="${esc(p.name)}">Call · Upkeep</button>
     </div>
     <div class="messages" id="messages">${msgs}</div>
     <div id="chat-error" class="chat-error" hidden></div>
@@ -293,7 +295,7 @@ function renderStore(): string {
   const photonCards = PHOTONS.map((p) => {
     const owned = allOwned || ownedPhotons.includes(p.name);
     return `<div class="card product-card photon-store">
-      ${portraitHtml(p.name, 64)}
+      ${portraitHtml(p.name, 220)}
       <h3>${esc(p.name)}</h3>
       <p>${esc(p.tagline)}</p>
       <p class="fine">${esc(p.focus)} And so much more.</p>
