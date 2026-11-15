@@ -145,12 +145,14 @@ function renderChatThread(): string {
     </div>
     <div class="switchboard-strip"><img src="/brand/switchboard.jpg" alt=""><p><b>On Switchboard.</b> This Launch stays in touch with the rest of the Lab — first of its kind.</p></div>
     <div class="messages" id="messages">${msgs}</div>
-    <div id="chat-error" class="chat-error" hidden></div>
-    <form id="chat-form" class="composer">
-      <input id="chat-input" type="text" placeholder="Ask ${esc(p.name)} anything…" autocomplete="off" aria-label="Message">
-      <button class="send" type="submit" aria-label="Send message">${SEND_SVG}</button>
-    </form>
-    <p class="fine">${esc(meterLine())}</p>
+    <div class="composer-dock">
+      <div class="thread-meter">${esc(meterLine())}${meterBar()}</div>
+      <div id="chat-error" class="chat-error" hidden></div>
+      <form id="chat-form" class="composer">
+        <input id="chat-input" type="text" placeholder="Ask ${esc(p.name)} anything…" autocomplete="off" aria-label="Message">
+        <button class="send" type="submit" aria-label="Send message">${SEND_SVG}</button>
+      </form>
+    </div>
   </section>`;
 }
 
