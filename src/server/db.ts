@@ -137,7 +137,10 @@ export function getOwned(accountId: string): { photons: string[]; products: stri
   const rows = db
     .query(`SELECT kind, ref FROM owned WHERE account_id = ?`)
     .all(accountId) as { kind: string; ref: string }[];
-  const photons = rows.filter((r) => r.kind === "photon").map((r) => r.ref);
+  // Prism comes with the app: everyone owns her, no purchase needed.
+  const photons = Array.from(
+    new Set(["Prism", ...rows.filter((r) => r.kind === "photon").map((r) => r.ref)]),
+  );
   const products = rows.filter((r) => r.kind === "product").map((r) => r.ref);
   return { photons, products };
 }
@@ -145,6 +148,7 @@ export function getOwned(accountId: string): { photons: string[]; products: stri
 export function ownsPhoton(accountId: string, photon: string): boolean {
   const a = getOrCreateAccount(accountId);
   if (a.free_code) return true;
+  if (photon === "Prism") return true;
   const row = db
     .query(`SELECT 1 AS x FROM owned WHERE account_id = ? AND kind = 'photon' AND ref = ?`)
     .get(accountId, photon) as any;

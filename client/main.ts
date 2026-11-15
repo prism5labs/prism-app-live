@@ -78,11 +78,11 @@ function renderChatFront(): string {
       ? `<div class="photon-grid">${owned.map((p: any) => photonCard(p)).join("")}</div>`
       : `<div class="empty-panel">
           <div class="empty-mark">${logoHtml(26)}</div>
-          <p class="empty-title">Your counter's empty.</p>
-          <p>You don't own any Photons yet. Buy one in the Store, or redeem a code below.</p>
+          <p class="empty-title">Prism is on the line.</p>
+          <p>Prism comes with the app, ready to talk. The Store is there whenever you want a specialist Photon.</p>
           <div class="row">
-            <button class="btn primary" data-action="goto" data-tab="store">Visit the Store</button>
-            <button class="btn" data-action="goto" data-tab="upkeep">Redeem a code</button>
+            <button class="btn primary" data-action="open-photon" data-photon="Prism">Start with Prism</button>
+            <button class="btn" data-action="goto" data-tab="store">Visit the Store</button>
           </div>
         </div>`;
   return `
@@ -389,7 +389,7 @@ function renderUpkeep(): string {
       ? `<ul class="owned-list">${ownedPhotons.map((n) => `<li>${esc(n)} — Photon</li>`).join("")}${ownedProducts
           .map((s) => `<li>${esc(s)}</li>`)
           .join("")}</ul>`
-      : `<p class="fine">Nothing owned yet. Buy in the Store, or redeem a code below.</p>`;
+      : `<p class="fine">Prism comes with the app. Anything else you buy shows up here.</p>`;
   return `
   <section>
     <h1 class="page-title">Upkeep</h1>
