@@ -1,0 +1,22 @@
+{
+  "description": "Prism 5 — standalone PWA (Bun + TypeScript, zero runtime dependencies). Rebuilt outside the Muse artifact system so we own every file.",
+  "devDependencies": {
+    "@types/jsdom": "^30.0.0",
+    "bun-types": "^1.4.0",
+    "jsdom": "^31.0.1",
+    "typescript": "^5.9.0"
+  },
+  "name": "prism-app-standalone",
+  "private": true,
+  "scripts": {
+    "build": "bun run build:client && bun run build:icons",
+    "build:client": "bun build client/main.ts --outdir public --target browser --minify",
+    "build:icons": "bun scripts/make-icons.ts",
+    "dev": "bun --watch src/server.ts",
+    "gen-catalog": "bun scripts/gen-catalog.ts",
+    "start": "bun src/server.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "type": "module",
+  "version": "1.0.0"
+}

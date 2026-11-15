@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: prism-app-live
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # ANTHROPIC_API_KEY: set in the Render dashboard (never in this file).
+      # Enables live chat replies. Without it the app serves the shell and
+      # chat history, and new replies answer "brain not connected".
+      # ANTHROPIC_MODEL: optional, default claude-sonnet-4-5.
+      # FREE_CODE: optional, overrides the friends-and-family redeem code.
+      # GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET / GOOGLE_REDIRECT_URI:
+      # optional, enable Gmail sign-in on the Inboxes tab. Without them the
+      # tab reports honestly that no accounts are connected.
+      # APP_URL: optional, public base URL of this deployment (used for the
+      # OAuth redirect). Defaults to the request host when unset.
