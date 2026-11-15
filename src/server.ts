@@ -4,7 +4,7 @@
 // and fetch for the brain and Gmail.
 
 import { join, normalize, extname } from "node:path";
-import { config, brainConnected, googleConfigured } from "./server/config";
+import { config, brainConnected, brainProvider, googleConfigured } from "./server/config";
 import {
   getOrCreateAccount,
   getOwned,
@@ -18,6 +18,7 @@ import {
   isUnlimited,
 } from "./server/db";
 import { chat as brainChat } from "./server/anthropic";
+import { chat as geminiChat } from "./server/gemini";
 import { systemPromptFor } from "./server/personas";
 import {
   PHOTONS,
@@ -227,7 +228,13 @@ async function handleApi(req: Request, path: string): Promise<Response> {
       content: m.content,
     }));
     const system = systemPromptFor(photon, a.custom_name || "Prism 5");
-    const result = await brainChat(system, history, message);
+    // Anthropic takes precedence; Gemini is only the free bridge when no
+    // Anthropic key is set. Gating and the meter already ran above and wrap
+    // this call either way.
+    const result =
+      brainProvider() === "anthropic"
+        ? await brainChat(system, history, message)
+        : await geminiChat(system, history, message);
     if (!result.ok) {
       const msg =
         result.error === "brain_unreachable" || result.error === "brain_error"
@@ -397,7 +404,7 @@ const server = Bun.serve({
     const path = url.pathname;
     try {
       if (path === "/healthz") {
-        return json({ ok: true, brain: brainConnected() });
+        return json({ ok: true, brain: brainConnected(), provider: brainProvider() });
       }
       if (path.startsWith("/api/")) {
         return await handleApi(req, path);
@@ -411,6 +418,6 @@ const server = Bun.serve({
 });
 
 console.log(`Prism 5 standalone listening on http://localhost:${server.port}`);
-console.log(`Brain connected: ${brainConnected()} (set ANTHROPIC_API_KEY to turn chat on)`);
+console.log(`Brain: ${brainProvider()} (set ANTHROPIC_API_KEY for Claude, GEMINI_API_KEY for the free Gemini bridge)`);
 console.log(`Google OAuth configured: ${googleConfigured()}`);
 console.log(`Data dir: ${config.dataDir}`);

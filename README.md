@@ -19,11 +19,13 @@ A PWA named **Prism 5**. Four bottom tabs: **Chat, Inboxes, Store, Upkeep**.
   Blueprint, Calendra, Shopbell, Keystone, Vesper, Goldstar. Each has a
   saved chat thread and a persona. Prism is seeded from the self-export's
   SOUL and IDENTITY (see "Persona and privacy" below).
-- **Chat** is real Claude-backed replies via the Anthropic API. 300 free
-  chats a month per account; Upkeep ($29/mo) is unlimited chat plus updates,
-  priority support, and live voice. The server enforces the meter and the
-  gating. With no API key the app runs and answers honestly that the brain
-  is not connected.
+- **Chat** is real replies via the Anthropic API, with a free Google
+  Gemini bridge as a fallback when no Anthropic key is set (see
+  "Temporary Gemini bridge" below). 300 free chats a month per account;
+  Upkeep ($29/mo) is unlimited chat plus updates, priority support, and
+  live voice. The server enforces the meter and the gating. With no API
+  key at all the app runs and answers honestly that the brain is not
+  connected.
 - **Store**: Supernova ($499 one-time, plus $49/mo, $39/mo 2-year, $539/yr),
   Satellite ($99 plus plans), each of the 12 Photons individually, Upkeep
   $29/mo, and the 23 Sparks & Plugs (Sparks $19/$25, Plugs $39/$59) grouped
@@ -100,6 +102,8 @@ the repo):
 |---|---|
 | `ANTHROPIC_API_KEY` | Turns chat on. Without it the app serves the shell and history, and new replies say the brain is not connected. |
 | `ANTHROPIC_MODEL` | Optional. Default `claude-sonnet-4-5`. |
+| `GEMINI_API_KEY` | Optional. Free Google Gemini bridge (key from Google AI Studio, no card). Only used when no Anthropic key is set; the app switches to Anthropic automatically once its key lands. |
+| `GEMINI_MODEL` | Optional. Default `gemini-2.5-flash`. |
 | `FREE_CODE` | Optional. Overrides the friends-and-family redeem code (default `2164039998`). Rotate the code by changing this, no code change needed. |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI` | Optional. Enable Gmail sign-in on the Inboxes tab. Without them the tab reports honestly that no accounts are connected. |
 | `APP_URL` | Optional. Public base URL (used for the OAuth redirect). |
@@ -111,6 +115,23 @@ the repo):
 - Ephemeral disk: chat history, unlocks, and Upkeep flags reset when the
   service redeploys or restarts. A persistent disk is a paid add-on.
 - 750 instance hours/month; one always-on service fits.
+
+## Temporary Gemini bridge
+
+Until the Anthropic credits land, the app can run on a free Google Gemini
+API key (Google AI Studio, no card required) as a demo brain for the
+first installs. Set `GEMINI_API_KEY` on Render; the server uses it only
+when `ANTHROPIC_API_KEY` is not set, and switches to Anthropic
+automatically the moment that key appears, no redeploy needed. The
+Gemini client (`src/server/gemini.ts`) sends the same distilled Prism
+system prompt and the same conversation history as the Anthropic client,
+and the 300/month meter and server-side gating wrap it identically.
+
+Caveats, by design: the free tier has tight, per-project rate limits
+(Google no longer publishes fixed numbers) and Google may use free-tier
+data to improve its models, so this is a bridge for testing and the
+first installs, not the production brain. Once the Anthropic key is set,
+remove the Gemini key from Render.
 
 ## Persona and privacy
 
@@ -127,7 +148,8 @@ If a deployment should carry the full private seed, inject it server-side
 
 ## API (for reference)
 
-- `GET /healthz` → `{ ok, brain }`
+- `GET /healthz` → `{ ok, brain, provider }` where provider is
+  `"anthropic"`, `"gemini"`, or `"none"`
 - `GET /api/state?accountId=` → display name, owned Photons/products,
   meter, Upkeep, brain, Google status, Photon roster with owned flags
 - `POST /api/redeem` `{ accountId, code }` → free code, server-side only.
@@ -216,3 +238,13 @@ These are deliberate, and the parent should confirm them before the push:
   Dockerfile mirrors the proven deploy package's (oven/bun:1.4-slim,
   frozen lockfile) plus the build step, which was verified above.
   Render will build it on push; watch the first deploy.
+- Gemini bridge (Nov 15, 2026): `bun run typecheck` clean; `bun
+  run build` bundles 6 modules, 33.5 KB. `bun scripts/test-gemini.ts`
+  (23 checks, all passing): both keys set -> healthz provider
+  "anthropic", chat uses the Anthropic mock, Gemini mock untouched;
+  Gemini only -> healthz provider "gemini", chat replies via the
+  Gemini mock, meter 0 -> 1 -> 2, second request carries the first
+  exchange in user/model history; no keys -> healthz provider "none",
+  brain false, chat returns brain_not_connected and the meter is
+  untouched. Mock Gemini server at `scripts/test-mock-gemini.ts`
+  (port 3102).
