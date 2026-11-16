@@ -3,7 +3,7 @@
 
 import { api, getAccountId } from "./api";
 import { portraitHtml } from "./ui";
-import { SUPERNOVA, SATELLITE, UPKEEP, PRODUCTS, CATEGORIES, photonBuyUrl } from "../src/shared/catalog";
+import { SUPERNOVA, SATELLITE, UPKEEP, PRODUCTS, CATEGORIES } from "../src/shared/catalog";
 import { TIER_COPY, UPKEEP_COPY } from "../src/shared/tiers";
 import { PHOTONS } from "../src/shared/photons";
 import { VOICES, TUNING_QUESTIONS, LOOK_SETS, voiceById, lookSetById, tuningStyle } from "../src/shared/voices";
@@ -55,6 +55,43 @@ let customizePhoton: string | null = null;
 let customizeStep: number = 1;
 let customizeDesign = false;
 let customizeTuning: Record<string, boolean> = {};
+
+// Live voice call screen (Step 5): turn-based only. One Photon at a time;
+// the call screen replaces the thread until the owner ends the call.
+let callPhotonName: string | null = null;
+let callPhase: "checking" | "idle" | "recording" | "transcribing" | "speaking" | "blocked" = "checking";
+let callHeard = "";
+let callRecorder: MediaRecorder | null = null;
+let callStream: MediaStream | null = null;
+let callChunks: Blob[] = [];
+let callAudio: HTMLAudioElement | null = null;
+
+// Proactive checks, reminders, push (Step 3) and the job plug (Step 8):
+// loaded when the Upkeep tab opens, so the tab shows a loading line
+// instead of stale or empty cards.
+let proactiveData: any = null;
+let proactiveLoading = false;
+let remindersData: any[] | null = null;
+let pushData: any = null;
+let lastCheck: any = null;
+let checkRunning = false;
+let jobsStatusData: any = null;
+let jobsRulesData: any = null;
+let jobsListingsData: any[] | null = null;
+let jobsListingsFilter: "filed" | "skipped" = "filed";
+let jobsRunning = false;
+let upkeepLoading = false;
+
+// Messenger (Step 9): Page threads, loaded with the Inboxes tab.
+let messengerStatusData: any = null;
+let messengerThreadsData: any[] | null = null;
+let messengerOpenId: string | null = null;
+let messengerOpenMessages: any[] | null = null;
+let messengerOpenError = "";
+
+// Stripe webhook status (Step 10): loaded when the Store tab opens.
+let stripeStatusData: any = null;
+let stripeLoading = false;
 
 const SEND_SVG = `<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 20V6M6 11l6-6 6 6" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 
@@ -207,6 +244,11 @@ function renderChatThread(): string {
         <input id="chat-input" type="text" placeholder="Ask ${esc(face)} anything…" autocomplete="off" aria-label="Message">
         <button class="send" type="submit" aria-label="Send message">${SEND_SVG}</button>
       </form>
+      <form id="research-form" class="research-row">
+        <input id="research-input" type="text" placeholder="Look something up live…" autocomplete="off" aria-label="Look something up live">
+        <button class="btn small" type="submit">Look it up</button>
+      </form>
+      <div id="research-results" class="research-results" hidden></div>
     </div>
   </section>`;
 }
@@ -286,7 +328,7 @@ function renderCustomVoice(p: any, c: Customization): string {
   return `
   <div class="card">
     <h3>Step 2 — Pick a voice</h3>
-    <p>This is how ${esc(face)} talks in chat. The house voice is the default. Live voice calls are an Upkeep extra, and the call line itself is still being built.</p>
+    <p>This is how ${esc(face)} talks in chat. The house voice is the default. Live voice calls are an Upkeep extra — tap Call in the chat menu and talk out loud, turn by turn.</p>
     ${opts}
     <button class="btn" data-action="custom-skip-step">Skip this step</button>
   </div>`;
@@ -442,7 +484,7 @@ async function reportToPrism(photon: string) {
   else toast("That didn't send. Try again.", "err");
 }
 
-async function sendChat(text: string) {
+async function sendChat(text: string): Promise<string | null> {
   const input = document.getElementById("chat-input") as HTMLInputElement | null;
   // The keyboard goes away after sending, so the reply is readable
   // instead of hidden behind the text box.
@@ -487,7 +529,7 @@ async function sendChat(text: string) {
     if (doneEv.meter && state) state.meter = doneEv.meter;
     render();
     scrollMessages();
-    return;
+    return doneEv.reply || gotText || null;
   }
   if (gotText) {
     // A partial reply is better than none: show what arrived, plus why it stopped.
@@ -495,7 +537,7 @@ async function sendChat(text: string) {
     render();
     showChatError(streamErr?.message || "The reply stopped partway. Try that again in a moment.");
     scrollMessages();
-    return;
+    return gotText;
   }
   if (transportFailed) {
     // The stream never reached the server at all: one try on the plain
@@ -506,31 +548,222 @@ async function sendChat(text: string) {
       if (r.meter && state) state.meter = r.meter;
       render();
       scrollMessages();
-      return;
+      return r.reply || null;
     }
     threadMessages = threadMessages.slice(0, -1);
     render();
     showChatError(r?.message || "Something went wrong. Try that again in a moment.");
-    return;
+    return null;
   }
   // The brain answered with an error and nothing arrived. The message was
   // not saved and the meter was not touched. Show why.
   threadMessages = threadMessages.slice(0, -1);
   render();
   showChatError(streamErr?.message || "Something went wrong. Try that again in a moment.");
+  return null;
+}
+
+// ---------- Live voice call screen (Step 5) ----------
+// Turn-based only: the owner talks, then the Photon answers out loud.
+// It is not a live phone call — there is no two-way audio, no barge-in.
+// Mic record → POST /api/voice/transcribe → normal chat → POST /api/voice/say.
+// The screen updates itself directly (no full render) while a turn is in
+// flight, so the mic button and status line never lose their state.
+let callStatusText = "";
+
+function setCallStatus(text: string) {
+  callStatusText = text;
+  const el = document.getElementById("call-status");
+  if (el) el.textContent = text;
+}
+
+function setCallPhase(phase: typeof callPhase) {
+  callPhase = phase;
+  const btn = document.getElementById("call-mic-btn") as HTMLButtonElement | null;
+  if (btn) {
+    btn.disabled = phase === "checking" || phase === "blocked" || phase === "transcribing" || phase === "speaking";
+    btn.classList.toggle("recording", phase === "recording");
+    btn.textContent = phase === "recording" ? "■ Stop" : "🎙️ Talk";
+  }
+  const heard = document.getElementById("call-heard");
+  if (heard) heard.textContent = callHeard ? `You said: “${callHeard}”` : "";
+}
+
+function renderCallScreen(): string {
+  const p = PHOTONS.find((x) => x.name === callPhotonName);
+  if (!p) return renderChatFront();
+  const face = faceNameOf(p);
+  const blocked = callPhase === "blocked";
+  const micDisabled = callPhase === "checking" || blocked;
+  return `
+  <section class="call-screen">
+    <button class="back-btn" data-action="end-call">← Back to chat</button>
+    <div class="call-hero">${portraitHtml(portraitNameOf(p), 120)}</div>
+    <h2 class="page-title">Call ${esc(face)}</h2>
+    <p class="page-lede">Turn-based voice: you talk, then ${esc(face)} answers out loud. It is not a live phone call — ${esc(face)} can't hear you while speaking.</p>
+    <p id="call-status" class="call-status" role="status">${esc(callStatusText || "Checking voice…")}</p>
+    <p id="call-heard" class="call-heard">${callHeard ? `You said: “${esc(callHeard)}”` : ""}</p>
+    <button id="call-mic-btn" class="call-mic${callPhase === "recording" ? " recording" : ""}" data-action="call-mic" ${micDisabled ? "disabled" : ""}>${callPhase === "recording" ? "■ Stop" : "🎙️ Talk"}</button>
+    ${blocked ? `<div class="row call-blocked-actions"><button class="btn primary" data-action="goto" data-tab="upkeep">Go to Upkeep</button><button class="btn" data-action="goto" data-tab="store">Visit the Store</button></div>` : ""}
+    <p class="fine">Voice is an Upkeep extra, and it needs the server's ElevenLabs key. If either is missing, this screen says so instead of pretending the call works.</p>
+  </section>`;
+}
+
+async function openCall(name: string) {
+  callPhotonName = name;
+  callHeard = "";
+  callStatusText = "Checking voice…";
+  callPhase = "checking";
+  render();
+  // The existing gate: owns the Photon, and has Upkeep.
+  const gate = await api.voice(name);
+  if (!gate || !gate.ok) {
+    setCallPhase("blocked");
+    setCallStatus(gate?.message || "Voice isn't available right now.");
+    render();
+    return;
+  }
+  const s = await api.voiceStatus();
+  if (!s || !s.ok || !s.configured) {
+    setCallPhase("blocked");
+    setCallStatus(
+      s?.message || "Live voice isn't set up yet — the server needs an ElevenLabs key.",
+    );
+    render();
+    return;
+  }
+  if (!s.upkeep) {
+    setCallPhase("blocked");
+    setCallStatus("Live voice is set up, and it comes with Upkeep.");
+    render();
+    return;
+  }
+  setCallPhase("idle");
+  setCallStatus("Tap the mic, talk, tap again — I'll answer out loud.");
+}
+
+function stopCallMedia() {
+  if (callRecorder && callRecorder.state !== "inactive") {
+    try {
+      callRecorder.stop();
+    } catch {
+      // Already stopped.
+    }
+  }
+  callRecorder = null;
+  if (callStream) {
+    callStream.getTracks().forEach((t) => t.stop());
+    callStream = null;
+  }
+  if (callAudio) {
+    callAudio.pause();
+    callAudio = null;
+  }
+}
+
+function endCall() {
+  stopCallMedia();
+  callPhotonName = null;
+  callPhase = "idle";
+  callHeard = "";
+  render();
+}
+
+async function speakReply(photon: string, text: string) {
+  const sayText = text.slice(0, 2000);
+  setCallPhase("speaking");
+  setCallStatus("Speaking…");
+  const r = await api.voiceSay(photon, sayText);
+  if (!r.ok || !r.blob) {
+    setCallPhase("idle");
+    setCallStatus(r.message || "I couldn't say that one out loud.");
+    return;
+  }
+  if (r.fallback) {
+    setCallStatus(
+      "That voice pick has no matching ElevenLabs voice, so I'm using the house voice for this one.",
+    );
+  }
+  if (!callAudio) callAudio = new Audio();
+  const url = URL.createObjectURL(r.blob);
+  const oldSrc = callAudio.src;
+  callAudio.src = url;
+  if (oldSrc.startsWith("blob:")) URL.revokeObjectURL(oldSrc);
+  callAudio.onended = () => {
+    if (callPhotonName) {
+      setCallPhase("idle");
+      setCallStatus("Tap the mic, talk, tap again — I'll answer out loud.");
+    }
+  };
+  try {
+    await callAudio.play();
+  } catch {
+    setCallPhase("idle");
+    setCallStatus("The reply wouldn't play. Try again in a moment.");
+  }
+}
+
+async function toggleCallMic() {
+  const photon = callPhotonName || "";
+  if (!photon) return;
+  if (callRecorder && callRecorder.state === "recording") {
+    callRecorder.stop(); // stopping ends the turn; transcription starts in onstop
+    return;
+  }
+  if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
+    setCallStatus("This browser can't record voice. Try a modern phone browser.");
+    return;
+  }
+  let stream: MediaStream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch {
+    setCallStatus("Microphone access was denied — allow it in the browser and try again.");
+    return;
+  }
+  callStream = stream;
+  callChunks = [];
+  const recorder = new MediaRecorder(stream);
+  callRecorder = recorder;
+  recorder.ondataavailable = (e) => {
+    if (e.data.size) callChunks.push(e.data);
+  };
+  recorder.onstop = async () => {
+    if (callStream) {
+      callStream.getTracks().forEach((t) => t.stop());
+      callStream = null;
+    }
+    callRecorder = null;
+    setCallPhase("transcribing");
+    setCallStatus("Heard you — writing that down…");
+    const blob = new Blob(callChunks, { type: recorder.mimeType || "audio/webm" });
+    const tr = await api.voiceTranscribe(photon, blob);
+    if (!tr.ok || !tr.text || !tr.text.trim()) {
+      setCallPhase("idle");
+      setCallStatus(tr.message || "I didn't catch any words in that one.");
+      return;
+    }
+    callHeard = tr.text.trim();
+    setCallStatus(`You said: “${callHeard}”`);
+    const heard = document.getElementById("call-heard");
+    if (heard) heard.textContent = `You said: “${callHeard}”`;
+    // The transcribed text goes through the normal chat, so it is saved
+    // and metered exactly like a typed message.
+    const reply = await sendChat(callHeard);
+    if (!reply) {
+      setCallPhase("idle");
+      setCallStatus("The reply didn't come through. Try that again in a moment.");
+      return;
+    }
+    await speakReply(photon, reply);
+  };
+  recorder.start();
+  setCallPhase("recording");
+  setCallStatus("Listening… tap stop when you're done.");
 }
 
 async function callPhoton(name: string) {
-  const r = await api.voice(name);
-  if (r && r.ok) {
-    toast(r.message || "Live voice isn't wired up yet.", "ok");
-  } else {
-    toast(r?.message || "Voice isn't available right now.", "err");
-    if (r?.error === "needs_upkeep") {
-      tab = "upkeep";
-      render();
-    }
-  }
+  await openCall(name);
 }
 
 // ---------- Inboxes ----------
@@ -567,6 +800,73 @@ function renderSwitchboardContacts(): string {
       <button class="btn primary" type="submit">Send connection request</button>
     </form>
   </div>`;
+}
+
+// Messenger (Step 9): Facebook Page messaging only. Personal Messenger
+// has no supported API, so the section says so instead of pretending.
+// Tap a thread to read it; a reply is drafted here and goes out only
+// when the owner taps Send.
+function renderMessenger(): string {
+  const s = messengerStatusData as any;
+  const threads = (messengerThreadsData || []) as any[];
+  const personal = `<p class="fine">Personal Messenger can't be connected — Meta offers messaging for Facebook Pages only, not personal accounts. For a personal thread, paste the messages into chat and your Photon will read them there.</p>`;
+  if (!s) return `<div class="card"><h3>Messenger</h3><p class="fine">Loading…</p></div>`;
+  if (!s.configured) {
+    return `<div class="card"><h3>Messenger</h3><p>Your business Facebook Page isn't connected yet.</p>${personal}</div>`;
+  }
+  const rows = threads
+    .map(
+      (t: any) => `<button class="inbox-msg msg-thread${messengerOpenId === t.id ? " open" : ""}" data-action="msg-thread" data-id="${esc(t.id)}">
+      <span class="inbox-subject">${esc((t.participants || []).map((p: any) => p.name).filter(Boolean).join(", ") || t.id)}</span>
+      <span class="inbox-snippet">${esc(t.snippet || "")}</span>
+      <span class="inbox-meta">${esc(t.updatedTime || "")}${typeof t.unreadCount === "number" && t.unreadCount > 0 ? ` · ${t.unreadCount} unread` : ""}</span>
+    </button>`,
+    )
+    .join("");
+  let openHtml = "";
+  if (messengerOpenId) {
+    if (messengerOpenError) {
+      openHtml = `<p class="chat-error">${esc(messengerOpenError)}</p>`;
+    } else if (!messengerOpenMessages) {
+      openHtml = `<p class="fine">Loading messages…</p>`;
+    } else {
+      const msgs = messengerOpenMessages
+        .map(
+          (m: any) => `<div class="inbox-msg"><p class="inbox-subject">${esc(m.from?.name || m.from?.id || "Page")}</p><p class="inbox-snippet">${esc(m.text || "")}</p><p class="inbox-meta">${esc(m.createdTime || "")}</p></div>`,
+        )
+        .join("");
+      openHtml = `${msgs || `<p class="fine">No messages in this thread yet.</p>`}
+      <form class="msg-send-form" data-id="${esc(messengerOpenId)}">
+        <h4>Reply as the Page</h4>
+        <textarea name="text" rows="3" placeholder="Write the reply…" required maxlength="2000"></textarea>
+        <p class="fine">Draft it here, then tap send — nothing goes out until you do. Meta only lets a Page reply inside the 24-hour window.</p>
+        <button class="btn primary" type="submit">Send reply</button>
+      </form>`;
+    }
+  }
+  return `<div class="card"><h3>Messenger — your Page</h3>
+    <p class="fine">Page messaging is connected. Replies go out only when you tap send.</p>
+    ${rows || `<p class="fine">No Page conversations yet.</p>`}
+    ${openHtml}
+    ${personal}</div>`;
+}
+
+async function openMessengerThread(id: string) {
+  messengerOpenId = id;
+  messengerOpenMessages = null;
+  messengerOpenError = "";
+  render();
+  const r = await api.messengerMessages(id);
+  if (r && r.ok) {
+    messengerOpenMessages = r.messages || [];
+  } else if (r?.error === "messenger_not_configured") {
+    messengerOpenError = "Facebook Page messaging isn't connected yet.";
+  } else if (r?.error === "meta_error") {
+    messengerOpenError = r.metaError?.message || r.message || "Meta refused that read.";
+  } else {
+    messengerOpenError = r?.message || "Those messages didn't load. Try again.";
+  }
+  render();
 }
 
 function renderInboxes(): string {
@@ -614,12 +914,22 @@ function renderInboxes(): string {
     <p class="page-lede">Your three Gmail accounts, side by side. Drafts you save here land in that account's Gmail drafts.</p>
     <div class="switchboard-strip"><img src="/brand/switchboard.jpg" alt=""><p><b>On Switchboard.</b> Inboxes is where Switchboard lives — every Launch in the Lab, one board.</p></div>
     ${renderSwitchboardContacts()}
+    ${renderMessenger()}
     ${state?.inboxError ? `<p class="chat-error">${esc(state.inboxError)}</p>` : ""}
     <div class="inbox-grid">${cards}</div>
   </section>`;
 }
 
 // ---------- Store ----------
+// Step 10: every Stripe checkout carries the account id, so the webhook
+// can unlock the purchase on the buyer's account. Format:
+// "<accountId>:<hint>". The server only trusts an account part starting
+// with "acc_"; a bare hint unlocks nothing.
+function buyUrl(url: string, hint: string): string {
+  const sep = url.includes("?") ? "&" : "?";
+  return `${url}${sep}client_reference_id=${encodeURIComponent(getAccountId() + ":" + hint)}`;
+}
+
 function buyButton(url: string, label: string, owned: boolean): string {
   if (owned) return `<span class="owned-badge">Owned — yours already</span>`;
   return `<a class="btn primary" href="${esc(url)}" target="_blank" rel="noopener">Buy — ${esc(label)}</a>`;
@@ -633,7 +943,7 @@ function productCard(p: (typeof PRODUCTS)[number]): string {
     <p class="kind">${esc(p.kind)}</p>
     <p>${esc(p.description)}</p>
     <p class="price">${esc(v.price)} <span class="fine">(${esc(v.total)} at checkout)</span></p>
-    ${buyButton(v.url + "?client_reference_id=" + p.slug + "-" + storeVariant, v.total, owned)}
+    ${buyButton(buyUrl(v.url, p.slug + "-" + storeVariant), v.total, owned)}
   </div>`;
 }
 
@@ -662,7 +972,7 @@ function renderStore(): string {
       <p>${esc(p.tagline)}</p>
       <p class="fine">${esc(p.focus)} And so much more.</p>
       <p class="price">$499.00 <span class="fine">($514.00 at checkout)</span></p>
-      ${buyButton(photonBuyUrl(p.name), "$514.00", owned)}
+      ${buyButton(buyUrl(SUPERNOVA.url, "Photon-" + p.name), "$514.00", owned)}
     </div>`;
   }).join("");
 
@@ -672,6 +982,9 @@ function renderStore(): string {
   return `
   <section>
     <div class="store-head"><img src="/brand/starburst.jpg" alt=""><div><h1 class="page-title">Store</h1><p>Buy a Launch once and it is yours forever. Checkout shows the full total, including the standard 3% processing fee.</p></div></div>
+    ${stripeStatusData
+      ? `<p class="fine stripe-line">${stripeStatusData.configured ? "Automatic unlocks are on — a purchase unlocks as soon as Stripe confirms the payment." : "Automatic unlocks are off — the Stripe webhook isn't set up yet. Purchases still unlock by code (redeem one in Upkeep) until it is."}</p>`
+      : `<p class="fine">Checking automatic unlocks…</p>`}
     <div class="chrome-thin"></div>
 
     <div class="store-jump" aria-label="Jump to a section">
@@ -683,16 +996,16 @@ function renderStore(): string {
     </div>
 
     <h2 class="section-title">Launches</h2>
-    <div class="poster-row" id="store-supernova"><img src="/brand/poster-supernova.jpg" alt="Supernova poster — $499 one-time, the whole front office"><div class="pr-txt"><b>Supernova</b><span class="desc">${esc(TIER_COPY.supernova.body)}</span><span class="desc">${esc(TIER_COPY.supernova.hours)}</span><span class="price">$499.00</span><span class="at">$514.00 at checkout</span>${buyButton(SUPERNOVA.url, "$514.00", allOwned || ownedProducts.includes("supernova"))}<p class="fine">Or pay monthly:</p><div class="row monthly-row">
-        <a class="btn small" href="${esc(SUPERNOVA.monthly.url)}" target="_blank" rel="noopener">$49/mo</a>
-        <a class="btn small" href="${esc(SUPERNOVA.twoYear.url)}" target="_blank" rel="noopener">$39/mo · 2-year</a>
-        <a class="btn small" href="${esc(SUPERNOVA.annual.url)}" target="_blank" rel="noopener">$539/yr</a>
+    <div class="poster-row" id="store-supernova"><img src="/brand/poster-supernova.jpg" alt="Supernova poster — $499 one-time, the whole front office"><div class="pr-txt"><b>Supernova</b><span class="desc">${esc(TIER_COPY.supernova.body)}</span><span class="desc">${esc(TIER_COPY.supernova.hours)}</span><span class="price">$499.00</span><span class="at">$514.00 at checkout</span>${buyButton(buyUrl(SUPERNOVA.url, "supernova"), "$514.00", allOwned || ownedProducts.includes("supernova"))}<p class="fine">Or pay monthly:</p><div class="row monthly-row">
+        <a class="btn small" href="${esc(buyUrl(SUPERNOVA.monthly.url, "supernova-monthly"))}" target="_blank" rel="noopener">$49/mo</a>
+        <a class="btn small" href="${esc(buyUrl(SUPERNOVA.twoYear.url, "supernova-two-year"))}" target="_blank" rel="noopener">$39/mo · 2-year</a>
+        <a class="btn small" href="${esc(buyUrl(SUPERNOVA.annual.url, "supernova-annual"))}" target="_blank" rel="noopener">$539/yr</a>
       </div></div></div>
 
-    <div class="poster-row" id="store-satellite"><img src="/brand/poster-satellite.jpg" alt="Satellite poster — $99 one-time, one Brain, one Face, one job duty"><div class="pr-txt"><b>Satellite</b><span class="desc">${esc(TIER_COPY.satellite.body)}</span><span class="desc">${esc(TIER_COPY.satellite.hours)}</span><span class="price">$99.00</span><span class="at">$101.97 at checkout</span>${buyButton(SATELLITE.url, "$101.97", allOwned || ownedProducts.includes("satellite"))}<p class="fine">Or pay monthly:</p><div class="row monthly-row">
-        <a class="btn small" href="${esc(SATELLITE.monthly.url)}" target="_blank" rel="noopener">$33/mo</a>
-        <a class="btn small" href="${esc(SATELLITE.twoYear.url)}" target="_blank" rel="noopener">$26/mo · 2-year</a>
-        <a class="btn small" href="${esc(SATELLITE.annual.url)}" target="_blank" rel="noopener">$363/yr</a>
+    <div class="poster-row" id="store-satellite"><img src="/brand/poster-satellite.jpg" alt="Satellite poster — $99 one-time, one Brain, one Face, one job duty"><div class="pr-txt"><b>Satellite</b><span class="desc">${esc(TIER_COPY.satellite.body)}</span><span class="desc">${esc(TIER_COPY.satellite.hours)}</span><span class="price">$99.00</span><span class="at">$101.97 at checkout</span>${buyButton(buyUrl(SATELLITE.url, "satellite"), "$101.97", allOwned || ownedProducts.includes("satellite"))}<p class="fine">Or pay monthly:</p><div class="row monthly-row">
+        <a class="btn small" href="${esc(buyUrl(SATELLITE.monthly.url, "satellite-monthly"))}" target="_blank" rel="noopener">$33/mo</a>
+        <a class="btn small" href="${esc(buyUrl(SATELLITE.twoYear.url, "satellite-two-year"))}" target="_blank" rel="noopener">$26/mo · 2-year</a>
+        <a class="btn small" href="${esc(buyUrl(SATELLITE.annual.url, "satellite-annual"))}" target="_blank" rel="noopener">$363/yr</a>
       </div></div></div>
 
     <details class="store-group" id="store-photons" ${storeOpen.photons ? "open" : ""}>
@@ -701,7 +1014,7 @@ function renderStore(): string {
       <div class="product-grid">${photonCards}</div>
     </details>
 
-    <div class="card upkeep-card" id="store-upkeep"><img src="/brand/starburst.jpg" alt=""><div><h2>Upkeep</h2><p>${esc(UPKEEP_COPY.body)}</p><p class="price">$29.00/month <span class="fine">($29.87 at checkout)</span></p><div class="row">${buyButton(UPKEEP.url, "$29.87", state?.upkeep === true)}</div></div></div>
+    <div class="card upkeep-card" id="store-upkeep"><img src="/brand/starburst.jpg" alt=""><div><h2>Upkeep</h2><p>${esc(UPKEEP_COPY.body)}</p><p class="price">$29.00/month <span class="fine">($29.87 at checkout)</span></p><div class="row">${buyButton(buyUrl(UPKEEP.url, "upkeep"), "$29.87", state?.upkeep === true)}</div></div></div>
 
     <h2 class="section-title" id="store-sparks-plugs">Sparks &amp; Plugs</h2>
     <p class="page-lede">One job each. A Spark is a single button for one job, push it and it does the thing. A Plug is a Spark that runs on its own.</p>
@@ -722,6 +1035,273 @@ function renderStore(): string {
     </details>
     <div class="store-foot">Let us handle the noise so you can focus on what you want and need to do.<br>© 2026 Prism 5 Labs · Green Bay, Wisconsin</div>
   </section>`;
+}
+
+// ---------- Proactive checks, reminders, push (Step 3) ----------
+function fmtTime(iso: string | null | undefined): string {
+  if (!iso) return "never";
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? iso : d.toLocaleString();
+}
+
+function renderProactive(): string {
+  if (!proactiveData) return `<div class="card"><h2>Checks &amp; reminders</h2><p class="fine">Loading…</p></div>`;
+  const s = proactiveData.scheduler || {};
+  const push = proactiveData.push || {};
+  const channels = proactiveData.channels || {};
+  const rems = (remindersData || []).filter((r: any) => !r.done);
+  const doneCount = (remindersData || []).filter((r: any) => r.done).length;
+  const remRows = rems
+    .map(
+      (r: any) => `<div class="inbox-msg"><p class="inbox-subject">${esc(r.text)}</p><p class="inbox-meta">Due ${esc(fmtTime(r.remindAt))}</p><button class="btn small" data-action="reminder-done" data-id="${esc(r.id)}">Mark done</button></div>`,
+    )
+    .join("");
+  let checkHtml = "";
+  if (lastCheck) {
+    const items = [
+      ...(lastCheck.gmail?.newItems || []),
+      ...(lastCheck.texts?.newItems || []),
+      ...(lastCheck.calendar?.newItems || []),
+      ...(lastCheck.remindersDue || []),
+    ];
+    checkHtml = `<div class="check-result"><p><b>Last check (${esc(fmtTime(lastCheck.checkedAt))}):</b> ${lastCheck.newTotal} new.</p>${
+      items.length
+        ? `<ul>${items
+            .map(
+              (i: any) =>
+                `<li><b>${esc(i.channel)}:</b> ${esc(i.summary)}${i.detail ? ` — ${esc(i.detail)}` : ""}</li>`,
+            )
+            .join("")}</ul>`
+        : `<p class="fine">Nothing new — nothing needs a decision right now.</p>`
+    }${lastCheck.push && lastCheck.push.configured ? `<p class="fine">Phone taps: ${lastCheck.push.sent} sent to your devices.</p>` : ""}</div>`;
+  }
+  let pushHtml = "";
+  if (!push.configured) {
+    pushHtml = `<p class="fine">Phone taps aren't set up on the server yet — it needs VAPID keys. Checks and reminders still run without them.</p>`;
+  } else if (push.subscribed) {
+    pushHtml = `<p><span class="owned-badge">Phone taps on</span> This device gets a tap when a check finds something new.</p><button class="btn small" data-action="push-toggle">Turn phone taps off</button>`;
+  } else {
+    pushHtml = `<p class="fine">Phone taps are set up, but this device isn't subscribed yet.</p><button class="btn primary" data-action="push-toggle">Turn phone taps on</button>`;
+  }
+  return `<div class="card">
+    <h2>Checks &amp; reminders</h2>
+    <p class="fine">${s.running ? `Checking every ${s.intervalMinutes || 5} minutes while the server is awake.` : "The checker isn't running right now."} ${s.lastCheckAt ? `Last check: ${esc(fmtTime(s.lastCheckAt))}.` : "No check has run yet."} ${s.totalNewFound ? `${s.totalNewFound} new item(s) found so far.` : ""}</p>
+    <p class="fine">Watching Gmail. ${channels.texts ? "Texts and calendar too." : "Texts and calendar checks aren't built yet, so Gmail is all it watches for now."}</p>
+    <div class="row"><button class="btn primary" data-action="check-now" ${checkRunning ? "disabled" : ""}>${checkRunning ? "Checking…" : "Check now"}</button></div>
+    ${checkHtml}
+    <h3>Reminders</h3>
+    ${remRows || `<p class="fine">No reminders set.</p>`}
+    ${doneCount ? `<p class="fine">${doneCount} done.</p>` : ""}
+    <form id="reminder-form" class="row reminder-form">
+      <input id="reminder-text" type="text" maxlength="500" placeholder="Remind me to…" required aria-label="Reminder text">
+      <input id="reminder-when" type="datetime-local" required aria-label="Remind at">
+      <button class="btn primary" type="submit">Set reminder</button>
+    </form>
+    <h3>Phone taps</h3>
+    ${pushHtml}
+  </div>`;
+}
+
+async function runProactiveCheck() {
+  if (checkRunning) return;
+  checkRunning = true;
+  render();
+  const r = await api.proactiveCheck();
+  checkRunning = false;
+  if (r && r.ok) {
+    lastCheck = r;
+    const p = await api.proactiveStatus();
+    if (p && p.ok) proactiveData = p;
+    const rems = await api.reminders();
+    if (rems && rems.ok) remindersData = rems.reminders || [];
+  } else {
+    toast("That check didn't run. Try again.", "err");
+  }
+  render();
+}
+
+// The standard base64url → Uint8Array helper for the VAPID public key.
+function urlBase64ToUint8Array(base64String: string): Uint8Array<ArrayBuffer> {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const raw = atob(base64);
+  const out = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
+  return out;
+}
+
+async function togglePush() {
+  if (!pushData) return;
+  if (pushData.subscribed) {
+    // No server unsubscribe route: drop the local subscription here; the
+    // server drops dead ones on its own when a send bounces.
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.getSubscription();
+      if (sub) await sub.unsubscribe();
+    } catch {
+      // Already gone.
+    }
+    const r = await api.pushStatus();
+    if (r && r.ok) pushData = r;
+    render();
+    toast("Phone taps off on this device.");
+    return;
+  }
+  if (!pushData.configured || !pushData.publicKey) {
+    toast("Phone taps aren't set up on the server yet.", "err");
+    return;
+  }
+  if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+    toast("This browser can't do phone taps.", "err");
+    return;
+  }
+  let permission: NotificationPermission = "default";
+  try {
+    permission = await Notification.requestPermission();
+  } catch {
+    permission = "denied";
+  }
+  if (permission !== "granted") {
+    toast("Notifications weren't allowed — turn them on in the browser to get taps.", "err");
+    return;
+  }
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    const existing = await reg.pushManager.getSubscription();
+    const sub =
+      existing ||
+      (await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(pushData.publicKey),
+      }));
+    const r = await api.pushSubscribe(sub.toJSON());
+    if (r && r.ok) {
+      const s = await api.pushStatus();
+      if (s && s.ok) pushData = s;
+      render();
+      toast("Phone taps on — this device gets a tap when a check finds something new.");
+    } else {
+      toast("That subscription didn't save. Try again.", "err");
+    }
+  } catch {
+    toast("That subscription didn't save. Try again.", "err");
+  }
+}
+
+// ---------- Job plug (Step 8) ----------
+// Files jobs that fit the owner's rules so they can be reviewed. It never
+// applies to a job, and auto-apply is always off.
+const JOB_BOOL_RULES: { key: string; label: string }[] = [
+  { key: "prefer_remote", label: "Prefer remote work" },
+  { key: "onsite_allowed", label: "Onsite in the Green Bay area is OK" },
+  { key: "hard_no_outbound_sales", label: "Hard no: outbound sales" },
+  { key: "hard_no_cold_calling", label: "Hard no: cold calling" },
+  { key: "hard_no_call_center", label: "Hard no: phone-heavy call centers" },
+  { key: "hard_no_commission_only", label: "Hard no: commission-only outbound" },
+  { key: "hard_no_fedex", label: "Hard no: FedEx, any role" },
+  { key: "hard_no_drug_test", label: "Hard no: postings that require a drug test" },
+  { key: "hard_no_dot_physical", label: "Hard no: postings that require a DOT physical" },
+  { key: "hard_no_thc_testing", label: "Hard no: employers that test for THC" },
+  { key: "allow_background_check", label: "Background-check consent is fine" },
+];
+
+function renderJobs(): string {
+  if (!jobsStatusData) return `<div class="card"><h2>Job plug</h2><p class="fine">Loading…</p></div>`;
+  const s = jobsStatusData;
+  const lastRun = s.lastRun;
+  const rules = (jobsRulesData && jobsRulesData.rules) || s.rules || {};
+  const boolRows = JOB_BOOL_RULES.map(
+    (r) =>
+      `<label class="rule-row"><input type="checkbox" name="${r.key}" ${rules[r.key] === "true" ? "checked" : ""}> ${r.label}</label>`,
+  ).join("");
+  let approved = "";
+  try {
+    const a = JSON.parse(rules.approved_roles || "[]");
+    approved = Array.isArray(a) ? a.join(", ") : "";
+  } catch {
+    approved = "";
+  }
+  const listings = (jobsListingsData || [])
+    .map(
+      (l: any) => `<div class="inbox-msg"><p class="inbox-subject">${esc(l.title)}</p><p class="inbox-meta">${esc(l.company)}${l.location ? ` · ${esc(l.location)}` : ""}${l.pay ? ` · ${esc(l.pay)}` : ""}</p><a class="btn small" href="${esc(l.url)}" target="_blank" rel="noopener">View listing</a></div>`,
+    )
+    .join("");
+  return `<div class="card">
+    <h2>Job plug</h2>
+    <p class="fine">${esc(s.message || "")}</p>
+    <p><b>Auto-apply: off.</b> The plug only files jobs for review — it never applies to one on its own.</p>
+    <p class="fine">${s.sourceConnected ? `Job source connected (${esc(s.source || "feed")}).` : "No job source is connected yet, so it can't search."} ${lastRun ? `Last run ${esc(fmtTime(lastRun.startedAt))}: ${lastRun.found} found, ${lastRun.kept} filed, ${lastRun.skipped} skipped.` : "No run yet."}</p>
+    <div class="row"><button class="btn primary" data-action="jobs-run" ${jobsRunning ? "disabled" : ""}>${jobsRunning ? "Running…" : "Run the job plug now"}</button></div>
+    <form id="jobs-rules-form">
+      <h3>Your rules</h3>
+      ${boolRows}
+      <label class="rule-row">Pay floor, $ a month <input type="number" name="pay_floor_monthly" min="0" step="100" value="${esc(rules.pay_floor_monthly || "3000")}" aria-label="Pay floor per month"></label>
+      <label class="rule-row">Onsite area <input type="text" name="onsite_area" value="${esc(rules.onsite_area || "Green Bay area")}" aria-label="Onsite area"></label>
+      <label class="rule-row">Approved roles for a drug test or DOT physical (titles or URLs, comma-separated) <input type="text" name="approved_roles" value="${esc(approved)}" aria-label="Approved roles"></label>
+      <p class="fine">The plug never signs a drug-test or background-check consent. An approved role is only filed for review, never applied to.</p>
+      <button class="btn primary" type="submit">Save rules</button>
+    </form>
+    <h3>Filed jobs</h3>
+    <div class="row" role="group" aria-label="Filed or skipped">
+      <button class="toggle-btn ${jobsListingsFilter === "filed" ? "active" : ""}" data-action="jobs-filter" data-filter="filed">Filed</button>
+      <button class="toggle-btn ${jobsListingsFilter === "skipped" ? "active" : ""}" data-action="jobs-filter" data-filter="skipped">Skipped</button>
+    </div>
+    ${listings || `<p class="fine">${jobsListingsFilter === "filed" ? "Nothing filed yet." : "Nothing skipped yet."}</p>`}
+  </div>`;
+}
+
+async function runJobs() {
+  if (jobsRunning) return;
+  jobsRunning = true;
+  render();
+  const r = await api.jobsRun();
+  jobsRunning = false;
+  if (r && r.ok) {
+    toast(`Found ${r.found}, filed ${r.kept}, skipped ${r.skipped}. Nothing was applied to.`);
+    const [js, jl] = await Promise.all([api.jobsStatus(), api.jobsListings(jobsListingsFilter)]);
+    if (js && js.ok) jobsStatusData = js;
+    if (jl && jl.ok) jobsListingsData = jl.listings || [];
+  } else if (r?.error === "job_source_not_connected") {
+    toast(r.message || "No job source is connected yet, so the plug can't search.", "err");
+  } else {
+    toast(r?.message || "That run didn't finish. Try again.", "err");
+  }
+  render();
+}
+
+async function loadUpkeep() {
+  if (upkeepLoading) return;
+  upkeepLoading = true;
+  try {
+    const [p, r, pu, js, jr, jl] = await Promise.all([
+      api.proactiveStatus(),
+      api.reminders(),
+      api.pushStatus(),
+      api.jobsStatus(),
+      api.jobsRules(),
+      api.jobsListings(jobsListingsFilter),
+    ]);
+    if (p && p.ok) proactiveData = p;
+    if (r && r.ok) remindersData = r.reminders || [];
+    if (pu && pu.ok) pushData = pu;
+    if (js && js.ok) jobsStatusData = js;
+    if (jr && jr.ok) jobsRulesData = jr;
+    if (jl && jl.ok) jobsListingsData = jl.listings || [];
+  } finally {
+    upkeepLoading = false;
+  }
+}
+
+async function loadStripeStatus() {
+  if (stripeLoading) return;
+  stripeLoading = true;
+  try {
+    const r = await api.stripeStatus();
+    if (r && r.ok) stripeStatusData = r;
+  } finally {
+    stripeLoading = false;
+  }
 }
 
 // ---------- Upkeep ----------
@@ -770,11 +1350,14 @@ function renderUpkeep(): string {
       ${
         state?.upkeep
           ? `<p><span class="owned-badge">Upkeep is on</span></p>`
-          : `<a class="btn primary" href="${esc(UPKEEP.url)}" target="_blank" rel="noopener">Buy Upkeep — $29.87</a>`
+          : `<a class="btn primary" href="${esc(buyUrl(UPKEEP.url, "upkeep"))}" target="_blank" rel="noopener">Buy Upkeep — $29.87</a>`
       }
       <p class="fine">Upkeep is never required to use what you bought.</p>
       </div>
     </div>
+
+    ${renderProactive()}
+    ${renderJobs()}
   </section>`;
 }
 
@@ -799,7 +1382,14 @@ function renderNav() {
 function render() {
   renderNav();
   const v = view();
-  if (tab === "chat") v.innerHTML = customizePhoton ? renderCustomize() : activePhoton ? renderChatThread() : renderChatFront();
+  if (tab === "chat")
+    v.innerHTML = callPhotonName
+      ? renderCallScreen()
+      : customizePhoton
+        ? renderCustomize()
+        : activePhoton
+          ? renderChatThread()
+          : renderChatFront();
   else if (tab === "inboxes") v.innerHTML = renderInboxes();
   else if (tab === "store") v.innerHTML = renderStore();
   else v.innerHTML = renderUpkeep();
@@ -821,6 +1411,16 @@ async function loadInboxes() {
   }
   const c = await api.contacts();
   if (c && c.ok) state.contacts = c.contacts || [];
+  const ms = await api.messengerStatus();
+  if (ms && ms.ok) {
+    messengerStatusData = ms;
+    if (ms.configured) {
+      const th = await api.messengerThreads();
+      if (th && th.ok) messengerThreadsData = th.threads || [];
+    } else {
+      messengerThreadsData = [];
+    }
+  }
 }
 
 // ---------- Events (delegation) ----------
@@ -845,8 +1445,49 @@ document.addEventListener("click", (e) => {
     tab = t.dataset.tab as Tab;
     activePhoton = null;
     customizePhoton = null;
+    // Ending a call leaves the thread; the call screen is chat-only.
+    if (callPhotonName) endCall();
     if (tab === "inboxes") loadInboxes().then(render);
+    if (tab === "upkeep") loadUpkeep().then(render);
+    if (tab === "store") loadStripeStatus().then(render);
     render();
+  } else if (action === "end-call") {
+    endCall();
+  } else if (action === "call-mic") {
+    toggleCallMic();
+  } else if (action === "check-now") {
+    runProactiveCheck();
+  } else if (action === "reminder-done") {
+    const id = t.dataset.id || "";
+    api.reminderDone(id).then(async (r: any) => {
+      if (r && r.ok) {
+        const rems = await api.reminders();
+        if (rems && rems.ok) remindersData = rems.reminders || [];
+        render();
+        toast("Reminder done.");
+      } else {
+        toast("That didn't save. Try again.", "err");
+      }
+    });
+  } else if (action === "push-toggle") {
+    togglePush();
+  } else if (action === "jobs-run") {
+    runJobs();
+  } else if (action === "jobs-filter") {
+    jobsListingsFilter = (t.dataset.filter as "filed" | "skipped") || "filed";
+    api.jobsListings(jobsListingsFilter).then((r: any) => {
+      if (r && r.ok) jobsListingsData = r.listings || [];
+      render();
+    });
+  } else if (action === "msg-thread") {
+    const id = t.dataset.id || "";
+    if (id) openMessengerThread(id);
+  } else if (action === "research-close") {
+    const box = document.getElementById("research-results");
+    if (box) {
+      box.hidden = true;
+      box.innerHTML = "";
+    }
   } else if (action === "open-photon") {
     const name = t.dataset.photon || "";
     if (name) openPhoton(name);
@@ -1013,6 +1654,86 @@ document.addEventListener("submit", async (e) => {
     } else {
       toast("That draft didn't save. Check the account is connected.", "err");
     }
+  } else if (form.id === "research-form") {
+    e.preventDefault();
+    const input = document.getElementById("research-input") as HTMLInputElement;
+    const box = document.getElementById("research-results") as HTMLElement | null;
+    const query = input.value.trim();
+    if (!query || !box) return;
+    box.hidden = false;
+    box.innerHTML = `<p class="fine">Looking that up…</p>`;
+    const r = await api.research(query);
+    if (r && r.ok) {
+      const results = (r.results || []) as any[];
+      box.innerHTML = results.length
+        ? `<div class="research-head"><b>Live results</b><button class="btn small" type="button" data-action="research-close">Close</button></div>` +
+          results
+            .map(
+              (res: any) =>
+                `<div class="research-item"><a href="${esc(res.url)}" target="_blank" rel="noopener">${esc(res.title || res.url)}</a><p>${esc(res.snippet || "")}</p><p class="fine">Source: ${esc(res.source || res.url)}</p></div>`,
+            )
+            .join("")
+        : `<p class="fine">Nothing came back for that one.</p><button class="btn small" type="button" data-action="research-close">Close</button>`;
+    } else {
+      // Research not connected (or failed): the server's plain words,
+      // never a guessed answer.
+      box.innerHTML = `<p>${esc(r?.message || "The search didn't come back. Try that again in a moment.")}</p><button class="btn small" type="button" data-action="research-close">Close</button>`;
+    }
+  } else if (form.id === "reminder-form") {
+    e.preventDefault();
+    const textInput = document.getElementById("reminder-text") as HTMLInputElement;
+    const whenInput = document.getElementById("reminder-when") as HTMLInputElement;
+    const text = textInput.value.trim();
+    const when = whenInput.value;
+    if (!text || !when) return;
+    const remindAt = new Date(when).toISOString();
+    const r = await api.reminderCreate(text, remindAt);
+    if (r && r.ok) {
+      const rems = await api.reminders();
+      if (rems && rems.ok) remindersData = rems.reminders || [];
+      render();
+      toast("Reminder set.");
+    } else {
+      toast(r?.error || "That reminder didn't save. Try again.", "err");
+    }
+  } else if (form.id === "jobs-rules-form") {
+    e.preventDefault();
+    const fd = new FormData(form);
+    const rules: Record<string, unknown> = {};
+    for (const { key } of JOB_BOOL_RULES) rules[key] = fd.get(key) === "on";
+    const floor = String(fd.get("pay_floor_monthly") || "").trim();
+    if (floor !== "") rules.pay_floor_monthly = Number(floor);
+    const area = String(fd.get("onsite_area") || "").trim();
+    if (area !== "") rules.onsite_area = area;
+    rules.approved_roles = String(fd.get("approved_roles") || "").trim();
+    const r = await api.jobsSaveRules(rules);
+    if (r && r.ok) {
+      jobsRulesData = { rules: r.rules, customized: true };
+      const js = await api.jobsStatus();
+      if (js && js.ok) jobsStatusData = js;
+      render();
+      toast("Rules saved.");
+    } else {
+      toast(r?.error || "Those rules didn't save. Check the values and try again.", "err");
+    }
+  } else if (form.classList.contains("msg-send-form")) {
+    e.preventDefault();
+    const fd = new FormData(form);
+    const conversationId = form.dataset.id || "";
+    const text = String(fd.get("text") || "").trim();
+    if (!conversationId || !text) return;
+    const r = await api.messengerSend(conversationId, text);
+    if (r && r.ok) {
+      toast("Reply sent as the Page.");
+      form.reset();
+      await openMessengerThread(conversationId);
+    } else if (r?.error === "meta_error") {
+      toast(r.message || "Meta refused the send.", "err");
+    } else if (r?.error === "messenger_not_configured") {
+      toast("Facebook Page messaging isn't connected yet.", "err");
+    } else {
+      toast(r?.message || "That reply didn't send. Try again.", "err");
+    }
   } else if (form.classList.contains("contact-form")) {
     e.preventDefault();
     const fd = new FormData(form);
@@ -1075,6 +1796,8 @@ function setupKeyboardDock(): void {
   if (t === "inboxes" || t === "store" || t === "upkeep" || t === "chat") tab = t as Tab;
   await refreshState();
   if (tab === "inboxes") await loadInboxes();
+  if (tab === "upkeep") await loadUpkeep();
+  if (tab === "store") await loadStripeStatus();
   render();
   const gmail = params.get("gmail");
   if (gmail === "connected") toast("Gmail account connected.");
