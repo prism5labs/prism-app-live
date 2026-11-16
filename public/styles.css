@@ -19,6 +19,7 @@
   --line: #E9DCBC;
   --card-line: #E4D3AC;
   --field-line: #D9C48C;
+  --field: #fff;
   --teal-soft: #DDEBE7;
   --meter-track: #EBDCB4;
   --radius: 16px;
@@ -140,7 +141,7 @@ input, textarea {
   font-family: "Nunito", sans-serif;
   font-size: 16px;
   color: var(--ink);
-  background: #fff;
+  background: var(--field);
   border: 1.5px solid var(--field-line);
   border-radius: 12px;
   padding: 10px 14px;
@@ -246,11 +247,11 @@ textarea { width: 100%; resize: vertical; }
 .portrait img, .portrait svg { display: block; width: 100%; height: 100%; object-fit: cover; }
 
 /* ---------- Chat thread: gallery-quiet, Claude-style replies ---------- */
+.thread { background: var(--cream); }
 .thread-head {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
-  row-gap: 2px;
+  flex-wrap: nowrap;
   gap: 10px;
   padding: 12px 16px 10px;
   border-bottom: 2px solid;
@@ -274,15 +275,67 @@ textarea { width: 100%; resize: vertical; }
   flex: none;
 }
 .thread-head .btn.call { margin-left: auto; }
-.thread-title { flex: 1 1 100px; min-width: 0; }
+.thread-title { flex: 1 1 auto; min-width: 0; }
 .thread-title h2 {
   font-family: "Nunito", sans-serif;
   font-weight: 800;
   font-size: 0.95rem;
   color: var(--ink);
   margin-bottom: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-.thread-voice { display: block; font-size: 0.72rem; font-weight: 700; color: var(--muted-2); }
+.thread-voice { display: block; font-size: 0.72rem; font-weight: 700; color: var(--muted-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ---------- Look sets: a skin is the whole feel, not a saved label ----------
+   Each set overrides the palette variables on the Photon's thread section
+   (and on its Photon card), so the chat, the composer dock, the menu and
+   the bubbles all follow. No look set chosen means no overrides: the
+   default gallery look is untouched. The class lives only on the thread
+   section and the card, so leaving a thread restores the default. */
+.thread.look-signal-red, .photon-card.look-signal-red {
+  --cream: #0E0E10; --card: #18181B; --field: #1E1E22;
+  --ink: #F7F2E7; --ink-soft: #D9D3C3; --muted: #B9B2A2; --muted-2: #A69E8C;
+  --teal: #D62828; --teal-deep: #8F1B1B; --teal-soft: #2B1214;
+  --line: #3D2226; --card-line: #4C262A; --field-line: #5C2A2E;
+  --cherry: #FF3B30; --cherry-dark: #D62828; --butter: #F4C95D;
+  --meter-track: #2E1A1C;
+}
+.thread.look-ledger-lake, .photon-card.look-ledger-lake {
+  --cream: #F7F0DC; --card: #FFFDF4; --field: #FFFDF4;
+  --ink: #141210; --ink-soft: #3D3831; --muted: #6E6455; --muted-2: #7D7263;
+  --teal: #B01E1E; --teal-deep: #7E1414; --teal-soft: #F3E3D8;
+  --line: #C65B45; --card-line: #C9B48A; --field-line: #B01E1E;
+  --cherry: #D62828; --cherry-dark: #B01E1E; --butter: #E8B84B;
+  --meter-track: #EAD9AE;
+}
+.thread.look-night-watch, .photon-card.look-night-watch {
+  --cream: #05070A; --card: #0C1116; --field: #10161D;
+  --ink: #E9E4D6; --ink-soft: #C4BFAF; --muted: #9AA3AD; --muted-2: #8A94A0;
+  --teal: #E0352B; --teal-deep: #5E1410; --teal-soft: #1E1214;
+  --line: #232A33; --card-line: #2C3540; --field-line: #3A4552;
+  --cherry: #FF4A3D; --cherry-dark: #C22A20; --butter: #F4C95D;
+  --meter-track: #1A222B;
+}
+/* The dark sets get a red glow on the portrait ring, like a signal
+   light; Night Watch glows harder, and its send button glows too. */
+.thread.look-signal-red .thread-head .portrait { box-shadow: 0 0 0 1.5px var(--teal), 0 0 10px rgba(214, 40, 40, 0.35); }
+.thread.look-night-watch .thread-head .portrait { box-shadow: 0 0 0 1.5px var(--teal), 0 0 14px rgba(255, 74, 61, 0.5); }
+.thread.look-night-watch .composer .send { box-shadow: 0 0 14px rgba(255, 74, 61, 0.4); }
+/* Menu buttons inside a skinned thread use the skin's card, not white,
+   so the overflow menu stays in the same world as the chat. */
+.thread.look-signal-red .thread-menu-list .btn,
+.thread.look-ledger-lake .thread-menu-list .btn,
+.thread.look-night-watch .thread-menu-list .btn { background: var(--card); }
+
+/* Narrow phone: the back button drops to just the arrow so the title
+   keeps room to breathe; the header stays one row, title truncating,
+   divider below it. Matches the 420px breakpoint used elsewhere. */
+@media (max-width: 420px) {
+  .thread-head { gap: 8px; padding: 10px 12px 8px; }
+  .thread-head .back-btn span { display: none; }
+}
 
 /* Customization wizard: name, voice, look. Same gallery look as the rest. */
 .customize { max-width: 720px; margin: 0 auto; }

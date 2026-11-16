@@ -6,7 +6,7 @@ import { portraitHtml } from "./ui";
 import { SUPERNOVA, SATELLITE, UPKEEP, PRODUCTS, CATEGORIES, photonBuyUrl } from "../src/shared/catalog";
 import { TIER_COPY, UPKEEP_COPY } from "../src/shared/tiers";
 import { PHOTONS } from "../src/shared/photons";
-import { VOICES, TUNING_QUESTIONS, LOOK_SETS, voiceById, tuningStyle } from "../src/shared/voices";
+import { VOICES, TUNING_QUESTIONS, LOOK_SETS, voiceById, lookSetById, tuningStyle } from "../src/shared/voices";
 
 type Tab = "chat" | "inboxes" | "store" | "upkeep";
 
@@ -104,7 +104,10 @@ function meterBar(): string {
 
 function photonCard(p: any, size = 220): string {
   const owned = p.owned;
-  return `<button class="photon-card" data-action="open-photon" data-photon="${esc(p.name)}" ${
+  // The owner's chosen look set reskins this Photon's card, so the
+  // choice is visible before the chat is even opened.
+  const look = lookSetById(customFor(p.name).lookSet || "");
+  return `<button class="photon-card${look ? ` look-${look.id}` : ""}" data-action="open-photon" data-photon="${esc(p.name)}" ${
     owned ? "" : "disabled"
   }>
     ${portraitHtml(portraitNameOf(p), size)}
@@ -160,6 +163,10 @@ function renderChatThread(): string {
   const face = faceNameOf(p);
   const portrait = portraitNameOf(p);
   const customized = !!(state as any)?.customizations?.[p.name];
+  // The owner's chosen look set reskins this Photon's whole chat.
+  // The class lives only on this section, so leaving the thread
+  // restores the default look with no cleanup.
+  const look = lookSetById(customFor(p.name).lookSet || "");
   // A streaming reply shows three dots until the first words land.
   const botMsg = (text: string, streaming = false) =>
     `<div class="msg bot${streaming ? " streaming" : ""}">${portraitHtml(portrait, 26)}<div><p>${text ? esc(text) : '<span class="typing"><span></span><span></span><span></span></span>'}</p></div></div>`;
@@ -176,9 +183,9 @@ function renderChatThread(): string {
     // saved into the thread.
     : botMsg(p.intro.replaceAll("{name}", face));
   return `
-  <section class="thread">
+  <section class="thread${look ? ` look-${look.id}` : ""}">
     <div class="thread-head">
-      <button class="back-btn" data-action="back-to-front">← All Photons</button>
+      <button class="back-btn" data-action="back-to-front">← <span>All Photons</span></button>
       ${portraitHtml(portrait, 38)}
       <div class="thread-title">
         <h2>${esc(face)}</h2>
