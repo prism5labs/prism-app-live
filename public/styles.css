@@ -730,6 +730,9 @@ textarea { width: 100%; resize: vertical; }
   text-align: center;
   z-index: 50;
 }
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+.toast.err { background: var(--cherry); }
+
 /* Inboxes extras — client-a (Messages, Contacts, Calendar, Drive). */
 .inbox-jump { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; }
 .inbox-jump a { font-size: 0.8rem; font-weight: 800; color: var(--teal); background: #fff; border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; text-decoration: none; }
@@ -749,3 +752,65 @@ textarea { width: 100%; resize: vertical; }
 .drive-file .inbox-meta { display: block; }
 .drive-read { border-top: 1px solid var(--line); margin-top: 12px; padding-top: 10px; }
 .drive-content { white-space: pre-wrap; word-break: break-word; background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 12px; font-size: 13px; line-height: 1.5; max-height: 50vh; overflow: auto; margin: 8px 0; }
+
+/* --- Client-B: live voice, proactive/reminders/push, job plug, Messenger,
+       research, Stripe unlock status (Nov 15, 2026). One block, appended. --- */
+
+/* Live voice call screen (turn-based). */
+.call-screen { text-align: center; padding-bottom: 24px; }
+.call-screen .back-btn { display: block; margin-bottom: 8px; }
+.call-hero { margin: 8px 0 4px; }
+.call-hero img { border-radius: 50%; }
+.call-status { font-family: "Nunito", sans-serif; font-weight: 800; color: var(--teal); margin: 12px 0 4px; }
+.call-heard { font-size: 14px; color: var(--ink-soft); font-style: italic; min-height: 1.4em; margin: 0 0 12px; }
+.call-mic {
+  display: block; margin: 8px auto; width: 120px; height: 120px; border-radius: 50%;
+  border: none; cursor: pointer; background: var(--teal); color: #fff;
+  font-family: "Nunito", sans-serif; font-size: 18px; font-weight: 800;
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.15);
+}
+.call-mic:disabled { background: var(--muted-2); cursor: default; box-shadow: none; }
+.call-mic.recording { background: var(--cherry); animation: call-pulse 1.2s ease-in-out infinite; }
+@keyframes call-pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.06); } }
+.call-blocked-actions { justify-content: center; margin-top: 12px; }
+
+/* Research in chat: a live look-up row under the composer. */
+.research-row { display: flex; gap: 8px; margin-top: 8px; }
+.research-row input {
+  flex: 1; min-width: 0; padding: 10px 12px; border: 1px solid var(--field-line);
+  border-radius: 12px; background: var(--field); font: inherit; font-size: 14px;
+}
+.research-results { text-align: left; margin-top: 10px; background: var(--card); border: 1px solid var(--card-line); border-radius: var(--radius); padding: 12px; }
+.research-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.research-item { border-top: 1px solid var(--line); padding: 8px 0; }
+.research-item:first-of-type { border-top: none; }
+.research-item a { font-weight: 800; color: var(--teal); }
+.research-item p { margin: 4px 0; font-size: 14px; }
+
+/* Proactive checks and reminders. */
+.check-result { background: var(--teal-soft); border-radius: 12px; padding: 10px 12px; margin: 10px 0; }
+.check-result ul { margin: 6px 0 0; padding-left: 18px; }
+.check-result li { margin-bottom: 4px; font-size: 14px; }
+.reminder-form { flex-wrap: wrap; }
+.reminder-form input { flex: 1 1 160px; min-width: 0; }
+
+/* Job plug rules editor. */
+.rule-row { display: flex; align-items: center; gap: 8px; margin: 8px 0; font-size: 15px; }
+.rule-row input[type="checkbox"] { width: 20px; height: 20px; flex: none; accent-color: var(--teal); }
+.rule-row input[type="number"], .rule-row input[type="text"] {
+  flex: 1; min-width: 0; padding: 8px 10px; border: 1px solid var(--field-line);
+  border-radius: 10px; background: var(--field); font: inherit; font-size: 14px;
+}
+
+/* Messenger threads: whole-row buttons. */
+.msg-thread {
+  display: block; width: 100%; text-align: left; background: none; border: none;
+  border-top: 1px solid var(--line); padding: 10px 0; cursor: pointer; font: inherit; color: inherit;
+}
+.msg-thread span { display: block; }
+.msg-thread.open { background: var(--teal-soft); border-radius: 10px; padding: 10px; }
+.msg-send-form { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+.msg-send-form textarea { width: 100%; }
+
+/* Stripe webhook status line in the Store. */
+.stripe-line { margin: 0 0 4px; }

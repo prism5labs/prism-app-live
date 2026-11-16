@@ -116,6 +116,106 @@ export const api = {
   },
   voice: (photon: string) =>
     req("/api/voice", { method: "POST", body: JSON.stringify({ accountId: getAccountId(), photon }) }),
+  // Live voice (Step 5): turn-based only. Status first, then transcribe a
+  // recorded turn, then say a reply out loud. say returns audio/mpeg, not
+  // JSON, so it goes through fetch directly, not req().
+  voiceStatus: () => req(`/api/voice/status?accountId=${encodeURIComponent(getAccountId())}`),
+  voiceSay: async (
+    photon: string,
+    text: string,
+  ): Promise<{ ok: boolean; blob?: Blob; fallback?: boolean; error?: string; message?: string }> => {
+    const res = await fetch("/api/voice/say", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-account-id": getAccountId(),
+      },
+      body: JSON.stringify({ accountId: getAccountId(), photon, text }),
+    });
+    if (!res.ok) {
+      const j = await res.json().catch(() => null);
+      return { ok: false, error: j?.error, message: j?.message || "I couldn't say that one out loud." };
+    }
+    return { ok: true, blob: await res.blob(), fallback: res.headers.get("x-voice-fallback") === "true" };
+  },
+  voiceTranscribe: async (
+    photon: string,
+    blob: Blob,
+  ): Promise<{ ok: boolean; text?: string; error?: string; message?: string }> => {
+    const form = new FormData();
+    form.append("accountId", getAccountId());
+    form.append("photon", photon);
+    form.append("file", blob, "voice-note.webm");
+    const res = await fetch("/api/voice/transcribe", {
+      method: "POST",
+      headers: { "x-account-id": getAccountId() },
+      body: form,
+    });
+    const j = await res.json().catch(() => null);
+    if (!res.ok || !j?.ok) {
+      return { ok: false, error: j?.error, message: j?.message || "I couldn't hear that one — try again." };
+    }
+    return { ok: true, text: j.text || "" };
+  },
+  // Proactive checks, reminders, push (Step 3).
+  proactiveStatus: () =>
+    req(`/api/proactive/status?accountId=${encodeURIComponent(getAccountId())}`),
+  proactiveCheck: () =>
+    req("/api/proactive/check", { method: "POST", body: JSON.stringify({ accountId: getAccountId() }) }),
+  reminders: () => req(`/api/reminders?accountId=${encodeURIComponent(getAccountId())}`),
+  reminderCreate: (text: string, remindAt: string) =>
+    req("/api/reminders", {
+      method: "POST",
+      body: JSON.stringify({ accountId: getAccountId(), text, remind_at: remindAt }),
+    }),
+  reminderDone: (id: string) =>
+    req(`/api/reminders/${encodeURIComponent(id)}/done`, {
+      method: "POST",
+      body: JSON.stringify({ accountId: getAccountId() }),
+    }),
+  pushStatus: () => req(`/api/push/status?accountId=${encodeURIComponent(getAccountId())}`),
+  pushSubscribe: (subscription: unknown) =>
+    req("/api/push/subscribe", {
+      method: "POST",
+      body: JSON.stringify({ accountId: getAccountId(), subscription }),
+    }),
+  // Job plug (Step 8). Files jobs for review; never applies to one.
+  jobsStatus: () => req(`/api/jobs/status?accountId=${encodeURIComponent(getAccountId())}`),
+  jobsRules: () => req(`/api/jobs/rules?accountId=${encodeURIComponent(getAccountId())}`),
+  jobsSaveRules: (rules: Record<string, unknown>) =>
+    req("/api/jobs/rules", {
+      method: "POST",
+      body: JSON.stringify({ accountId: getAccountId(), rules }),
+    }),
+  jobsListings: (status: "filed" | "skipped") =>
+    req(
+      `/api/jobs/listings?accountId=${encodeURIComponent(getAccountId())}&status=${status}&limit=50`,
+    ),
+  jobsRun: () =>
+    req("/api/jobs/run", { method: "POST", body: JSON.stringify({ accountId: getAccountId() }) }),
+  // Messenger, Facebook Pages only (Step 9). Personal Messenger has no
+  // supported API, so there is no route for it.
+  messengerStatus: () =>
+    req(`/api/messenger/status?accountId=${encodeURIComponent(getAccountId())}`),
+  messengerThreads: () =>
+    req(`/api/messenger/threads?accountId=${encodeURIComponent(getAccountId())}`),
+  messengerMessages: (conversationId: string) =>
+    req(
+      `/api/messenger/messages?accountId=${encodeURIComponent(getAccountId())}&conversationId=${encodeURIComponent(conversationId)}`,
+    ),
+  messengerSend: (conversationId: string, text: string) =>
+    req("/api/messenger/send", {
+      method: "POST",
+      body: JSON.stringify({ accountId: getAccountId(), conversationId, text }),
+    }),
+  // Live web research with sources (Step 10), and the Stripe webhook
+  // status that decides whether purchases unlock automatically.
+  research: (query: string) =>
+    req("/api/research", {
+      method: "POST",
+      body: JSON.stringify({ accountId: getAccountId(), query }),
+    }),
+  stripeStatus: () => req("/api/stripe/status"),
   inboxes: () => req(`/api/inboxes?accountId=${encodeURIComponent(getAccountId())}`),
   saveDraft: (label: string, to: string, subject: string, body: string) =>
     req("/api/inboxes/draft", {
