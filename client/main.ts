@@ -1318,11 +1318,25 @@ function renderStore(): string {
 
   return `
   <section>
-    <div class="store-head"><img src="/brand/starburst.jpg" alt=""><div><h1 class="page-title">Store</h1><p>Buy a Launch once and it is yours forever. Checkout shows the full total, including the standard 3% processing fee.</p></div></div>
+    <div class="store-head"><img src="/brand/starburst.jpg" alt=""><div><h1 class="page-title">Store</h1><p>A Launch is the helper you talk with in this app. Pick the helper that fits your day, then pick how you want to pay. The prices are further down, after a plain explanation of how it all works.</p></div></div>
     ${stripeStatusData
       ? `<p class="fine stripe-line">${stripeStatusData.configured ? "Automatic unlocks are on — a purchase unlocks as soon as Stripe confirms the payment." : "Automatic unlocks are off — the Stripe webhook isn't set up yet. Purchases still unlock by code (redeem one in Upkeep) until it is."}</p>`
       : `<p class="fine">Checking automatic unlocks…</p>`}
     <div class="chrome-thin"></div>
+
+    <details class="store-group pricing-explainer" id="store-pricing" ${storeOpen.pricing ? "open" : ""}>
+      <summary><span class="summary-title">Understand our pricing</span><span class="fine">tap to read, in plain words</span></summary>
+      <div class="pricing-body">
+        <p><b>First, what are these things?</b> A Launch is what gives this app someone to talk to. With no Launch, there is no one to talk to. Each Launch is called a Photon, and each Photon has its own way of helping, like keeping on top of your messages, sorting your calendar, or drafting notes in your words.</p>
+        <p><b>A Spark</b> is one button for one job. You press it, it does that one job, and you can press it again as often as you like. It never runs out and it never dies. <b>A Plug</b> is the same idea, except you do not press anything. It runs on its own, in the background, and does its job without being asked.</p>
+        <p><b>A Supernova</b> is the full helper. It is the whole front office in one: messages, calendar, paperwork, and anything else that comes up, and it learns how you like things done. <b>A Satellite</b> is a smaller version of the same thing, for one job at a time, with one way of talking and one way of looking.</p>
+        <p><b>Upkeep</b> is the care that keeps your helper working well: unlimited chats, updates as they come out, help first when you need it, and talking out loud instead of typing. Upkeep is never required. Every purchase already includes 300 chats a month, free forever, with no monthly payment needed.</p>
+        <p><b>How paying works.</b> Some things you pay for once, and then they are yours forever. That is how Sparks, Plugs, Supernova, and Satellite work when you buy them outright. Or you can pay month by month instead. Paying monthly costs less at the start, and if you stop paying, the live help pauses until you start again. What you already bought stays on your phone, nothing is deleted and nothing is chased. Paying for two years at a time costs less each month, because you are committing for longer. Paying for a whole year at once costs the same as 11 months, so the 12th month is free.</p>
+        <p><b>Why does it cost what it does?</b> Each helper is written out, line by line, for the way you actually work, then tested until it works properly, and then kept working with updates. A Supernova is about 300 hours of that careful building and testing. A Satellite is about 150 hours, a Plug about 50 hours, and a Spark about 25 hours. You are paying for that time, and for a helper that is built around your day, not a generic one.</p>
+        <p><b>The small print, in plain words.</b> When you pay, the card company adds a small fee of 3 percent, and the checkout page shows you the full total before you pay anything, so there are no surprises. You can try things free for 14 days, with no card details, no charge, and nothing that renews on its own. If you buy Upkeep with your first purchase, you get 15 percent off your purchases while Upkeep stays on.</p>
+        <p class="pricing-contact"><b>Questions? Please ask.</b> No question is too small, and you do not need to know anything about technology to ask it. Email us at <a href="mailto:prism5labscontact@gmail.com">prism5labscontact@gmail.com</a> or call <a href="tel:+19203937294">(920) 393-7294</a>. We will explain it in plain words, and help you pick what fits.</p>
+      </div>
+    </details>
 
     <div class="store-jump" aria-label="Jump to a section">
       <a href="#store-supernova">Supernova</a>
@@ -1333,13 +1347,13 @@ function renderStore(): string {
     </div>
 
     <h2 class="section-title">Launches</h2>
-    <div class="poster-row" id="store-supernova"><img src="/brand/poster-supernova.jpg" alt="Supernova poster — $499 one-time, the whole front office"><div class="pr-txt"><b>Supernova</b><span class="desc">${esc(TIER_COPY.supernova.body)}</span><span class="desc">${esc(TIER_COPY.supernova.hours)}</span><span class="price">$499.00</span><span class="at">$514.00 at checkout</span>${buyButton(buyUrl(SUPERNOVA.url, "supernova"), "$514.00", allOwned || ownedProducts.includes("supernova"))}<p class="fine">Or pay monthly:</p><div class="row monthly-row">
+    <div class="poster-row" id="store-supernova"><img src="/brand/poster-supernova.jpg" alt="Supernova poster, the whole front office"><div class="pr-txt"><b>Supernova</b><span class="desc">${esc(TIER_COPY.supernova.body)}</span><span class="desc">${esc(TIER_COPY.supernova.hours)}</span><span class="price">$499.00</span><span class="at">$514.00 at checkout</span>${buyButton(buyUrl(SUPERNOVA.url, "supernova"), "$514.00", allOwned || ownedProducts.includes("supernova"))}<p class="fine">Or pay monthly:</p><div class="row monthly-row">
         <a class="btn small" href="${esc(buyUrl(SUPERNOVA.monthly.url, "supernova-monthly"))}" target="_blank" rel="noopener">$49/mo</a>
         <a class="btn small" href="${esc(buyUrl(SUPERNOVA.twoYear.url, "supernova-two-year"))}" target="_blank" rel="noopener">$39/mo · 2-year</a>
         <a class="btn small" href="${esc(buyUrl(SUPERNOVA.annual.url, "supernova-annual"))}" target="_blank" rel="noopener">$539/yr</a>
       </div></div></div>
 
-    <div class="poster-row" id="store-satellite"><img src="/brand/poster-satellite.jpg" alt="Satellite poster — $99 one-time, one Brain, one Face, one job duty"><div class="pr-txt"><b>Satellite</b><span class="desc">${esc(TIER_COPY.satellite.body)}</span><span class="desc">${esc(TIER_COPY.satellite.hours)}</span><span class="price">$99.00</span><span class="at">$101.97 at checkout</span>${buyButton(buyUrl(SATELLITE.url, "satellite"), "$101.97", allOwned || ownedProducts.includes("satellite"))}<p class="fine">Or pay monthly:</p><div class="row monthly-row">
+    <div class="poster-row" id="store-satellite"><img src="/brand/poster-satellite.jpg" alt="Satellite poster, one Brain, one Face, one job duty"><div class="pr-txt"><b>Satellite</b><span class="desc">${esc(TIER_COPY.satellite.body)}</span><span class="desc">${esc(TIER_COPY.satellite.hours)}</span><span class="price">$99.00</span><span class="at">$101.97 at checkout</span>${buyButton(buyUrl(SATELLITE.url, "satellite"), "$101.97", allOwned || ownedProducts.includes("satellite"))}<p class="fine">Or pay monthly:</p><div class="row monthly-row">
         <a class="btn small" href="${esc(buyUrl(SATELLITE.monthly.url, "satellite-monthly"))}" target="_blank" rel="noopener">$33/mo</a>
         <a class="btn small" href="${esc(buyUrl(SATELLITE.twoYear.url, "satellite-two-year"))}" target="_blank" rel="noopener">$26/mo · 2-year</a>
         <a class="btn small" href="${esc(buyUrl(SATELLITE.annual.url, "satellite-annual"))}" target="_blank" rel="noopener">$363/yr</a>
@@ -1362,7 +1376,7 @@ function renderStore(): string {
     <details class="store-group" id="store-sparks" ${storeOpen.sparks ? "open" : ""}>
       <summary><span class="summary-title">Sparks</span><span class="fine">${sparkCount} · one button, one job · tap to browse</span></summary>
       <p class="page-lede">${esc(TIER_COPY.spark.body)} ${esc(TIER_COPY.spark.hours)}</p>
-      <div class="addon-row featured"><div><b>Personality Builder</b><span>Spark · Personal $19 · Business $25</span><span class="pb-desc">The extra attribute that builds a personality for your interface — for a Spark or Plug that doesn't come with one.</span></div><div class="price">$19–$25</div></div>
+      <div class="addon-row featured"><div><b>Personality Builder</b><span>Spark · one button, one job</span><span class="pb-desc">The extra attribute that builds a personality for your interface — for a Spark or Plug that doesn't come with one.</span></div><div class="price">$19–$25</div></div>
       ${kindGroups("Spark")}
     </details>
     <details class="store-group" id="store-plugs" ${storeOpen.plugs ? "open" : ""}>
@@ -1370,7 +1384,7 @@ function renderStore(): string {
       <p class="page-lede">${esc(TIER_COPY.plug.body)} ${esc(TIER_COPY.plug.hours)}</p>
       ${kindGroups("Plug")}
     </details>
-    <div class="store-foot">Let us handle the noise so you can focus on what you want and need to do.<br>© 2026 Prism 5 Labs · Green Bay, Wisconsin</div>
+    <div class="store-foot">Questions about any price? Email <a href="mailto:prism5labscontact@gmail.com">prism5labscontact@gmail.com</a> or call <a href="tel:+19203937294">(920) 393-7294</a>.<br>Let us handle the noise so you can focus on what you want and need to do.<br>© 2026 Prism 5 Labs · Green Bay, Wisconsin</div>
   </section>`;
 }
 
@@ -1690,6 +1704,7 @@ function renderUpkeep(): string {
           : `<a class="btn primary" href="${esc(buyUrl(UPKEEP.url, "upkeep"))}" target="_blank" rel="noopener">Buy Upkeep — $29.87</a>`
       }
       <p class="fine">Upkeep is never required to use what you bought.</p>
+      <p class="fine">Questions about Upkeep or any price? Email <a href="mailto:prism5labscontact@gmail.com">prism5labscontact@gmail.com</a> or call <a href="tel:+19203937294">(920) 393-7294</a>.</p>
       </div>
     </div>
 

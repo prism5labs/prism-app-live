@@ -626,6 +626,27 @@ textarea { width: 100%; resize: vertical; }
 }
 .store-group summary .summary-title::before { content: "▸ "; color: var(--cherry); }
 .store-group[open] summary .summary-title::before { content: "▾ "; }
+
+/* Pricing explainer: plain-words "Understand our pricing", collapsed
+   behind a tap, sitting above the price list. */
+.pricing-explainer {
+  background: var(--card);
+  border: 1.5px solid var(--butter);
+  border-radius: var(--radius);
+  padding: 2px 14px 6px;
+  margin-bottom: 18px;
+}
+.pricing-explainer summary { padding: 12px 2px; }
+.pricing-body p { font-size: 0.85rem; line-height: 1.55; color: var(--ink-soft); margin: 0 0 10px; }
+.pricing-body p b { color: var(--ink); }
+.pricing-body .pricing-contact {
+  background: #FFF8EA;
+  border: 1px solid var(--butter);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+}
+.pricing-contact a, .store-foot a { color: var(--teal); font-weight: 800; }
 .cat-title {
   font-family: "Nunito", sans-serif;
   font-size: 13px;
