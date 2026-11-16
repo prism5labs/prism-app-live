@@ -16,6 +16,8 @@
 // body and returns a Response, so the coordinator only has to mount it in
 // the route if-chain. Nothing here edits server.ts.
 
+import { config } from "./config";
+
 export type SearchResult = {
   title: string;
   url: string;
@@ -33,9 +35,8 @@ export const MAX_QUERY_LENGTH = 500;
 export const BRAVE_SEARCH_URL = "https://api.search.brave.com/res/v1/web/search";
 export const BRAVE_RESULT_COUNT = 5;
 
-// Read at call time, not import time, so the key can land after boot.
 export function researchConfigured(): boolean {
-  return (process.env.BRAVE_SEARCH_API_KEY || "").length > 0;
+  return config.braveSearchApiKey.length > 0;
 }
 
 function sourceFromUrl(url: string): string {
@@ -72,7 +73,7 @@ function normalizeBraveResults(data: any): SearchResult[] {
 /** Brave Search API adapter. Throws on any upstream failure; the handler
  *  turns that into a plain-words research_failed, never the upstream body. */
 export async function searchBrave(query: string): Promise<SearchResult[]> {
-  const key = process.env.BRAVE_SEARCH_API_KEY || "";
+  const key = config.braveSearchApiKey;
   if (!key) throw new Error("research_not_connected");
   const url =
     `${BRAVE_SEARCH_URL}?q=${encodeURIComponent(query)}` +

@@ -23,6 +23,7 @@
 // coordinator consolidates env handling at merge time.
 
 import { db } from "./db";
+import { config } from "./config";
 
 // --- Tables (created here, at import, like db.ts does for its own) ---
 
@@ -516,7 +517,7 @@ export type JobSourceAdapter = {
 };
 
 export function jobsFeedUrl(): string {
-  return (process.env.JOBS_FEED_URL || "").trim();
+  return config.jobsFeedUrl.trim();
 }
 
 export function jobSourceConnected(): boolean {

@@ -28,6 +28,7 @@
 //     reminders still run and list; only the tap on the phone is missing.
 
 import { db } from "./db";
+import { config } from "./config";
 import { listInbox, connectedLabels, type GmailLabel } from "./gmail";
 
 // --- Own tables (created at import, like db.ts) ---
@@ -93,12 +94,12 @@ function isValidAccountId(id: string): boolean {
   return /^[A-Za-z0-9][A-Za-z0-9_-]{7,127}$/.test(id);
 }
 
-// --- VAPID / Web Push configuration (read lazily, from env directly) ---
+// --- VAPID / Web Push configuration (from config.ts) ---
 function vapidConfig(): { publicKey: string; privateKey: string; subject: string } {
   return {
-    publicKey: process.env.VAPID_PUBLIC_KEY || "",
-    privateKey: process.env.VAPID_PRIVATE_KEY || "",
-    subject: process.env.VAPID_SUBJECT || "",
+    publicKey: config.vapidPublicKey,
+    privateKey: config.vapidPrivateKey,
+    subject: config.vapidSubject,
   };
 }
 

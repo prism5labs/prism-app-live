@@ -31,6 +31,34 @@ export const config = {
   googleRedirectUri: process.env.GOOGLE_REDIRECT_URI || "",
   // Public base URL of this deployment (used for the OAuth redirect).
   appUrl: process.env.APP_URL || "",
+  // Twilio (steps 1 + 7): texts and calls. Without these the telephony
+  // endpoints answer not_connected in plain words.
+  twilioAccountSid: process.env.TWILIO_ACCOUNT_SID || "",
+  twilioAuthToken: process.env.TWILIO_AUTH_TOKEN || "",
+  twilioPhoneNumber: process.env.TWILIO_PHONE_NUMBER || "",
+  // ElevenLabs (step 5): live voice, turn-based. Without a key the voice
+  // endpoints answer voice_not_connected.
+  elevenLabsApiKey: process.env.ELEVENLABS_API_KEY || "",
+  // Meta (step 9): Facebook Page messaging. Without these the Messenger
+  // endpoints answer messenger_not_configured. Personal Messenger has no
+  // supported API and is never connected.
+  metaPageId: process.env.META_PAGE_ID || "",
+  metaPageAccessToken: process.env.META_PAGE_ACCESS_TOKEN || "",
+  metaWebhookVerifyToken: process.env.META_WEBHOOK_VERIFY_TOKEN || "",
+  // VAPID (step 3): Web Push. Without these, checks and reminders still
+  // run but no push is sent.
+  vapidPublicKey: process.env.VAPID_PUBLIC_KEY || "",
+  vapidPrivateKey: process.env.VAPID_PRIVATE_KEY || "",
+  vapidSubject: process.env.VAPID_SUBJECT || "",
+  // Job plug (step 8): URL of a JSON or RSS/Atom job feed. No feed URL
+  // means no job source is connected; the plug never scrapes a board.
+  jobsFeedUrl: process.env.JOBS_FEED_URL || "",
+  // Brave Search (step 10): live web research. Without a key the research
+  // endpoint answers research_not_connected.
+  braveSearchApiKey: process.env.BRAVE_SEARCH_API_KEY || "",
+  // Stripe (step 10): the webhook signing secret (whsec_...). The webhook
+  // secret alone proves an event came from Stripe; no Stripe API key.
+  stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET || "",
 };
 
 export type BrainProvider = "anthropic" | "gemini" | "none";

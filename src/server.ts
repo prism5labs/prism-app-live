@@ -22,6 +22,7 @@ import {
   listContacts,
   getContactByAddress,
   createContact,
+  setContactPhone,
   getContactByToken,
   setContactStatus,
   markRequestSent,
@@ -48,6 +49,36 @@ import {
   GMAIL_LABEL_TITLES,
   type GmailLabel,
 } from "./server/gmail";
+// Capability steps (design doc): each module owns its own routes and
+// tables and reads its env vars directly; server.ts only mounts them.
+import {
+  authUrlExtra,
+  handleExtraOAuthCallback,
+  calendarStatus,
+  listCalendarEvents,
+  bookCalendarEvent,
+  cancelCalendarEvent,
+  freeBusy,
+  driveStatus,
+  searchDrive,
+  readDriveFile,
+} from "./server/google";
+import { voiceStatus, voiceSay, voiceTranscribe } from "./server/voice";
+import { handleMessenger } from "./server/messenger";
+import {
+  getTextsStatus,
+  listTexts,
+  sendText,
+  incomingText,
+  listCalls,
+  dialCall,
+  voiceWebhook,
+  voicemailCallback,
+} from "./server/telephony";
+import { handleProactiveApi, startProactiveScheduler } from "./server/proactive";
+import { handleJobsApi, startJobPlugScheduler } from "./server/jobs";
+import { handleResearch } from "./server/research";
+import { handleStripeWebhook, handleStripeStatus } from "./server/stripe";
 
 // Switchboard is email. Reports to Prism 5 go to the Labs test inbox.
 export const PRISM_REPORT_ADDRESS = "prism5labstest@gmail.com";
@@ -244,6 +275,30 @@ function stateFor(accountId: string) {
 async function handleApi(req: Request, path: string): Promise<Response> {
   const url = new URL(req.url);
   const method = req.method;
+
+  // Step 10 — Stripe webhook. Mounted FIRST and routed straight to the
+  // handler: it reads the raw body itself (req.text()) for the HMAC
+  // signature, so nothing here may call readBody(req) for this path.
+  if (path === "/api/stripe/webhook" && method === "POST") {
+    return await handleStripeWebhook(req);
+  }
+
+  // GET /api/stripe/status — is the webhook secret set?
+  if (path === "/api/stripe/status" && method === "GET") {
+    return await handleStripeStatus(req);
+  }
+
+  // Step 10 — POST /api/research — live web search with sources.
+  if (path === "/api/research" && method === "POST") {
+    return await handleResearch(req);
+  }
+
+  // Step 9 — Messenger (Facebook Pages only). The module returns null
+  // for paths it does not own, so this never swallows another route.
+  if (path.startsWith("/api/messenger")) {
+    const r = await handleMessenger(req, path);
+    if (r) return r;
+  }
 
   // GET /api/state
   if (path === "/api/state" && method === "GET") {
@@ -496,7 +551,8 @@ async function handleApi(req: Request, path: string): Promise<Response> {
       });
     }
     // The saved voice pick rides with the call gate, so the call UI can show
-    // the Photon's voice. The audio line itself is not wired yet.
+    // the Photon's voice. The audio line itself is live at /api/voice/say
+    // and /api/voice/transcribe (turn-based, ElevenLabs, Upkeep only).
     const c = getCustomization(accountId, photon);
     const voiceId = c?.voice || "house";
     return json({
@@ -505,8 +561,26 @@ async function handleApi(req: Request, path: string): Promise<Response> {
       voice: voiceId,
       voiceName: voiceById(voiceId).name,
       message:
-        "Live voice isn't wired up yet. The call button is here and the gate is on, but the voice line itself lands with the next build.",
+        "Live voice is turn-based: tap the mic, talk, and the reply comes back out loud. It needs Upkeep and the server's ElevenLabs key.",
     });
+  }
+
+  // Step 5 — GET /api/voice/status — is voice configured, and does this
+  // account have Upkeep? No Photon needed.
+  if (path === "/api/voice/status" && method === "GET") {
+    return await voiceStatus(req);
+  }
+
+  // Step 5 — POST /api/voice/say — body { accountId, photon, text }.
+  // Returns audio/mpeg in the Photon's saved voice.
+  if (path === "/api/voice/say" && method === "POST") {
+    return await voiceSay(req);
+  }
+
+  // Step 5 — POST /api/voice/transcribe — multipart body, audio file in
+  // the "file" field (also accepts "audio"). Returns { ok: true, text }.
+  if (path === "/api/voice/transcribe" && method === "POST") {
+    return await voiceTranscribe(req);
   }
 
   // GET /api/inboxes — all three Gmail accounts side by side.
@@ -576,6 +650,107 @@ async function handleApi(req: Request, path: string): Promise<Response> {
     return Response.redirect(dest, 302);
   }
 
+  // Steps 4 + 6 — GET /api/oauth/google/start-extra — begin a Calendar +
+  // Drive sign-in (same Google client as Gmail, calendar and Drive scopes
+  // added). Owners already connected for Gmail sign in once more.
+  if (path === "/api/oauth/google/start-extra" && method === "GET") {
+    const accountId = url.searchParams.get("accountId") || "";
+    if (!isValidAccountId(accountId)) return bad("accountId required", 400);
+    const u = authUrlExtra(accountId);
+    if (!u) {
+      return json({
+        ok: false,
+        error: "google_not_configured",
+        message:
+          "Calendar and Drive sign-in isn't set up on this server yet. It needs a Google OAuth client (client ID, secret, and redirect).",
+      });
+    }
+    return Response.redirect(u, 302);
+  }
+
+  // Steps 4 + 6 — GET /api/oauth/google/callback-extra — finish a
+  // Calendar + Drive sign-in. A different path from Gmail's callback on
+  // purpose; the redirect URI must be registered in the Google console.
+  if (path === "/api/oauth/google/callback-extra" && method === "GET") {
+    const code = url.searchParams.get("code") || "";
+    const state = url.searchParams.get("state") || "";
+    const r = await handleExtraOAuthCallback(code, state);
+    const base = config.appUrl || "";
+    const dest = r.ok
+      ? `${base}/?tab=inboxes&google=connected`
+      : `${base}/?tab=inboxes&google=error`;
+    return Response.redirect(dest, 302);
+  }
+
+  // Step 4 — GET /api/calendar/status — is Calendar connected?
+  if (path === "/api/calendar/status" && method === "GET") {
+    const accountId = accountIdFrom(req, {});
+    if (!isValidAccountId(accountId)) return bad("accountId required", 400);
+    return json(calendarStatus(accountId));
+  }
+
+  // Step 4 — GET /api/calendar/events — events in a window (defaults to
+  // now through 7 days out). Query: timeMin, timeMax (ISO dates).
+  if (path === "/api/calendar/events" && method === "GET") {
+    const accountId = accountIdFrom(req, {});
+    if (!isValidAccountId(accountId)) return bad("accountId required", 400);
+    const timeMin = url.searchParams.get("timeMin") || undefined;
+    const timeMax = url.searchParams.get("timeMax") || undefined;
+    return json(await listCalendarEvents(accountId, timeMin, timeMax));
+  }
+
+  // Step 4 — POST /api/calendar/book — create an event. Only when called;
+  // the Photon drafts, the owner taps.
+  if (path === "/api/calendar/book" && method === "POST") {
+    const body = await readBody(req);
+    const accountId = accountIdFrom(req, body);
+    if (!isValidAccountId(accountId)) return bad("accountId required", 400);
+    return json(await bookCalendarEvent(accountId, body));
+  }
+
+  // Step 4 — POST /api/calendar/cancel — body { accountId, eventId }.
+  if (path === "/api/calendar/cancel" && method === "POST") {
+    const body = await readBody(req);
+    const accountId = accountIdFrom(req, body);
+    if (!isValidAccountId(accountId)) return bad("accountId required", 400);
+    return json(await cancelCalendarEvent(accountId, String(body.eventId || "")));
+  }
+
+  // Step 4 — GET /api/calendar/freebusy — busy times in a window.
+  if (path === "/api/calendar/freebusy" && method === "GET") {
+    const accountId = accountIdFrom(req, {});
+    if (!isValidAccountId(accountId)) return bad("accountId required", 400);
+    const timeMin = url.searchParams.get("timeMin") || undefined;
+    const timeMax = url.searchParams.get("timeMax") || undefined;
+    return json(await freeBusy(accountId, timeMin, timeMax));
+  }
+
+  // Step 6 — GET /api/drive/status — is Drive connected?
+  if (path === "/api/drive/status" && method === "GET") {
+    const accountId = accountIdFrom(req, {});
+    if (!isValidAccountId(accountId)) return bad("accountId required", 400);
+    return json(driveStatus(accountId));
+  }
+
+  // Step 6 — GET /api/drive/search — search Drive, or list the most
+  // recently modified files when no q is given.
+  if (path === "/api/drive/search" && method === "GET") {
+    const accountId = accountIdFrom(req, {});
+    if (!isValidAccountId(accountId)) return bad("accountId required", 400);
+    const q = url.searchParams.get("q") || undefined;
+    return json(await searchDrive(accountId, q));
+  }
+
+  // Step 6 — GET /api/drive/file — read a file as text (Docs as text,
+  // Sheets as CSV). Some types cannot be read as text; the endpoint
+  // says so plainly instead of inventing content.
+  if (path === "/api/drive/file" && method === "GET") {
+    const accountId = accountIdFrom(req, {});
+    if (!isValidAccountId(accountId)) return bad("accountId required", 400);
+    const id = url.searchParams.get("id") || "";
+    return json(await readDriveFile(accountId, id));
+  }
+
   // POST /api/inboxes/draft — save a real draft into a Gmail account.
   if (path === "/api/inboxes/draft" && method === "POST") {
     const body = await readBody(req);
@@ -601,6 +776,7 @@ async function handleApi(req: Request, path: string): Promise<Response> {
       photon: c.photon,
       name: c.name,
       address: c.address,
+      phone: c.phone,
       status: c.status,
       createdAt: c.created_at,
     }));
@@ -632,6 +808,10 @@ async function handleApi(req: Request, path: string): Promise<Response> {
       return json({ ok: false, error: "contact_declined" });
     }
     const contact = existing || createContact(accountId, photon, name, address);
+    // Optional phone number for texts and caller ID (step 1). Stored
+    // with the contact; texts and calls still need the email approval.
+    const phone = String(body.phone || "").trim().slice(0, 40);
+    if (phone) setContactPhone(accountId, contact.id, phone);
     if (contact.requestSentAt) {
       return json({ ok: false, error: "already_requested", contactId: contact.id });
     }
@@ -765,6 +945,84 @@ async function handleApi(req: Request, path: string): Promise<Response> {
     return json({ ok: true, sent: true, messageId: sent.messageId, fromLabel: sent.label });
   }
 
+  // Steps 1 + 7 — GET /api/texts/status — Twilio configured or not,
+  // number masked.
+  if (path === "/api/texts/status" && method === "GET") {
+    const accountId = accountIdFrom(req, {});
+    if (!isValidAccountId(accountId)) return bad("accountId required", 400);
+    return getTextsStatus(req, accountId);
+  }
+
+  // Steps 1 + 7 — GET /api/texts — stored inbound/outbound texts
+  // (?limit=, default 50, max 100).
+  if (path === "/api/texts" && method === "GET") {
+    const accountId = accountIdFrom(req, {});
+    if (!isValidAccountId(accountId)) return bad("accountId required", 400);
+    return listTexts(req, accountId);
+  }
+
+  // Steps 1 + 7 — POST /api/texts/send — owner-tap send. Body:
+  // { accountId, to, body }. `to` is a phone number, or an email address
+  // (the contact's phone column is used). Only approved contacts.
+  if (path === "/api/texts/send" && method === "POST") {
+    const body = await readBody(req);
+    const accountId = accountIdFrom(req, body);
+    if (!isValidAccountId(accountId)) return bad("accountId required", 400);
+    return sendText(req, accountId, body);
+  }
+
+  // Steps 1 + 7 — POST /api/texts/incoming — Twilio webhook
+  // (form-encoded). No accountId check here: the handler reads
+  // ?accountId= from the URL and validates the Twilio signature itself.
+  if (path === "/api/texts/incoming" && method === "POST") {
+    return incomingText(req);
+  }
+
+  // Steps 1 + 7 — GET /api/calls — the call log (?limit=, default 50,
+  // max 100).
+  if (path === "/api/calls" && method === "GET") {
+    const accountId = accountIdFrom(req, {});
+    if (!isValidAccountId(accountId)) return bad("accountId required", 400);
+    return listCalls(req, accountId);
+  }
+
+  // Steps 1 + 7 — POST /api/calls/dial — owner-tap outbound call. Body:
+  // { accountId, to }. Only approved contacts. Needs APP_URL set (Twilio
+  // fetches the call instructions from it).
+  if (path === "/api/calls/dial" && method === "POST") {
+    const body = await readBody(req);
+    const accountId = accountIdFrom(req, body);
+    if (!isValidAccountId(accountId)) return bad("accountId required", 400);
+    return dialCall(req, accountId, body);
+  }
+
+  // Steps 1 + 7 — POST /api/calls/voice — TwiML webhook for inbound
+  // calls (and the Url Twilio fetches for outbound dials). Greets,
+  // records a voicemail with transcription on.
+  if (path === "/api/calls/voice" && method === "POST") {
+    return voiceWebhook(req);
+  }
+
+  // Steps 1 + 7 — POST /api/calls/voicemail — Twilio transcription
+  // callback. Signature validated; transcript stored on the call row
+  // and as a message the Photon can read.
+  if (path === "/api/calls/voicemail" && method === "POST") {
+    return voicemailCallback(req);
+  }
+
+  // Step 3 — proactive checks, reminders, push. The module returns null
+  // for paths it does not own.
+  {
+    const proactive = await handleProactiveApi(req, path);
+    if (proactive) return proactive;
+  }
+
+  // Step 8 — the job plug. handleJobsApi returns null for non-jobs paths.
+  if (path.startsWith("/api/jobs")) {
+    const jobsResponse = await handleJobsApi(req, path);
+    if (jobsResponse) return jobsResponse;
+  }
+
   return bad("not found", 404);
 }
 
@@ -829,3 +1087,9 @@ console.log(`Prism 5 standalone listening on http://localhost:${server.port}`);
 console.log(`Brain: ${brainProvider()} (set ANTHROPIC_API_KEY for Claude, GEMINI_API_KEY for the free Gemini bridge)`);
 console.log(`Google OAuth configured: ${googleConfigured()}`);
 console.log(`Data dir: ${config.dataDir}`);
+
+// Schedulers (capability steps 3 and 8). Neither auto-starts on import;
+// both run only while the server is awake, so on the free tier they run
+// while the app is in use and stop when it sleeps.
+startProactiveScheduler();
+startJobPlugScheduler();

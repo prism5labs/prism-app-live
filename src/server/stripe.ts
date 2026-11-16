@@ -28,6 +28,7 @@
 // fail the webhook over a missing mapping, and never guess an unlock.
 
 import { timingSafeEqual } from "node:crypto";
+import { config } from "./config";
 import { db, ownPhoton, ownProduct, setUpkeep, getOrCreateAccount } from "./db";
 import { PHOTON_NAMES } from "../shared/photons";
 import { PRODUCTS } from "../shared/catalog";
@@ -45,9 +46,8 @@ CREATE TABLE IF NOT EXISTS stripe_payments (
 
 export const STRIPE_SIGNATURE_TOLERANCE_SECONDS = 300;
 
-// Read at call time, not import time, so the secret can land after boot.
 export function stripeConfigured(): boolean {
-  return (process.env.STRIPE_WEBHOOK_SECRET || "").length > 0;
+  return config.stripeWebhookSecret.length > 0;
 }
 
 /**
@@ -292,7 +292,7 @@ export function listStripePayments(limit = 20): StripePaymentRow[] {
 // this server ignores. Returns 400 only when the signature cannot be
 // verified, the secret is not configured, or the payload is not JSON.
 export async function handleStripeWebhook(req: Request): Promise<Response> {
-  const secret = process.env.STRIPE_WEBHOOK_SECRET || "";
+  const secret = config.stripeWebhookSecret;
   if (!secret) {
     return json({
       ok: false,

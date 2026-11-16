@@ -417,6 +417,7 @@ export type Contact = {
   photon: string;
   name: string;
   address: string;
+  phone: string | null;
   status: "pending" | "approved" | "declined";
   token: string;
   created_at: string;
@@ -430,6 +431,7 @@ function rowToContact(row: any): Contact {
     photon: row.photon,
     name: row.name,
     address: row.address,
+    phone: row.phone || null,
     status: row.status,
     token: row.token,
     created_at: row.created_at,
@@ -466,6 +468,17 @@ export function createContact(
      VALUES (?, ?, ?, ?, ?, 'pending', ?, ?)`,
   ).run(accountId, id, photon, name, address, token, now);
   return getContactByAddress(accountId, address) as Contact;
+}
+
+// Step 1: a contact's phone number, for texts and caller ID. The column
+// itself is added by the telephony module at import (ALTER TABLE ...
+// ADD COLUMN, wrapped so it no-ops if the column already exists).
+export function setContactPhone(accountId: string, contactId: string, phone: string): void {
+  db.query(`UPDATE contacts SET phone = ? WHERE account_id = ? AND id = ?`).run(
+    phone,
+    accountId,
+    contactId,
+  );
 }
 
 export function getContactByToken(

@@ -5,8 +5,7 @@ services:
     dockerfilePath: ./Dockerfile
     plan: free
     domains:
-      - prism5labs.com
-      - www.prism5labs.com
+      - app.prism5labs.com
     envVars:
       - key: NODE_ENV
         value: production
@@ -18,6 +17,29 @@ services:
       # unset, no free code works. Set in the Render dashboard, never here.
       # GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET / GOOGLE_REDIRECT_URI:
       # optional, enable Gmail sign-in on the Inboxes tab. Without them the
-      # tab reports honestly that no accounts are connected.
+      # tab reports honestly that no accounts are connected. The same
+      # client also powers Calendar and Drive once those APIs are enabled
+      # in the Google Cloud project and the callback-extra redirect URI is
+      # registered there.
       # APP_URL: optional, public base URL of this deployment (used for the
       # OAuth redirect). Defaults to the request host when unset.
+      # TWILIO_ACCOUNT_SID / TWILIO_AUTH_TOKEN / TWILIO_PHONE_NUMBER:
+      # optional, enable texts and calls (steps 1 + 7). Without them the
+      # telephony endpoints answer not_connected.
+      # ELEVENLABS_API_KEY: optional, enables turn-based live voice
+      # (step 5). Without it the voice endpoints answer voice_not_connected.
+      # META_PAGE_ID / META_PAGE_ACCESS_TOKEN / META_WEBHOOK_VERIFY_TOKEN:
+      # optional, enable Facebook Page messaging (step 9). Personal
+      # Messenger has no supported API and is never connected.
+      # VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY / VAPID_SUBJECT: optional,
+      # enable Web Push for proactive checks (step 3). Without them checks
+      # and reminders still run but no push is sent.
+      # JOBS_FEED_URL: optional, URL of a JSON or RSS/Atom job feed for the
+      # job plug (step 8). No feed URL means no job source is connected.
+      # BRAVE_SEARCH_API_KEY: optional, enables live web research
+      # (step 10). Without it the research endpoint answers
+      # research_not_connected.
+      # STRIPE_WEBHOOK_SECRET: optional, the whsec_ signing secret for the
+      # Stripe webhook (step 10). Without it, purchases unlock by code as
+      # before; with it, they unlock automatically when Stripe reports the
+      # payment.

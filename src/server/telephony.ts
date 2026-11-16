@@ -19,6 +19,7 @@
 // Twilio does not retry-storm a number that was never pointed at us.
 
 import { createHmac, timingSafeEqual } from "node:crypto";
+import { config } from "./config";
 import { addMessage, db, getContactByAddress } from "./db";
 
 // --- Tables (created here, in this module, at import) ---
@@ -60,19 +61,18 @@ try {
   // Column already exists; nothing to do.
 }
 
-// --- Config (read from the environment directly; the coordinator
-// consolidates these into config.ts at merge time) ---
+// --- Config (from config.ts) ---
 function twilioSid(): string {
-  return process.env.TWILIO_ACCOUNT_SID || "";
+  return config.twilioAccountSid;
 }
 function twilioToken(): string {
-  return process.env.TWILIO_AUTH_TOKEN || "";
+  return config.twilioAuthToken;
 }
 function twilioNumber(): string {
-  return process.env.TWILIO_PHONE_NUMBER || "";
+  return config.twilioPhoneNumber;
 }
 function appUrl(): string {
-  return (process.env.APP_URL || "").replace(/\/$/, "");
+  return (config.appUrl || "").replace(/\/$/, "");
 }
 
 export function twilioConfigured(): boolean {

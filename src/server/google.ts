@@ -21,6 +21,7 @@
 // same as Gmail.
 
 import { db } from "./db";
+import { config } from "./config";
 
 // Own table, created here at import (this module's file ownership).
 db.exec(`
@@ -49,11 +50,10 @@ export const CALENDAR_SCOPES = [
 
 export const DRIVE_SCOPES = ["https://www.googleapis.com/auth/drive.readonly"] as const;
 
-// Same Google OAuth client env vars as Gmail. Read directly here; the
-// coordinator consolidates config.ts at merge. No new secrets.
-const googleClientId = process.env.GOOGLE_CLIENT_ID || "";
-const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET || "";
-const googleRedirectUri = process.env.GOOGLE_REDIRECT_URI || "";
+// Same Google OAuth client as Gmail, from config.ts. No new secrets.
+const googleClientId = config.googleClientId;
+const googleClientSecret = config.googleClientSecret;
+const googleRedirectUri = config.googleRedirectUri;
 
 export function googleExtraConfigured(): boolean {
   return (

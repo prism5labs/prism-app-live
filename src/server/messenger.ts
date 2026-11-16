@@ -26,20 +26,19 @@
 // same pattern as src/server/gmail.ts.
 
 import { db } from "./db";
+import { config } from "./config";
 
 const GRAPH_BASE = "https://graph.facebook.com/v26.0";
 
-// The Page id, token, and webhook verify token, read fresh each call so a
-// server started without them still answers honestly, and one started with
-// them uses them.
+// The Page id, token, and webhook verify token, from config.ts.
 function pageId(): string {
-  return (process.env.META_PAGE_ID || "").trim();
+  return config.metaPageId.trim();
 }
 function pageAccessToken(): string {
-  return (process.env.META_PAGE_ACCESS_TOKEN || "").trim();
+  return config.metaPageAccessToken.trim();
 }
 function webhookVerifyToken(): string {
-  return (process.env.META_WEBHOOK_VERIFY_TOKEN || "").trim();
+  return config.metaWebhookVerifyToken.trim();
 }
 
 export function messengerConfigured(): boolean {

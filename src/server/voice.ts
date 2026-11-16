@@ -25,6 +25,7 @@
 // must be confirmed at build time — this module states no price.
 
 import { getOrCreateAccount, ownsPhoton, getCustomization } from "./db";
+import { config } from "./config";
 import { photonByName } from "../shared/photons";
 import { voiceById } from "../shared/voices";
 
@@ -134,7 +135,7 @@ function accountIdFrom(req: Request, body: any): string {
 }
 
 function elevenLabsKey(): string {
-  return (process.env.ELEVENLABS_API_KEY || "").trim();
+  return config.elevenLabsApiKey.trim();
 }
 
 export function voiceConfigured(): boolean {
