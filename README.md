@@ -1,5 +1,7 @@
 # Prism 5 — standalone app
 
+> **Read [IRONCLAD.md](IRONCLAD.md) first.** It states the locked rules — prices, launch model, free code — set by Neil, the owner. Run `bash scripts/ironclad-check.sh` (or `bun run ironclad`) to check for drift.
+
 A complete rebuild of the Prism 5 app (the `prism-app-live` builder version,
 live v9) as a standalone fullstack project, so we own every file and can
 deploy it to GitHub and Render. No Muse artifact runtime, no

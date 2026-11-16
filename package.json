@@ -13,6 +13,7 @@
     "build:client": "bun build client/main.ts --outdir public --target browser --minify",
     "dev": "bun --watch src/server.ts",
     "gen-catalog": "bun scripts/gen-catalog.ts",
+    "ironclad": "bash scripts/ironclad-check.sh",
     "start": "bun src/server.ts",
     "typecheck": "tsc --noEmit"
   },
