@@ -1,9 +1,11 @@
 // Prism 5 service worker. Cache-first for the app shell and static assets,
 // network-first for the API (chat, state, and inboxes must always be fresh).
-// CACHE v3: bumped Nov 15, 2026 for the client-B voice/proactive/jobs/
-// Messenger/research UI and the push handler below, so existing installs
-// fetch the new look instead of the old cached shell.
-const CACHE = "prism5-v3";
+// CACHE v4: bumped Nov 16, 2026 for the Photon intro (client/main.ts shows
+// each Photon's intro on an empty thread). The intro shipped in main.js
+// without a cache bump, so existing installs kept serving the cached
+// pre-intro shell with its generic "Howdy, neighbor!" greeting; bumping
+// the cache makes them fetch the new shell instead.
+const CACHE = "prism5-v4";
 const SHELL = ["/", "/index.html", "/styles.css", "/main.js", "/manifest.json"];
 
 self.addEventListener("install", (event) => {
