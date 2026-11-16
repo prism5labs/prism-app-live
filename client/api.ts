@@ -125,16 +125,63 @@ export const api = {
   // Switchboard: email sends to approved contacts, and the friend-request
   // flow that approves a new contact first.
   contacts: () => req(`/api/contacts?accountId=${encodeURIComponent(getAccountId())}`),
-  requestContact: (photon: string, name: string, address: string) =>
+  requestContact: (photon: string, name: string, address: string, phone?: string) =>
     req("/api/contacts/request", {
       method: "POST",
-      body: JSON.stringify({ accountId: getAccountId(), photon, name, address }),
+      body: JSON.stringify({ accountId: getAccountId(), photon, name, address, phone: phone || "" }),
     }),
   switchboardSend: (photon: string, to: string, subject: string, body: string, name?: string) =>
     req("/api/switchboard/send", {
       method: "POST",
       body: JSON.stringify({ accountId: getAccountId(), photon, to, subject, body, name }),
     }),
+  // Texts & calls (Twilio). Status first: nothing is claimed to work
+  // until the server says the number is connected.
+  textsStatus: () => req(`/api/texts/status?accountId=${encodeURIComponent(getAccountId())}`),
+  texts: (limit = 50) =>
+    req(`/api/texts?accountId=${encodeURIComponent(getAccountId())}&limit=${limit}`),
+  sendText: (to: string, body: string) =>
+    req("/api/texts/send", {
+      method: "POST",
+      body: JSON.stringify({ accountId: getAccountId(), to, body }),
+    }),
+  calls: (limit = 50) =>
+    req(`/api/calls?accountId=${encodeURIComponent(getAccountId())}&limit=${limit}`),
+  // Calendar (Google). Events default to now through 7 days out on the
+  // server when no window is given.
+  calendarStatus: () => req(`/api/calendar/status?accountId=${encodeURIComponent(getAccountId())}`),
+  calendarEvents: (timeMin?: string, timeMax?: string) => {
+    const q = new URLSearchParams({ accountId: getAccountId() });
+    if (timeMin) q.set("timeMin", timeMin);
+    if (timeMax) q.set("timeMax", timeMax);
+    return req(`/api/calendar/events?${q.toString()}`);
+  },
+  calendarFreeBusy: (timeMin?: string, timeMax?: string) => {
+    const q = new URLSearchParams({ accountId: getAccountId() });
+    if (timeMin) q.set("timeMin", timeMin);
+    if (timeMax) q.set("timeMax", timeMax);
+    return req(`/api/calendar/freebusy?${q.toString()}`);
+  },
+  bookCalendar: (title: string, start: string, end: string, description?: string, attendees?: string[]) =>
+    req("/api/calendar/book", {
+      method: "POST",
+      body: JSON.stringify({ accountId: getAccountId(), title, start, end, description, attendees }),
+    }),
+  cancelCalendar: (eventId: string) =>
+    req("/api/calendar/cancel", {
+      method: "POST",
+      body: JSON.stringify({ accountId: getAccountId(), eventId }),
+    }),
+  // Drive (Google). Search lists files; file reads one as text (Docs as
+  // text, Sheets as CSV). Some types cannot be read — the server says so.
+  driveStatus: () => req(`/api/drive/status?accountId=${encodeURIComponent(getAccountId())}`),
+  driveSearch: (q?: string) => {
+    const p = new URLSearchParams({ accountId: getAccountId() });
+    if (q) p.set("q", q);
+    return req(`/api/drive/search?${p.toString()}`);
+  },
+  driveFile: (id: string) =>
+    req(`/api/drive/file?accountId=${encodeURIComponent(getAccountId())}&id=${encodeURIComponent(id)}`),
   // Per-Photon customization (name, voice, look). Progress saved per
   // Photon so the owner picks up where they left off.
   customizeGet: (photon: string) =>
