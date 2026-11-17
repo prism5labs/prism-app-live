@@ -1657,48 +1657,43 @@ function syncBodyLook() {
 }
 
 // ---------- Chat backgrounds: the room you talk in ----------
-// On-brand poster art behind the chat, specific to the Photon (or tab)
-// you are with, rotating every 2 days so the room stays fresh instead
-// of two black boxes talking to each other. Deterministic by date, so
-// every device sees the same art on the same day and it changes without
-// any server state. Switching tabs (or Photons) slides the background
-// along with the view: it fades and shifts out, the art swaps mid-fade,
-// and it slides back in.
-const CHAT_BACKGROUNDS = ["/chat-bg/bg-rocket.jpg", "/chat-bg/bg-helmets.jpg", "/chat-bg/bg-starburst.jpg"];
-const BG_ROTATION_DAYS = 2;
+// On-brand poster art behind the chat. A dozen backgrounds that swap:
+// every tab or Photon change steps to the next one in the cycle, and a
+// timer steps to the next one every minute, so the room keeps changing
+// as you move around instead of two black boxes talking to each other.
+// Switching tabs (or Photons) slides the background along with the
+// view: it fades and shifts out, the art swaps mid-fade, and it slides
+// back in.
+const CHAT_BACKGROUNDS = [
+  "/chat-bg/bg-rocket.jpg",
+  "/chat-bg/bg-helmets.jpg",
+  "/chat-bg/bg-starburst.jpg",
+  "/chat-bg/bg-robot.jpg",
+  "/chat-bg/bg-saucer.jpg",
+  "/chat-bg/bg-raygun.jpg",
+  "/chat-bg/bg-car.jpg",
+  "/chat-bg/bg-pilot.jpg",
+  "/chat-bg/bg-moonbase.jpg",
+  "/chat-bg/bg-diner.jpg",
+  "/chat-bg/bg-launchpad.jpg",
+  "/chat-bg/bg-spacestation.jpg",
+];
+const BG_SWAP_INTERVAL_MS = 60000;
 const TAB_ORDER: Tab[] = ["chat", "inboxes", "store", "upkeep"];
+let bgIndex = 0;
 let lastBgKey = "";
 let lastTab: Tab = "chat";
 let bgSwapTimer: number | null = null;
-
-function bgPeriod(): number {
-  return Math.floor(Date.now() / 86400000 / BG_ROTATION_DAYS);
-}
-
-function bgIndexFor(seed: string): number {
-  let h = 0;
-  const s = seed + ":" + bgPeriod();
-  for (const c of s) h = (h * 31 + c.charCodeAt(0)) >>> 0;
-  return h % CHAT_BACKGROUNDS.length;
-}
+let bgIntervalTimer: number | null = null;
 
 function bgSeed(): string {
   if (tab === "chat") return activePhoton ? "photon:" + activePhoton : "chat-front";
   return "tab:" + tab;
 }
 
-function syncAppBackground(): void {
+function applyBackground(url: string, dir: number): void {
   const bg = document.getElementById("app-bg") as HTMLElement | null;
   if (!bg) return;
-  const key = bgSeed();
-  const url = CHAT_BACKGROUNDS[bgIndexFor(key)];
-  // Slide direction follows the tab order: moving right through the tabs
-  // slides the art in from the right, moving back slides it from the left.
-  const dir = TAB_ORDER.indexOf(tab) >= TAB_ORDER.indexOf(lastTab) ? 1 : -1;
-  const changed = key !== lastBgKey;
-  lastBgKey = key;
-  lastTab = tab;
-  if (!changed && bg.style.backgroundImage) return;
   if (bgSwapTimer) window.clearTimeout(bgSwapTimer);
   bg.classList.add("is-sliding");
   bg.style.setProperty("--bg-shift", `${dir * 48}px`);
@@ -1706,6 +1701,40 @@ function syncAppBackground(): void {
     bg.style.backgroundImage = `url("${url}")`;
     bg.classList.remove("is-sliding");
   }, 220);
+}
+
+function nextBackground(dir: number): void {
+  bgIndex = (bgIndex + 1) % CHAT_BACKGROUNDS.length;
+  applyBackground(CHAT_BACKGROUNDS[bgIndex], dir);
+}
+
+function startBgInterval(): void {
+  if (bgIntervalTimer !== null) return;
+  bgIntervalTimer = window.setInterval(() => {
+    if (document.hidden) return;
+    nextBackground(1);
+  }, BG_SWAP_INTERVAL_MS);
+}
+
+function syncAppBackground(): void {
+  const bg = document.getElementById("app-bg") as HTMLElement | null;
+  if (!bg) return;
+  startBgInterval();
+  const key = bgSeed();
+  // Slide direction follows the tab order: moving right through the tabs
+  // slides the art in from the right, moving back slides it from the left.
+  const dir = TAB_ORDER.indexOf(tab) >= TAB_ORDER.indexOf(lastTab) ? 1 : -1;
+  const changed = key !== lastBgKey;
+  lastBgKey = key;
+  lastTab = tab;
+  if (!changed && bg.style.backgroundImage) return;
+  if (!bg.style.backgroundImage) {
+    // First paint: show the current background without advancing.
+    applyBackground(CHAT_BACKGROUNDS[bgIndex], dir);
+    return;
+  }
+  // Tab or Photon change: step to the next background in the cycle.
+  nextBackground(dir);
 }
 
 function render() {
