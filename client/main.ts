@@ -83,6 +83,23 @@ let messengerThreadsData: any[] | null = null;
 let messengerOpenId: string | null = null;
 let messengerOpenMessages: any[] | null = null;
 let messengerOpenError = "";
+// Pages connected from the app (a Page access token pasted in by the
+// owner). Null means the server's Page, when one is set up. The token
+// itself is never in this state: the server only ever sends back the
+// Page id and name.
+let messengerPagesData: any[] | null = null;
+let messengerSelectedPageId: string | null = null;
+
+// About you: what the owner tells Prism about themselves, loaded with
+// the Inboxes tab. The form edits a local copy until Save.
+let profileData: any = null;
+let profileSaved = false;
+
+// Memory imported from another AI. The parsed file waits on this device
+// until the owner taps Import; nothing is sent by picking a file.
+let memoryImportsData: any[] = [];
+let memoryParsed: { source: string; title: string; content: string; summary: string } | null = null;
+let memoryParseError = "";
 
 // Stripe webhook status (Step 10): loaded when the Store tab opens.
 let stripeStatusData: any = null;
@@ -431,6 +448,176 @@ function dedupeImported(rows: { name: string; email: string; phone: string }[]):
     out.push(r);
   }
   return out;
+}
+
+// ---------- Memory from another AI ----------
+// Parse a file the owner picked from their phone into one import: what
+// they already told another assistant, so they keep continuity and do
+// not start over. Accepted shapes, all read on this device only:
+//   - ChatGPT export (.json): { conversations: [{ title, mapping: { id:
+//     { message: { author: { role }, content: { parts: [...] } } } } }] }
+//   - Claude export (.json): [{ name, chat_messages: [{ sender, text }] }]
+//     or [{ name, messages: [{ role, content }] }]
+//   - A plain list of messages (.json): [{ role, content }] or
+//     { messages: [...] } or { conversations: [...] } in either shape.
+//   - Notes (.md, .txt): the whole file as one memory note.
+// Anything else says so plainly and imports nothing. A parsed import is
+// capped at 200 messages and 100,000 characters; the server caps it
+// again when it is stored.
+const MEMORY_MAX_MESSAGES = 200;
+const MEMORY_MAX_CHARS = 100_000;
+
+function memoryLinesFromParts(parts: unknown): string {
+  if (!Array.isArray(parts)) return "";
+  return parts
+    .map((p) => (typeof p === "string" ? p : typeof (p as any)?.text === "string" ? (p as any).text : ""))
+    .filter(Boolean)
+    .join("\n");
+}
+
+function memoryTurn(role: string, text: string): string | null {
+  const t = String(text || "").trim();
+  if (!t) return null;
+  const who = role === "user" || role === "human" ? "You" : role === "assistant" ? "Assistant" : role;
+  return `${who}: ${t}`;
+}
+
+function memoryFromChatGpt(data: any): { title: string; content: string; count: number } | null {
+  const convos = Array.isArray(data?.conversations) ? data.conversations : null;
+  if (!convos) return null;
+  const lines: string[] = [];
+  let count = 0;
+  let title = "ChatGPT export";
+  for (const c of convos) {
+    if (count >= MEMORY_MAX_MESSAGES) break;
+    const name = typeof c?.title === "string" && c.title ? c.title : "Conversation";
+    if (convos.length === 1) title = `ChatGPT: ${name}`;
+    const mapping = c?.mapping;
+    if (!mapping || typeof mapping !== "object") continue;
+    const nodes = Object.values(mapping) as any[];
+    const turns: string[] = [];
+    for (const n of nodes) {
+      if (count >= MEMORY_MAX_MESSAGES) break;
+      const msg = n?.message;
+      if (!msg || typeof msg !== "object") continue;
+      const role = msg.author?.role;
+      if (role !== "user" && role !== "assistant") continue;
+      const content = msg.content;
+      if (!content || typeof content !== "object") continue;
+      const text =
+        content.content_type === "text" || Array.isArray(content.parts)
+          ? memoryLinesFromParts(content.parts)
+          : typeof content.text === "string"
+            ? content.text
+            : "";
+      const turn = memoryTurn(role, text);
+      if (turn) {
+        turns.push(turn);
+        count++;
+      }
+    }
+    if (turns.length) lines.push(`--- ${name} ---\n${turns.join("\n")}`);
+  }
+  if (!count) return null;
+  return { title, content: lines.join("\n\n").slice(0, MEMORY_MAX_CHARS), count };
+}
+
+function memoryFromClaude(data: any): { title: string; content: string; count: number } | null {
+  const convos = Array.isArray(data)
+    ? data
+    : Array.isArray(data?.conversations)
+      ? data.conversations
+      : null;
+  if (!convos) return null;
+  const lines: string[] = [];
+  let count = 0;
+  let title = "Claude export";
+  for (const c of convos) {
+    if (count >= MEMORY_MAX_MESSAGES) break;
+    const name = typeof c?.name === "string" && c.name ? c.name : typeof c?.title === "string" && c.title ? c.title : "Conversation";
+    if (convos.length === 1) title = `Claude: ${name}`;
+    const msgs = Array.isArray(c?.chat_messages)
+      ? c.chat_messages
+      : Array.isArray(c?.messages)
+        ? c.messages
+        : null;
+    if (!msgs) continue;
+    const turns: string[] = [];
+    for (const m of msgs) {
+      if (count >= MEMORY_MAX_MESSAGES) break;
+      const role = m?.sender || m?.role;
+      const text = typeof m?.text === "string" ? m.text : typeof m?.content === "string" ? m.content : memoryLinesFromParts(m?.content?.parts);
+      const turn = memoryTurn(role, text);
+      if (turn) {
+        turns.push(turn);
+        count++;
+      }
+    }
+    if (turns.length) lines.push(`--- ${name} ---\n${turns.join("\n")}`);
+  }
+  if (!count) return null;
+  return { title, content: lines.join("\n\n").slice(0, MEMORY_MAX_CHARS), count };
+}
+
+function memoryFromMessageList(data: any): { title: string; content: string; count: number } | null {
+  const msgs = Array.isArray(data) ? data : Array.isArray(data?.messages) ? data.messages : null;
+  if (!msgs) return null;
+  const turns: string[] = [];
+  for (const m of msgs) {
+    if (turns.length >= MEMORY_MAX_MESSAGES) break;
+    const role = m?.role || m?.sender;
+    const text = typeof m?.content === "string" ? m.content : typeof m?.text === "string" ? m.text : memoryLinesFromParts(m?.content?.parts);
+    const turn = memoryTurn(role, text);
+    if (turn) turns.push(turn);
+  }
+  if (!turns.length) return null;
+  return { title: "Message list", content: turns.join("\n").slice(0, MEMORY_MAX_CHARS), count: turns.length };
+}
+
+// Parse one picked file. Returns the import, or an error in plain words.
+// Nothing is sent by parsing; the import only happens when the owner
+// taps Import this memory.
+function parseMemoryFile(
+  name: string,
+  text: string,
+): { source: string; title: string; content: string; summary: string } | { error: string } {
+  const lower = name.toLowerCase();
+  if (lower.endsWith(".md") || lower.endsWith(".txt")) {
+    const clean = text.slice(0, MEMORY_MAX_CHARS);
+    if (!clean.trim()) return { error: "That file is empty. Nothing was imported." };
+    const title = name.replace(/\.(md|txt)$/i, "") || "Notes";
+    return {
+      source: "Notes file",
+      title,
+      content: clean,
+      summary: `${clean.length.toLocaleString()} characters of notes from ${name}.`,
+    };
+  }
+  if (!lower.endsWith(".json")) {
+    return { error: "That file type is not accepted. Pick a .json export, or notes as .md or .txt." };
+  }
+  let data: any;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    return { error: "That file is not valid JSON. Nothing was imported." };
+  }
+  const parsed =
+    memoryFromChatGpt(data) || memoryFromClaude(data) || memoryFromMessageList(data);
+  if (!parsed) {
+    return {
+      error:
+        "That file did not look like a ChatGPT export, a Claude export, or a plain list of messages. Nothing was imported.",
+    };
+  }
+  const source =
+    memoryFromChatGpt(data) ? "ChatGPT export" : memoryFromClaude(data) ? "Claude export" : "Message list";
+  return {
+    source,
+    title: parsed.title,
+    content: parsed.content,
+    summary: `${parsed.count} message${parsed.count === 1 ? "" : "s"} from ${name}, ${parsed.content.length.toLocaleString()} characters.`,
+  };
 }
 
 function meterLine(): string {
@@ -1325,16 +1512,42 @@ function renderDriveSection(): string {
 
 // Messenger (Step 9): Facebook Page messaging only. Personal Messenger
 // has no supported API, so the section says so instead of pretending.
-// Tap a thread to read it; a reply is drafted here and goes out only
-// when the owner taps Send.
+// A Page can be connected from here with a Page access token, pasted in
+// below; the token is tested before it is stored, and it is never shown
+// back. Tap a thread to read it; a reply is drafted here and goes out
+// only when the owner taps Send.
 function renderMessenger(): string {
   const s = messengerStatusData as any;
   const threads = (messengerThreadsData || []) as any[];
+  const pages = (messengerPagesData || []) as any[];
   const personal = `<p class="fine">Personal Messenger can't be connected — Meta offers messaging for Facebook Pages only, not personal accounts. For a personal thread, paste the messages into chat and your Photon will read them there.</p>`;
-  if (!s) return `<div class="card"><h3>Messenger</h3><p class="fine">Loading…</p></div>`;
-  if (!s.configured) {
-    return `<div class="card"><h3>Messenger</h3><p>Your business Facebook Page isn't connected yet.</p>${personal}</div>`;
+  const connectForm = `<form id="page-connect-form" class="page-connect-form">
+        <h4>Connect your Facebook Page</h4>
+        <p class="fine">Paste a Page access token from Meta's developer console (your Page's settings, under Messenger). It is tested before it is stored, it is kept on the server like your Gmail sign-in, and it is never shown back to you.</p>
+        <input name="token" type="password" placeholder="Page access token" required autocomplete="off">
+        <button class="btn primary" type="submit">Connect this Page</button>
+        <p class="fine">Messages that arrive on the Page come in through the server. Connecting here lets you read threads and reply from the app.</p>
+      </form>`;
+  if (!s) return `<div class="card" id="messenger"><h3>Messenger</h3><p class="fine">Loading…</p></div>`;
+  const usable = pages.length > 0 || s.configured;
+  if (!usable) {
+    return `<div class="card" id="messenger"><h3>Messenger</h3><p>Your business Facebook Page isn't connected yet.</p>${connectForm}${personal}</div>`;
   }
+  // Which Page's threads are showing: a Page connected here, or the
+  // server's Page when none is connected here.
+  const pageChips = [
+    ...pages.map(
+      (p: any) => `<span class="page-chip${messengerSelectedPageId === String(p.pageId) ? " selected" : ""}">
+        <button class="page-chip-btn" data-action="page-select" data-id="${esc(String(p.pageId))}">${esc(p.pageName || p.pageId)}</button>
+        <button class="page-chip-x" data-action="page-disconnect" data-id="${esc(String(p.pageId))}" aria-label="Disconnect ${esc(p.pageName || p.pageId)}">✕</button>
+      </span>`,
+    ),
+    ...(s.configured
+      ? [`<span class="page-chip${messengerSelectedPageId === null ? " selected" : ""}">
+        <button class="page-chip-btn" data-action="page-select" data-id="">Server Page</button>
+      </span>`]
+      : []),
+  ].join("");
   const rows = threads
     .map(
       (t: any) => `<button class="inbox-msg msg-thread${messengerOpenId === t.id ? " open" : ""}" data-action="msg-thread" data-id="${esc(t.id)}">
@@ -1365,11 +1578,22 @@ function renderMessenger(): string {
       </form>`;
     }
   }
-  return `<div class="card"><h3>Messenger — your Page</h3>
+  return `<div class="card" id="messenger"><h3>Messenger — your Page</h3>
     <p class="fine">Page messaging is connected. Replies go out only when you tap send.</p>
+    ${pageChips ? `<div class="page-chips" aria-label="Choose a Page">${pageChips}</div>` : ""}
     ${rows || `<p class="fine">No Page conversations yet.</p>`}
     ${openHtml}
+    ${connectForm}
     ${personal}</div>`;
+}
+
+async function reloadMessengerThreads() {
+  const th = await api.messengerThreads(messengerSelectedPageId || undefined);
+  if (th && th.ok) {
+    messengerThreadsData = th.threads || [];
+  } else {
+    messengerThreadsData = [];
+  }
 }
 
 async function openMessengerThread(id: string) {
@@ -1377,7 +1601,7 @@ async function openMessengerThread(id: string) {
   messengerOpenMessages = null;
   messengerOpenError = "";
   render();
-  const r = await api.messengerMessages(id);
+  const r = await api.messengerMessages(id, messengerSelectedPageId || undefined);
   if (r && r.ok) {
     messengerOpenMessages = r.messages || [];
   } else if (r?.error === "messenger_not_configured") {
@@ -1392,13 +1616,16 @@ async function openMessengerThread(id: string) {
 
 // ---------- Connect an account ----------
 // One generic button, not three named slots. Tapping it asks what to
-// connect: a Gmail account (as many as you like, each a separate Google
-// sign-in) or Google Calendar & Drive (one sign-in covers both). Only
-// Google accounts can be connected from the app — other email providers
-// have no supported sign-in here, and texts, calls, and Facebook Page
-// messaging are set up on the server, not from the app. The chooser
-// reuses the character-card modal, so it dismisses the same four ways:
-// the X, the Close button, a tap on the backdrop, or the Escape key.
+// connect: a Gmail account or an Outlook account (as many as you like,
+// each a separate sign-in), Google Calendar & Drive (one sign-in covers
+// both), or a Facebook Page (a Page access token, pasted in the
+// Messenger section below). Each option is shown on its own: an option
+// whose sign-in is not set up on this server says so plainly instead of
+// pretending. Yahoo, Apple Mail, and other mail providers have no
+// supported sign-in here, and texts, calls, and Facebook Page messaging
+// are set up on the server, not from the app. The chooser reuses the
+// character-card modal, so it dismisses the same four ways: the X, the
+// Close button, a tap on the backdrop, or the Escape key.
 function nextGmailLabel(): string {
   const used = new Set((state?.inboxAccounts || []).map((a: any) => String(a.label || "")));
   let n = 1;
@@ -1406,22 +1633,46 @@ function nextGmailLabel(): string {
   return `gmail-${n}`;
 }
 
+function nextOutlookLabel(): string {
+  const used = new Set((state?.outlookAccounts || []).map((a: any) => String(a.label || "")));
+  let n = 1;
+  while (used.has(`outlook-${n}`)) n++;
+  return `outlook-${n}`;
+}
+
 function connectChooserHtml(): string {
-  const configured = state?.googleConfigured;
-  const body = configured
-    ? `<p class="card-tagline">Add as many accounts as you like. Each one is a separate sign-in, and each shows up here as its own inbox.</p>
+  const google = state?.googleConfigured;
+  const microsoft = state?.microsoftConfigured;
+  const choices: string[] = [];
+  if (google) {
+    choices.push(`<a class="btn primary" href="/api/oauth/google/start?accountId=${encodeURIComponent(
+      getAccountId(),
+    )}&label=${nextGmailLabel()}">Add a Gmail account</a>
+        <p class="fine">Sign in with Google. That account's inbox and drafts appear below.</p>`);
+  } else {
+    choices.push(`<p>Gmail sign-in isn't set up on this server yet. It needs a Google OAuth client (client ID, secret, and redirect).</p>`);
+  }
+  if (microsoft) {
+    choices.push(`<a class="btn primary" href="/api/oauth/microsoft/start?accountId=${encodeURIComponent(
+      getAccountId(),
+    )}&label=${nextOutlookLabel()}">Add an Outlook account</a>
+        <p class="fine">Sign in with Microsoft. That account's inbox and drafts appear below, next to your Gmail accounts.</p>`);
+  } else {
+    choices.push(`<p>Outlook sign-in isn't set up on this server yet. It needs a Microsoft OAuth client (client ID, secret, and redirect).</p>`);
+  }
+  if (google) {
+    choices.push(`<a class="btn primary" href="/api/oauth/google/start-extra?accountId=${encodeURIComponent(
+      getAccountId(),
+    )}">Connect Calendar &amp; Drive</a>
+        <p class="fine">One sign-in covers both Calendar and Drive. If you already connected Gmail, you'll sign in once more to add the permission.</p>`);
+  }
+  choices.push(`<button class="btn primary" data-action="goto-messenger">Connect a Facebook Page</button>
+        <p class="fine">Your business Facebook Page connects in the Messenger section below — paste a Page access token there. Personal Messenger can't be connected: Meta offers messaging for Facebook Pages only.</p>`);
+  const body = `<p class="card-tagline">Add as many accounts as you like. Each one is a separate sign-in, and each shows up here as its own inbox.</p>
       <div class="connect-choices">
-        <a class="btn primary" href="/api/oauth/google/start?accountId=${encodeURIComponent(
-          getAccountId(),
-        )}&label=${nextGmailLabel()}">Add a Gmail account</a>
-        <p class="fine">Sign in with Google. That account's inbox and drafts appear below.</p>
-        <a class="btn primary" href="/api/oauth/google/start-extra?accountId=${encodeURIComponent(
-          getAccountId(),
-        )}">Connect Calendar &amp; Drive</a>
-        <p class="fine">One sign-in covers both Calendar and Drive. If you already connected Gmail, you'll sign in once more to add the permission.</p>
+        ${choices.join("\n")}
       </div>
-      <p class="fine">Only Google accounts can be connected from the app — other email providers aren't supported yet. Texts, calls, and Facebook Page messaging are set up on the server, not from the app.</p>`
-    : `<p>Account sign-in isn't set up on this server yet. It needs a Google OAuth client (client ID, secret, and redirect).</p>`;
+      <p class="fine">Google and Outlook can be connected from the app. Yahoo, Apple Mail, and other mail providers are not supported yet — they need a mail connection this app does not have. Texts and calls are set up on the server, not from the app.</p>`;
   return cardShell("Connect an account", body);
 }
 
@@ -1429,25 +1680,21 @@ function openConnectChooser(opener: HTMLElement | null) {
   openCard(connectChooserHtml(), opener);
 }
 
-function renderInboxes(): string {
-  const accounts = (state?.inboxAccounts || []) as any[];
-  const configured = state?.googleConfigured;
-  const cards = accounts
-    .map((acct: any) => {
-      const msgs = (acct.messages || [])
-        .map(
-          (m: any) => `<div class="inbox-msg">
+function emailCard(acct: any, provider: "gmail" | "outlook"): string {
+  const msgs = (acct.messages || [])
+    .map(
+      (m: any) => `<div class="inbox-msg">
             <p class="inbox-subject">${esc(m.subject || "(no subject)")}</p>
             <p class="inbox-meta">${esc(m.from || "")} · ${esc(m.date || "")}</p>
             <p class="inbox-snippet">${esc(m.snippet || "")}</p>
           </div>`,
-        )
-        .join("");
-      return `<div class="card inbox-card">
+    )
+    .join("");
+  return `<div class="card inbox-card">
         <h3>${esc(acct.title || acct.email || "Email")}</h3>
-        <p class="fine">${esc(acct.email || "")}</p>
+        <p class="fine">${esc(acct.email || "")} · ${provider === "outlook" ? "Outlook" : "Gmail"}</p>
         ${msgs || `<p class="fine">Nothing in the inbox right now.</p>`}
-        <form class="draft-form" data-label="${esc(String(acct.label || ""))}">
+        <form class="draft-form" data-label="${esc(String(acct.label || ""))}" data-provider="${provider}">
           <h4>Save a draft</h4>
           <input name="to" type="text" placeholder="To" required>
           <input name="subject" type="text" placeholder="Subject">
@@ -1455,15 +1702,25 @@ function renderInboxes(): string {
           <button class="btn primary" type="submit">Save draft</button>
         </form>
       </div>`;
-    })
-    .join("");
-  const emailEmpty = configured
-    ? `<p class="fine">No email accounts connected yet — tap <b>Connect an account</b> above to add one.</p>`
-    : `<p class="fine">Email sign-in isn't set up on this server yet.</p>`;
+}
+
+function renderInboxes(): string {
+  const accounts = (state?.inboxAccounts || []) as any[];
+  const outlookAccounts = (state?.outlookAccounts || []) as any[];
+  const googleConfigured = state?.googleConfigured;
+  const microsoftConfigured = state?.microsoftConfigured;
+  const cards = [
+    ...accounts.map((acct: any) => emailCard(acct, "gmail")),
+    ...outlookAccounts.map((acct: any) => emailCard(acct, "outlook")),
+  ].join("");
+  const emailEmpty =
+    googleConfigured || microsoftConfigured
+      ? `<p class="fine">No email accounts connected yet — tap <b>Connect an account</b> above to add one.</p>`
+      : `<p class="fine">Email sign-in isn't set up on this server yet.</p>`;
   return `
   <section>
     <h1 class="page-title">Inboxes</h1>
-    <p class="page-lede">Messages, contacts, calendar, and Drive — plus your Gmail accounts. Drafts you save here land in that account's Gmail drafts.</p>
+    <p class="page-lede">Messages, contacts, calendar, and Drive — plus your email accounts. Drafts you save here land in that account's drafts.</p>
     <div class="connect-bar"><button class="btn primary" data-action="connect-open">Connect an account</button></div>
     <div class="switchboard-strip"><img src="/brand/switchboard.jpg" alt=""><p><b>On Switchboard.</b> Inboxes is where Switchboard lives — every Launch in the Lab, one board.</p></div>
     <div class="inbox-jump" aria-label="Jump to a section">
@@ -1472,6 +1729,8 @@ function renderInboxes(): string {
       <a href="#calendar">Calendar</a>
       <a href="#drive">Drive</a>
       <a href="#gmail-accounts">Email</a>
+      <a href="#about-you">About you</a>
+      <a href="#memory-import">Memory</a>
     </div>
     ${renderMessagesSection()}
     ${renderSwitchboardContacts()}
@@ -1481,8 +1740,82 @@ function renderInboxes(): string {
     ${state?.inboxError ? `<p class="chat-error">${esc(state.inboxError)}</p>` : ""}
     <h2 class="section-title" id="gmail-accounts">Email</h2>
     <div class="inbox-grid">${cards}</div>
-    ${accounts.length ? "" : emailEmpty}
+    ${accounts.length || outlookAccounts.length ? "" : emailEmpty}
+    ${renderProfile()}
+    ${renderMemoryImport()}
   </section>`;
+}
+
+// ---------- About you ----------
+// What the owner tells Prism about themselves, so the Photons know them
+// instead of starting cold. The form edits a local copy until Save; the
+// server stores it for this account only, and the Photons read it in the
+// chat system prompt. It is never shared with anyone else.
+function renderProfile(): string {
+  const p = profileData || {};
+  const saved = profileSaved
+    ? `<p class="fine">Saved. Your Photons know you now.</p>`
+    : "";
+  return `<div class="card" id="about-you"><h3>About you</h3>
+    <p class="fine">Tell your Photons who you are, so they know you instead of starting cold. This stays on the server for your account only. It is never shared with anyone else.</p>
+    <form id="profile-form" class="profile-form">
+      <label class="field-label">What should they call you?
+        <input name="displayName" type="text" placeholder="Your name" value="${esc(p.displayName || "")}" maxlength="80">
+      </label>
+      <label class="field-label">About you
+        <textarea name="about" rows="3" placeholder="Who you are, what matters to you, what you do…">${esc(p.about || "")}</textarea>
+      </label>
+      <label class="field-label">How you like things done
+        <textarea name="preferences" rows="3" placeholder="How you like answers, what to remember, what to never do…">${esc(p.preferences || "")}</textarea>
+      </label>
+      <label class="field-label">Anything else they should know
+        <textarea name="notes" rows="2" placeholder="Anything else…">${esc(p.notes || "")}</textarea>
+      </label>
+      <button class="btn primary" type="submit">Save who you are</button>
+      ${saved}
+    </form>
+  </div>`;
+}
+
+// ---------- Memory from another AI ----------
+// Bring what the owner already told another assistant, so they keep
+// continuity and do not start over. The file is read on this device
+// only; nothing is sent until the owner taps Import. Accepted: a
+// ChatGPT export (.json), a Claude export (.json), a plain list of
+// messages (.json), or notes as Markdown or text (.md, .txt). What is
+// imported is stored on the server for this account only, and a short
+// digest of it is read into the chat system prompt as background, never
+// as instructions.
+function renderMemoryImport(): string {
+  const rows = memoryImportsData
+    .map(
+      (m: any) => `<div class="inbox-msg"><p class="inbox-subject">${esc(m.title || "Imported memory")}</p>
+        <p class="inbox-meta">${esc(m.source || "file")} · ${Number(m.chars || 0).toLocaleString()} characters · ${esc(fmtDateOnly(m.importedAt || ""))}</p>
+        <button class="btn small" data-action="memory-delete" data-id="${esc(String(m.id))}">Delete</button></div>`,
+    )
+    .join("");
+  const parsed = memoryParsed
+    ? `<div class="memory-preview">
+        <p><b>${esc(memoryParsed.title)}</b></p>
+        <p class="fine">${esc(memoryParsed.summary)}</p>
+        <div class="row">
+          <button class="btn primary" data-action="memory-import">Import this memory</button>
+          <button class="btn" data-action="memory-discard">Discard</button>
+        </div>
+      </div>`
+    : "";
+  const err = memoryParseError ? `<p class="chat-error">${esc(memoryParseError)}</p>` : "";
+  return `<div class="card" id="memory-import"><h3>Memory from another AI</h3>
+    <p class="fine">Bring what you already told another assistant, so you do not start over. Pick a file from your phone. It is read on this device only, and only what you tap Import is sent to the server.</p>
+    <p class="fine">Accepted: a ChatGPT export (.json), a Claude export (.json), a plain list of messages (.json), or notes as Markdown or text (.md, .txt).</p>
+    <div class="import-box">
+      <label class="btn" for="memory-file">Choose a memory file</label>
+      <input id="memory-file" type="file" accept=".json,.md,.txt,application/json,text/markdown,text/plain" hidden>
+    </div>
+    ${parsed}
+    ${err}
+    ${rows || `<p class="fine">Nothing imported yet.</p>`}
+  </div>`;
 }
 
 // ---------- Store ----------
@@ -2012,8 +2345,20 @@ async function loadInboxes() {
     state.inboxAccounts = r.accounts;
     state.googleConfigured = r.googleConfigured;
   }
+  const o = await api.outlookInboxes();
+  if (o && o.ok) {
+    state.outlookAccounts = o.accounts;
+    state.microsoftConfigured = o.microsoftConfigured;
+  }
   const c = await api.contacts();
   if (c && c.ok) state.contacts = c.contacts || [];
+  const prof = await api.profileGet();
+  if (prof && prof.ok) {
+    profileData = prof.profile || null;
+    profileSaved = false;
+  }
+  const mem = await api.memoryList();
+  if (mem && mem.ok) memoryImportsData = mem.imports || [];
   // Messages, Calendar, Drive: each status endpoint answers honestly
   // when its service is not connected, so a failure here just leaves
   // that section in its "not connected yet" state.
@@ -2038,9 +2383,24 @@ async function loadInboxes() {
 const ms = await api.messengerStatus();
   if (ms && ms.ok) {
     messengerStatusData = ms;
-    if (ms.configured) {
-      const th = await api.messengerThreads();
-      if (th && th.ok) messengerThreadsData = th.threads || [];
+    const pg = await api.messengerPages();
+    if (pg && pg.ok) {
+      messengerPagesData = pg.pages || [];
+      // The selected Page is the first one connected here, or the
+      // server's Page when none is connected here. A selection that no
+      // longer exists (a Page just disconnected) falls back the same way.
+      const ids = new Set((messengerPagesData || []).map((p: any) => String(p.pageId)));
+      if (messengerSelectedPageId && !ids.has(messengerSelectedPageId)) {
+        messengerSelectedPageId = null;
+        messengerOpenId = null;
+        messengerOpenMessages = null;
+      }
+      if (!messengerSelectedPageId && (messengerPagesData || []).length) {
+        messengerSelectedPageId = String((messengerPagesData || [])[0].pageId);
+      }
+    }
+    if (ms.configured || (messengerPagesData && messengerPagesData.length)) {
+      await reloadMessengerThreads();
     } else {
       messengerThreadsData = [];
     }
@@ -2134,6 +2494,78 @@ document.addEventListener("click", async (e) => {
     // The one generic connect button: asks what to connect, then starts
     // that sign-in. Any number of accounts, any supported type.
     openConnectChooser(t);
+  } else if (action === "goto-messenger") {
+    // The chooser's "Connect a Facebook Page": close the chooser and
+    // jump to the Messenger section, where the Page token goes in.
+    closeCard();
+    tab = "inboxes";
+    render();
+    const el = document.getElementById("messenger");
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+  } else if (action === "page-select") {
+    // Which connected Page's threads to show. Empty id = the server's Page.
+    const id = t.dataset.id || "";
+    messengerSelectedPageId = id || null;
+    messengerOpenId = null;
+    messengerOpenMessages = null;
+    messengerOpenError = "";
+    await reloadMessengerThreads();
+    render();
+  } else if (action === "page-disconnect") {
+    const id = t.dataset.id || "";
+    if (!id) return;
+    const r = await api.messengerDisconnect(id);
+    if (r && r.ok) {
+      toast("That Page is disconnected.");
+      if (messengerSelectedPageId === id) {
+        messengerSelectedPageId = null;
+        messengerOpenId = null;
+        messengerOpenMessages = null;
+      }
+      const pg = await api.messengerPages();
+      if (pg && pg.ok) {
+        messengerPagesData = pg.pages || [];
+        if (!messengerSelectedPageId && (messengerPagesData || []).length) {
+          messengerSelectedPageId = String((messengerPagesData || [])[0].pageId);
+        }
+      }
+      await reloadMessengerThreads();
+      render();
+    } else {
+      toast(r?.message || "That Page didn't disconnect. Try again.", "err");
+    }
+  } else if (action === "memory-import") {
+    // The owner picked a file, read the summary, and tapped Import.
+    // Only now is anything sent.
+    if (!memoryParsed) return;
+    const parsed = memoryParsed;
+    const r = await api.memoryImport(parsed.source, parsed.title, parsed.content);
+    if (r && r.ok) {
+      memoryParsed = null;
+      memoryParseError = "";
+      const mem = await api.memoryList();
+      if (mem && mem.ok) memoryImportsData = mem.imports || [];
+      toast(`Imported: ${parsed.title}.`);
+      render();
+    } else {
+      toast(r?.message || "That memory didn't import. Try again.", "err");
+    }
+  } else if (action === "memory-discard") {
+    memoryParsed = null;
+    memoryParseError = "";
+    render();
+  } else if (action === "memory-delete") {
+    const id = Number(t.dataset.id || "0");
+    if (!id) return;
+    const r = await api.memoryDelete(id);
+    if (r && r.ok) {
+      const mem = await api.memoryList();
+      if (mem && mem.ok) memoryImportsData = mem.imports || [];
+      toast("That memory is deleted.");
+      render();
+    } else {
+      toast(r?.message || "That memory didn't delete. Try again.", "err");
+    }
   } else if (action === "card-chat") {
     // Owned Photon: close the card and open the thread.
     const name = t.dataset.photon || "";
@@ -2446,15 +2878,60 @@ document.addEventListener("submit", async (e) => {
     e.preventDefault();
     const fd = new FormData(form);
     const label = form.dataset.label || "";
+    const provider = form.dataset.provider === "outlook" ? "outlook" : "gmail";
     const to = String(fd.get("to") || "");
     const subject = String(fd.get("subject") || "");
     const body = String(fd.get("body") || "");
-    const r = await api.saveDraft(label, to, subject, body);
+    const r =
+      provider === "outlook"
+        ? await api.outlookDraft(label, to, subject, body)
+        : await api.saveDraft(label, to, subject, body);
     if (r && r.ok) {
-      toast("Draft saved to Gmail drafts.");
+      toast(provider === "outlook" ? "Draft saved to Outlook drafts." : "Draft saved to Gmail drafts.");
       form.reset();
     } else {
       toast("That draft didn't save. Check the account is connected.", "err");
+    }
+  } else if (form.id === "profile-form") {
+    // About you: what the owner tells Prism about themselves.
+    e.preventDefault();
+    const fd = new FormData(form);
+    const r = await api.profileSave({
+      displayName: String(fd.get("displayName") || ""),
+      about: String(fd.get("about") || ""),
+      preferences: String(fd.get("preferences") || ""),
+      notes: String(fd.get("notes") || ""),
+    });
+    if (r && r.ok) {
+      profileData = r.profile || profileData;
+      profileSaved = true;
+      toast("Saved. Your Photons know you now.");
+      render();
+    } else {
+      toast(r?.message || "That didn't save. Try again.", "err");
+    }
+  } else if (form.id === "page-connect-form") {
+    // Connect a Facebook Page with a Page access token. The token is
+    // tested by the server before it is stored, and never shown back.
+    e.preventDefault();
+    const fd = new FormData(form);
+    const token = String(fd.get("token") || "").trim();
+    if (!token) return;
+    const r = await api.messengerConnect(token);
+    if (r && r.ok) {
+      toast(`Connected: ${r.pageName || r.pageId}.`);
+      form.reset();
+      const pg = await api.messengerPages();
+      if (pg && pg.ok) {
+        messengerPagesData = pg.pages || [];
+        if (!messengerSelectedPageId && (messengerPagesData || []).length) {
+          messengerSelectedPageId = String((messengerPagesData || [])[0].pageId);
+        }
+      }
+      await reloadMessengerThreads();
+      render();
+    } else {
+      toast(r?.message || "That Page didn't connect. Check the token and try again.", "err");
     }
   } else if (form.id === "research-form") {
     e.preventDefault();
@@ -2504,7 +2981,7 @@ document.addEventListener("submit", async (e) => {
     const conversationId = form.dataset.id || "";
     const text = String(fd.get("text") || "").trim();
     if (!conversationId || !text) return;
-    const r = await api.messengerSend(conversationId, text);
+    const r = await api.messengerSend(conversationId, text, messengerSelectedPageId || undefined);
     if (r && r.ok) {
       toast("Reply sent as the Page.");
       form.reset();
@@ -2575,6 +3052,35 @@ document.addEventListener("change", async (e) => {
     toast("No new contacts in that file — they may already be in the book, or have no email address.", "err");
   }
   if (already > 0) console.info(`${already} imported contact(s) already in the address book.`);
+  input.value = "";
+});
+
+// ---------- Memory import (.json / .md / .txt) ----------
+// The file is read on this device only. Parsing shows a summary and
+// waits for the owner to tap Import; nothing is sent by picking a file.
+document.addEventListener("change", async (e) => {
+  const input = e.target as HTMLInputElement;
+  if (!input || input.id !== "memory-file") return;
+  const file = input.files?.[0];
+  if (!file) return;
+  let text = "";
+  try {
+    text = await file.text();
+  } catch {
+    memoryParsed = null;
+    memoryParseError = "That file couldn't be read. Try again.";
+    render();
+    return;
+  }
+  const parsed = parseMemoryFile(file.name, text);
+  if ("error" in parsed) {
+    memoryParsed = null;
+    memoryParseError = parsed.error;
+  } else {
+    memoryParsed = parsed;
+    memoryParseError = "";
+  }
+  render();
   input.value = "";
 });
 

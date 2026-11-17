@@ -25,7 +25,7 @@
 // changelog before changing it). Plain fetch only, zero dependencies,
 // same pattern as src/server/gmail.ts.
 
-import { db } from "./db";
+import { db, setFacebookPage, getFacebookPageToken, listFacebookPages, deleteFacebookPage } from "./db";
 import { config } from "./config";
 
 const GRAPH_BASE = "https://graph.facebook.com/v26.0";
@@ -39,6 +39,18 @@ function pageAccessToken(): string {
 }
 function webhookVerifyToken(): string {
   return config.metaWebhookVerifyToken.trim();
+}
+
+// Resolve the token and Page id for a Graph call. A Page connected from
+// the app (accountId + pageId) uses its own stored token; anything else
+// uses the server's Page from the env vars. The token is only ever read
+// server-side and is never sent back to the client.
+function resolvePage(accountId: string | null, pageIdArg: string | null): { token: string; pageId: string } {
+  if (accountId && pageIdArg) {
+    const t = getFacebookPageToken(accountId, pageIdArg);
+    if (t) return { token: t, pageId: pageIdArg };
+  }
+  return { token: pageAccessToken(), pageId: pageId() };
 }
 
 export function messengerConfigured(): boolean {
@@ -79,6 +91,49 @@ export function messengerStatus(): MessengerStatus {
       ? "Facebook Page messaging is connected. Personal Messenger is not connected — there is no supported API for it."
       : "Facebook Page messaging is not connected yet — set META_PAGE_ID and META_PAGE_ACCESS_TOKEN. Personal Messenger is not connected either — there is no supported API for it.",
   };
+}
+
+// --- Pages connected from the app ---
+//
+// A customer connects their own Facebook Page by pasting a Page access
+// token (from Meta's developer console, their Page's settings). The token
+// is tested against Graph first — GET /me?fields=id,name — so a wrong or
+// expired token is refused before anything is stored. The token is stored
+// in SQLite the same way Gmail refresh tokens are, and it is never sent
+// back to the client: the app only ever sees the Page id and name.
+// Messages that arrive on a Page still come in through the server's
+// webhook (the server's Page); connecting here lets the owner read
+// threads and reply from the app on their own Page.
+export async function connectPage(
+  accountId: string,
+  token: string,
+): Promise<
+  | { ok: true; pageId: string; pageName: string }
+  | { ok: false; error: string; message?: string }
+> {
+  const t = String(token || "").trim();
+  if (!t || /\s/.test(t)) return { ok: false, error: "bad_token" };
+  const r = await graphGet("/me", { fields: "id,name" }, t);
+  if (!r.ok) {
+    return {
+      ok: false,
+      error: "token_rejected",
+      message: r.error?.message || "Meta did not accept that token.",
+    };
+  }
+  const pageIdVal = String(r.data?.id || "").trim();
+  const pageName = String(r.data?.name || "").trim();
+  if (!pageIdVal) return { ok: false, error: "token_rejected", message: "Meta did not return a Page for that token." };
+  setFacebookPage(accountId, pageIdVal, pageName || pageIdVal, t);
+  return { ok: true, pageId: pageIdVal, pageName: pageName || pageIdVal };
+}
+
+export function listConnectedPages(accountId: string): { pageId: string; pageName: string; createdAt: string }[] {
+  return listFacebookPages(accountId);
+}
+
+export function disconnectPage(accountId: string, pageIdArg: string): void {
+  deleteFacebookPage(accountId, String(pageIdArg || "").trim());
 }
 
 export type MessengerThread = {
@@ -193,13 +248,14 @@ type GraphError = { code?: number; subcode?: number; message: string; type?: str
 async function graphGet(
   path: string,
   params: Record<string, string>,
+  tokenOverride?: string,
 ): Promise<{ ok: true; data: any } | { ok: false; error: GraphError; status: number }> {
   const url = new URL(`${GRAPH_BASE}${path}`);
   for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
   let res: Response;
   try {
     res = await fetch(url.toString(), {
-      headers: { Authorization: `Bearer ${pageAccessToken()}` },
+      headers: { Authorization: `Bearer ${tokenOverride || pageAccessToken()}` },
     });
   } catch (e) {
     console.error("Messenger Graph request failed:", e);
@@ -226,13 +282,14 @@ async function graphGet(
 async function graphPost(
   path: string,
   payload: Record<string, unknown>,
+  tokenOverride?: string,
 ): Promise<{ ok: true; data: any } | { ok: false; error: GraphError; status: number }> {
   let res: Response;
   try {
     res = await fetch(`${GRAPH_BASE}${path}`, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${pageAccessToken()}`,
+        Authorization: `Bearer ${tokenOverride || pageAccessToken()}`,
         "content-type": "application/json",
       },
       body: JSON.stringify(payload),
@@ -259,20 +316,24 @@ async function graphPost(
   return { ok: true, data: body };
 }
 
-// GET /{page-id}/conversations — the Page's threads.
+// GET /{page-id}/conversations — the Page's threads. opts selects a
+// Page connected from the app (accountId + pageId); without it the
+// server's Page is used, exactly as before.
 export async function listMessengerThreads(
   limit = 25,
+  opts?: { accountId?: string; pageId?: string },
 ): Promise<
   | { ok: true; threads: MessengerThread[] }
   | { ok: false; error: string; metaError?: GraphError; status?: number }
 > {
-  if (!messengerConfigured()) {
+  const resolved = resolvePage(opts?.accountId || null, opts?.pageId || null);
+  if (!resolved.token || !resolved.pageId) {
     return { ok: false, error: "messenger_not_configured" };
   }
-  const r = await graphGet(`/${pageId()}/conversations`, {
+  const r = await graphGet(`/${resolved.pageId}/conversations`, {
     fields: "id,participants,snippet,updated_time,unread_count",
     limit: String(Math.max(1, Math.min(100, Math.floor(limit)))),
-  });
+  }, resolved.token);
   if (!r.ok) return { ok: false, error: "meta_error", metaError: r.error, status: r.status };
   const threads: MessengerThread[] = ((r.data.data || []) as any[]).map((c) => ({
     id: c.id,
@@ -291,18 +352,20 @@ export async function listMessengerThreads(
 export async function listMessengerMessages(
   conversationId: string,
   limit = 25,
+  opts?: { accountId?: string; pageId?: string },
 ): Promise<
   | { ok: true; conversationId: string; messages: MessengerMessage[] }
   | { ok: false; error: string; metaError?: GraphError; status?: number }
 > {
-  if (!messengerConfigured()) {
+  const resolved = resolvePage(opts?.accountId || null, opts?.pageId || null);
+  if (!resolved.token) {
     return { ok: false, error: "messenger_not_configured" };
   }
   if (!conversationId.trim()) return { ok: false, error: "conversationId required" };
   const r = await graphGet(`/${conversationId.trim()}/messages`, {
     fields: "id,from,message,created_time",
     limit: String(Math.max(1, Math.min(100, Math.floor(limit)))),
-  });
+  }, resolved.token);
   if (!r.ok) return { ok: false, error: "meta_error", metaError: r.error, status: r.status };
   const messages: MessengerMessage[] = ((r.data.data || []) as any[]).map((m) => ({
     id: m.id,
@@ -318,11 +381,13 @@ export async function listMessengerMessages(
 // look the participants up and take the one who is not the Page.
 async function recipientForConversation(
   conversationId: string,
+  opts?: { accountId?: string; pageId?: string },
 ): Promise<{ ok: true; recipientId: string } | { ok: false; error: string; metaError?: GraphError; status?: number }> {
-  const r = await graphGet(`/${conversationId.trim()}`, { fields: "participants" });
+  const resolved = resolvePage(opts?.accountId || null, opts?.pageId || null);
+  const r = await graphGet(`/${conversationId.trim()}`, { fields: "participants" }, resolved.token);
   if (!r.ok) return { ok: false, error: "meta_error", metaError: r.error, status: r.status };
   const participants = ((r.data.participants?.data || []) as any[]).filter(
-    (p) => p.id && p.id !== pageId(),
+    (p) => p.id && p.id !== resolved.pageId,
   );
   if (!participants.length) {
     return { ok: false, error: "no_recipient" };
@@ -340,11 +405,13 @@ async function recipientForConversation(
 export async function sendMessengerMessage(
   conversationId: string,
   text: string,
+  opts?: { accountId?: string; pageId?: string },
 ): Promise<
   | { ok: true; messageId: string; recipientId: string }
   | { ok: false; error: string; metaError?: GraphError; status?: number }
 > {
-  if (!messengerConfigured()) {
+  const resolved = resolvePage(opts?.accountId || null, opts?.pageId || null);
+  if (!resolved.token) {
     return { ok: false, error: "messenger_not_configured" };
   }
   const convo = conversationId.trim();
@@ -352,18 +419,18 @@ export async function sendMessengerMessage(
   if (!convo) return { ok: false, error: "conversationId required" };
   if (!body) return { ok: false, error: "text required" };
   if (body.length > 2000) return { ok: false, error: "text too long" };
-  const recipient = await recipientForConversation(convo);
+  const recipient = await recipientForConversation(convo, opts);
   if (!recipient.ok) return recipient;
   const r = await graphPost("/me/messages", {
     recipient: { id: recipient.recipientId },
     messaging_type: "RESPONSE",
     message: { text: body },
-  });
+  }, resolved.token);
   if (!r.ok) return { ok: false, error: "meta_error", metaError: r.error, status: r.status };
   const messageId = String(r.data.message_id || "");
   // Keep the local thread history whole: the sent message, from the Page.
   try {
-    storeMessengerMessage(convo, pageId(), body, new Date().toISOString(), messageId || null);
+    storeMessengerMessage(convo, resolved.pageId, body, new Date().toISOString(), messageId || null);
   } catch {
     // The send already happened; a local-store failure must not fail it.
   }
@@ -510,6 +577,48 @@ export async function handleMessenger(req: Request, path: string): Promise<Respo
     return json(messengerStatus());
   }
 
+  // POST /api/messenger/connect — connect a Page from the app. Body:
+  // { accountId, token }. The token is tested against Graph before it is
+  // stored, and it is never echoed back. The token itself is never
+  // returned by any endpoint.
+  if (path === "/api/messenger/connect" && method === "POST") {
+    const body = await readBody(req);
+    const accountId = accountIdFrom(req, body);
+    if (!isValidAccountId(accountId)) return bad("accountId required", 400);
+    const token = String(body.token || "");
+    const r = await connectPage(accountId, token);
+    if (!r.ok) {
+      if (r.error === "bad_token") return bad("a Page access token is required", 400);
+      return json({
+        ok: false,
+        error: r.error,
+        message: r.message || "Meta did not accept that token. Check it and try again.",
+      });
+    }
+    return json({ ok: true, pageId: r.pageId, pageName: r.pageName });
+  }
+
+  // GET /api/messenger/pages — the Pages this account connected from the
+  // app (page id + name only; the token is never returned).
+  if (path === "/api/messenger/pages" && method === "GET") {
+    const accountId = accountIdFrom(req, {});
+    if (!isValidAccountId(accountId)) return bad("accountId required", 400);
+    return json({ ok: true, pages: listConnectedPages(accountId) });
+  }
+
+  // POST /api/messenger/disconnect — remove a Page connected from the
+  // app. Body: { accountId, pageId }. The server's own Page (env vars)
+  // is not touched by this.
+  if (path === "/api/messenger/disconnect" && method === "POST") {
+    const body = await readBody(req);
+    const accountId = accountIdFrom(req, body);
+    if (!isValidAccountId(accountId)) return bad("accountId required", 400);
+    const pageIdArg = String(body.pageId || "").trim();
+    if (!pageIdArg) return bad("pageId required", 400);
+    disconnectPage(accountId, pageIdArg);
+    return json({ ok: true, disconnected: true });
+  }
+
   // Everything below needs an account, like the Gmail routes.
   const needsAccount =
     (path === "/api/messenger/threads" && method === "GET") ||
@@ -521,9 +630,13 @@ export async function handleMessenger(req: Request, path: string): Promise<Respo
   const body = method === "POST" ? await readBody(req) : {};
   const accountId = accountIdFrom(req, body);
   if (!isValidAccountId(accountId)) return bad("accountId required", 400);
+  // A Page connected from the app is selected with pageId; without it
+  // the server's Page is used, exactly as before.
+  const pageIdArg =
+    url.searchParams.get("pageId") || url.searchParams.get("page_id") || String(body.pageId || "") || "";
 
   if (path === "/api/messenger/threads" && method === "GET") {
-    const r = await listMessengerThreads();
+    const r = await listMessengerThreads(25, { accountId, pageId: pageIdArg });
     if (!r.ok) {
       if (r.error === "messenger_not_configured") return notConfigured();
       return json({ ok: false, error: r.error, metaError: r.metaError || null }, r.status || 502);
@@ -535,7 +648,7 @@ export async function handleMessenger(req: Request, path: string): Promise<Respo
     const conversationId =
       url.searchParams.get("conversationId") || url.searchParams.get("conversation_id") || "";
     if (!conversationId.trim()) return bad("conversationId required", 400);
-    const r = await listMessengerMessages(conversationId);
+    const r = await listMessengerMessages(conversationId, 25, { accountId, pageId: pageIdArg });
     if (!r.ok) {
       if (r.error === "messenger_not_configured") return notConfigured();
       if (r.error === "conversationId required") return bad(r.error, 400);
@@ -561,7 +674,7 @@ export async function handleMessenger(req: Request, path: string): Promise<Respo
     const text = String(body.text || "");
     if (!conversationId) return bad("conversationId required", 400);
     if (!text.trim()) return bad("text required", 400);
-    const r = await sendMessengerMessage(conversationId, text);
+    const r = await sendMessengerMessage(conversationId, text, { accountId, pageId: pageIdArg });
     if (!r.ok) {
       if (r.error === "messenger_not_configured") return notConfigured();
       if (r.error === "conversationId required" || r.error === "text required" || r.error === "text too long") {

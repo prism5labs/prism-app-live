@@ -180,19 +180,41 @@ export const api = {
       body: JSON.stringify({ accountId: getAccountId(), subscription }),
     }),
   // Messenger, Facebook Pages only (Step 9). Personal Messenger has no
-  // supported API, so there is no route for it.
+  // supported API, so there is no route for it. A Page can be connected
+  // from the app with a Page access token (connect), and the threads,
+  // messages, and send calls take an optional pageId to use that Page
+  // instead of the server's Page.
   messengerStatus: () =>
     req(`/api/messenger/status?accountId=${encodeURIComponent(getAccountId())}`),
-  messengerThreads: () =>
-    req(`/api/messenger/threads?accountId=${encodeURIComponent(getAccountId())}`),
-  messengerMessages: (conversationId: string) =>
-    req(
-      `/api/messenger/messages?accountId=${encodeURIComponent(getAccountId())}&conversationId=${encodeURIComponent(conversationId)}`,
-    ),
-  messengerSend: (conversationId: string, text: string) =>
+  messengerPages: () =>
+    req(`/api/messenger/pages?accountId=${encodeURIComponent(getAccountId())}`),
+  messengerConnect: (token: string) =>
+    req("/api/messenger/connect", {
+      method: "POST",
+      body: JSON.stringify({ accountId: getAccountId(), token }),
+    }),
+  messengerDisconnect: (pageId: string) =>
+    req("/api/messenger/disconnect", {
+      method: "POST",
+      body: JSON.stringify({ accountId: getAccountId(), pageId }),
+    }),
+  messengerThreads: (pageId?: string) => {
+    const q = new URLSearchParams({ accountId: getAccountId() });
+    if (pageId) q.set("pageId", pageId);
+    return req(`/api/messenger/threads?${q.toString()}`);
+  },
+  messengerMessages: (conversationId: string, pageId?: string) => {
+    const q = new URLSearchParams({
+      accountId: getAccountId(),
+      conversationId,
+    });
+    if (pageId) q.set("pageId", pageId);
+    return req(`/api/messenger/messages?${q.toString()}`);
+  },
+  messengerSend: (conversationId: string, text: string, pageId?: string) =>
     req("/api/messenger/send", {
       method: "POST",
-      body: JSON.stringify({ accountId: getAccountId(), conversationId, text }),
+      body: JSON.stringify({ accountId: getAccountId(), conversationId, text, pageId: pageId || "" }),
     }),
   // Live web research with sources (Step 10), and the Stripe webhook
   // status that decides whether purchases unlock automatically.
@@ -207,6 +229,34 @@ export const api = {
     req("/api/inboxes/draft", {
       method: "POST",
       body: JSON.stringify({ accountId: getAccountId(), label, to, subject, body }),
+    }),
+  // Outlook mail (Microsoft Graph): the same shape as Gmail, so an
+  // Outlook mailbox shows as its own card and can save real drafts.
+  outlookInboxes: () => req(`/api/outlook/inboxes?accountId=${encodeURIComponent(getAccountId())}`),
+  outlookDraft: (label: string, to: string, subject: string, body: string) =>
+    req("/api/outlook/draft", {
+      method: "POST",
+      body: JSON.stringify({ accountId: getAccountId(), label, to, subject, body }),
+    }),
+  // About you: what the owner tells Prism about themselves, so the
+  // Photons know them instead of starting cold.
+  profileGet: () => req(`/api/profile?accountId=${encodeURIComponent(getAccountId())}`),
+  profileSave: (patch: Record<string, unknown>) =>
+    req("/api/profile", {
+      method: "POST",
+      body: JSON.stringify({ accountId: getAccountId(), ...patch }),
+    }),
+  // Memory imported from another AI: what the owner already told an
+  // assistant, so they keep continuity and do not start over.
+  memoryList: () => req(`/api/memory?accountId=${encodeURIComponent(getAccountId())}`),
+  memoryImport: (source: string, title: string, content: string) =>
+    req("/api/memory", {
+      method: "POST",
+      body: JSON.stringify({ accountId: getAccountId(), source, title, content }),
+    }),
+  memoryDelete: (id: number) =>
+    req(`/api/memory/${encodeURIComponent(id)}?accountId=${encodeURIComponent(getAccountId())}`, {
+      method: "DELETE",
     }),
   // Switchboard: email sends to approved contacts, and the friend-request
   // flow that approves a new contact first.

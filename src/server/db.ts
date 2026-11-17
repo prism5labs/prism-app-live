@@ -62,6 +62,60 @@ CREATE TABLE IF NOT EXISTS gmail_accounts (
   token_expiry INTEGER,
   PRIMARY KEY (account_id, label)
 );
+-- Outlook accounts (Microsoft Graph), same shape as Gmail: one row per
+-- connected mailbox, labelled outlook-1, outlook-2, ... so anyone can add
+-- as many Outlook accounts as they like. Tokens are stored the same way
+-- as Gmail refresh tokens and are never sent back to the client.
+CREATE TABLE IF NOT EXISTS outlook_accounts (
+  account_id TEXT NOT NULL,
+  label TEXT NOT NULL,
+  email TEXT NOT NULL,
+  refresh_token TEXT NOT NULL,
+  access_token TEXT,
+  token_expiry INTEGER,
+  PRIMARY KEY (account_id, label)
+);
+-- Facebook Pages connected from the app. A Page access token is pasted in
+-- by the owner (from Meta's developer console) and stored here, the same
+-- way Gmail refresh tokens are stored. The token is never sent back to
+-- the client: the app only ever sees the page id and name. The server's
+-- own Page (META_PAGE_ID / META_PAGE_ACCESS_TOKEN) still works on its own
+-- and is the fallback when no Page is connected here.
+CREATE TABLE IF NOT EXISTS facebook_pages (
+  account_id TEXT NOT NULL,
+  page_id TEXT NOT NULL,
+  page_name TEXT NOT NULL,
+  access_token TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (account_id, page_id)
+);
+-- About you: what the owner tells Prism about themselves, so the Photons
+-- know them instead of starting cold. One row per account. This is the
+-- owner's own words, stored on the server for their account only, and it
+-- is never shared with anyone else. It is read into the chat system
+-- prompt, so the Photons actually know it.
+CREATE TABLE IF NOT EXISTS profile (
+  account_id TEXT PRIMARY KEY,
+  display_name TEXT,
+  about TEXT,
+  preferences TEXT,
+  notes TEXT,
+  updated_at TEXT NOT NULL
+);
+-- Memory imported from other AIs, so the owner keeps continuity and does
+-- not start over. One row per imported file. The content is the parsed
+-- transcript (or the notes, for a Markdown or text file), capped when it
+-- is stored. A short digest of the most recent imports is read into the
+-- chat system prompt as background, never as instructions.
+CREATE TABLE IF NOT EXISTS imported_memory (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  account_id TEXT NOT NULL,
+  source TEXT NOT NULL,
+  title TEXT NOT NULL,
+  content TEXT NOT NULL,
+  imported_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_imported_memory_account ON imported_memory (account_id, imported_at);
 CREATE TABLE IF NOT EXISTS customizations (
   account_id TEXT NOT NULL,
   photon TEXT NOT NULL,
@@ -409,6 +463,240 @@ export function updateGmailAccessToken(
   db.query(
     `UPDATE gmail_accounts SET access_token = ?, token_expiry = ? WHERE account_id = ? AND label = ?`,
   ).run(accessToken, tokenExpiry, accountId, label);
+}
+
+// --- Outlook accounts (Microsoft Graph) ---
+export type OutlookAccount = {
+  label: string;
+  email: string;
+  refresh_token: string;
+  access_token: string | null;
+  token_expiry: number | null;
+};
+
+export function setOutlookAccount(
+  accountId: string,
+  label: string,
+  email: string,
+  refreshToken: string,
+  accessToken: string | null,
+  tokenExpiry: number | null,
+): void {
+  db.query(
+    `INSERT INTO outlook_accounts (account_id, label, email, refresh_token, access_token, token_expiry)
+     VALUES (?, ?, ?, ?, ?, ?)
+     ON CONFLICT(account_id, label) DO UPDATE SET
+       email = excluded.email, refresh_token = excluded.refresh_token,
+       access_token = excluded.access_token, token_expiry = excluded.token_expiry`,
+  ).run(accountId, label, email, refreshToken, accessToken, tokenExpiry);
+}
+
+export function getOutlookAccounts(accountId: string): OutlookAccount[] {
+  return db
+    .query(`SELECT label, email, refresh_token, access_token, token_expiry FROM outlook_accounts WHERE account_id = ?`)
+    .all(accountId) as OutlookAccount[];
+}
+
+export function getOutlookAccount(accountId: string, label: string): OutlookAccount | null {
+  const row = db
+    .query(
+      `SELECT label, email, refresh_token, access_token, token_expiry FROM outlook_accounts WHERE account_id = ? AND label = ?`,
+    )
+    .get(accountId, label) as OutlookAccount | null;
+  return row ?? null;
+}
+
+export function updateOutlookAccessToken(
+  accountId: string,
+  label: string,
+  accessToken: string,
+  tokenExpiry: number,
+): void {
+  db.query(
+    `UPDATE outlook_accounts SET access_token = ?, token_expiry = ? WHERE account_id = ? AND label = ?`,
+  ).run(accessToken, tokenExpiry, accountId, label);
+}
+
+// --- Facebook Pages connected from the app ---
+export type FacebookPage = {
+  pageId: string;
+  pageName: string;
+  createdAt: string;
+};
+
+export function setFacebookPage(
+  accountId: string,
+  pageId: string,
+  pageName: string,
+  accessToken: string,
+): void {
+  const now = new Date().toISOString();
+  db.query(
+    `INSERT INTO facebook_pages (account_id, page_id, page_name, access_token, created_at)
+     VALUES (?, ?, ?, ?, ?)
+     ON CONFLICT(account_id, page_id) DO UPDATE SET
+       page_name = excluded.page_name, access_token = excluded.access_token`,
+  ).run(accountId, pageId, pageName, accessToken, now);
+}
+
+// The token is only ever read server-side, for Graph API calls. It is
+// never returned to the client.
+export function getFacebookPageToken(accountId: string, pageId: string): string | null {
+  const row = db
+    .query(`SELECT access_token FROM facebook_pages WHERE account_id = ? AND page_id = ?`)
+    .get(accountId, pageId) as { access_token?: string } | null;
+  return row?.access_token || null;
+}
+
+export function listFacebookPages(accountId: string): FacebookPage[] {
+  const rows = db
+    .query(`SELECT page_id, page_name, created_at FROM facebook_pages WHERE account_id = ? ORDER BY created_at ASC`)
+    .all(accountId) as any[];
+  return rows.map((r) => ({ pageId: r.page_id, pageName: r.page_name, createdAt: r.created_at }));
+}
+
+export function deleteFacebookPage(accountId: string, pageId: string): void {
+  db.query(`DELETE FROM facebook_pages WHERE account_id = ? AND page_id = ?`).run(accountId, pageId);
+}
+
+// --- About you (the owner's profile) ---
+export type Profile = {
+  displayName: string | null;
+  about: string | null;
+  preferences: string | null;
+  notes: string | null;
+  updatedAt: string | null;
+};
+
+export function getProfile(accountId: string): Profile {
+  const row = db
+    .query(`SELECT display_name, about, preferences, notes, updated_at FROM profile WHERE account_id = ?`)
+    .get(accountId) as any;
+  if (!row) {
+    return { displayName: null, about: null, preferences: null, notes: null, updatedAt: null };
+  }
+  return {
+    displayName: row.display_name || null,
+    about: row.about || null,
+    preferences: row.preferences || null,
+    notes: row.notes || null,
+    updatedAt: row.updated_at || null,
+  };
+}
+
+export function saveProfile(
+  accountId: string,
+  patch: { displayName?: string | null; about?: string | null; preferences?: string | null; notes?: string | null },
+): Profile {
+  const now = new Date().toISOString();
+  const current = getProfile(accountId);
+  const displayName =
+    patch.displayName === undefined
+      ? current.displayName
+      : patch.displayName === null
+        ? null
+        : String(patch.displayName).trim().slice(0, 80) || null;
+  const about =
+    patch.about === undefined
+      ? current.about
+      : patch.about === null
+        ? null
+        : String(patch.about).trim().slice(0, 4000) || null;
+  const preferences =
+    patch.preferences === undefined
+      ? current.preferences
+      : patch.preferences === null
+        ? null
+        : String(patch.preferences).trim().slice(0, 4000) || null;
+  const notes =
+    patch.notes === undefined
+      ? current.notes
+      : patch.notes === null
+        ? null
+        : String(patch.notes).trim().slice(0, 4000) || null;
+  db.query(
+    `INSERT INTO profile (account_id, display_name, about, preferences, notes, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?)
+     ON CONFLICT(account_id) DO UPDATE SET
+       display_name = excluded.display_name, about = excluded.about,
+       preferences = excluded.preferences, notes = excluded.notes,
+       updated_at = excluded.updated_at`,
+  ).run(accountId, displayName, about, preferences, notes, now);
+  return getProfile(accountId);
+}
+
+// --- Memory imported from other AIs ---
+export type ImportedMemory = {
+  id: number;
+  source: string;
+  title: string;
+  chars: number;
+  importedAt: string;
+};
+
+const MEMORY_MAX_CHARS = 100_000;
+
+export function addImportedMemory(
+  accountId: string,
+  source: string,
+  title: string,
+  content: string,
+): ImportedMemory {
+  const now = new Date().toISOString();
+  const clean = String(content || "").slice(0, MEMORY_MAX_CHARS);
+  const safeTitle = String(title || "Imported memory").trim().slice(0, 200) || "Imported memory";
+  const safeSource = String(source || "file").trim().slice(0, 80) || "file";
+  const info = db
+    .query(
+      `INSERT INTO imported_memory (account_id, source, title, content, imported_at)
+       VALUES (?, ?, ?, ?, ?)`,
+    )
+    .run(accountId, safeSource, safeTitle, clean, now);
+  return {
+    id: Number(info.lastInsertRowid),
+    source: safeSource,
+    title: safeTitle,
+    chars: clean.length,
+    importedAt: now,
+  };
+}
+
+export function listImportedMemory(accountId: string): ImportedMemory[] {
+  const rows = db
+    .query(
+      `SELECT id, source, title, length(content) AS chars, imported_at
+       FROM imported_memory WHERE account_id = ? ORDER BY imported_at DESC`,
+    )
+    .all(accountId) as any[];
+  return rows.map((r) => ({
+    id: r.id,
+    source: r.source,
+    title: r.title,
+    chars: r.chars,
+    importedAt: r.imported_at,
+  }));
+}
+
+export function deleteImportedMemory(accountId: string, id: number): void {
+  db.query(`DELETE FROM imported_memory WHERE account_id = ? AND id = ?`).run(accountId, id);
+}
+
+// A short digest of the most recent imports, for the chat system prompt.
+// Capped hard: the two most recent imports, 1,500 characters each, 3,000
+// total. It is background, never instructions.
+export function memoryDigest(accountId: string): string {
+  const rows = db
+    .query(
+      `SELECT title, source, content FROM imported_memory
+       WHERE account_id = ? ORDER BY imported_at DESC LIMIT 2`,
+    )
+    .all(accountId) as any[];
+  if (!rows.length) return "";
+  const parts = rows.map((r) => {
+    const text = String(r.content || "").slice(0, 1500);
+    return `[From ${r.source}: ${r.title}]\n${text}`;
+  });
+  return parts.join("\n\n").slice(0, 3000);
 }
 
 // --- Switchboard contacts ---

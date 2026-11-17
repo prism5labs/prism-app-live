@@ -4,7 +4,7 @@
 // and fetch for the brain and Gmail.
 
 import { join, normalize, extname } from "node:path";
-import { config, brainConnected, brainProvider, googleConfigured } from "./server/config";
+import { config, brainConnected, brainProvider, googleConfigured, microsoftConfigured } from "./server/config";
 import {
   getOrCreateAccount,
   getOwned,
@@ -26,11 +26,17 @@ import {
   getContactByToken,
   setContactStatus,
   markRequestSent,
+  getProfile,
+  saveProfile,
+  listImportedMemory,
+  addImportedMemory,
+  deleteImportedMemory,
+  memoryDigest,
   type Contact,
 } from "./server/db";
 import { chat as brainChat } from "./server/anthropic";
 import { chat as geminiChat, chatStream as geminiChatStream } from "./server/gemini";
-import { systemPromptFor } from "./server/personas";
+import { systemPromptFor, type OwnerContext } from "./server/personas";
 import { voiceById } from "./shared/voices";
 import {
   PHOTONS,
@@ -49,6 +55,18 @@ import {
   gmailLabelTitle,
   type GmailLabel,
 } from "./server/gmail";
+// Outlook mail (Microsoft Graph): the same shape as Gmail, so an Outlook
+// mailbox shows as its own card in Inboxes and can save real drafts.
+import {
+  authUrl as outlookAuthUrl,
+  handleOAuthCallback as outlookHandleOAuthCallback,
+  listInbox as outlookListInbox,
+  saveDraft as outlookSaveDraft,
+  connectedLabels as outlookConnectedLabels,
+  isValidOutlookLabel,
+  outlookLabelTitle,
+  type OutlookLabel,
+} from "./server/outlook";
 // Capability steps (design doc): each module owns its own routes and
 // tables and reads its env vars directly; server.ts only mounts them.
 import {
@@ -243,7 +261,20 @@ async function prepareChat(
   // The Photon's saved customization (if any) names the Face and sets how
   // it talks. No customization row means chat behaves exactly as before.
   const c = getCustomization(accountId, photon);
-  const system = systemPromptFor(photon, c?.faceName || a.custom_name || photon, c);
+  // What the owner told Prism about themselves, and what they brought
+  // from another AI. Both ride in the system prompt so the Photons know
+  // the owner instead of starting cold. The profile is the owner's own
+  // words; the memory digest is a capped excerpt of what they imported,
+  // framed as background, never as instructions.
+  const profile = getProfile(accountId);
+  const ownerContext: OwnerContext = {
+    name: profile.displayName,
+    about: profile.about,
+    preferences: profile.preferences,
+    notes: profile.notes,
+    memoryDigest: memoryDigest(accountId),
+  };
+  const system = systemPromptFor(photon, c?.faceName || a.custom_name || photon, c, ownerContext);
   return { accountId, photon, message, system, history };
 }
 
@@ -263,6 +294,7 @@ function stateFor(accountId: string) {
     freeCode: a.free_code,
     brain: brainConnected(),
     googleConfigured: googleConfigured(),
+    microsoftConfigured: microsoftConfigured(),
     customizations: getCustomizations(accountId),
     photons: PHOTONS.map((p) => ({
       name: p.name,
@@ -759,6 +791,137 @@ async function handleApi(req: Request, path: string): Promise<Response> {
     const r = await saveDraft(accountId, label as GmailLabel, to, subject, draftBody);
     if (!r.ok) return json({ ok: false, error: r.error || "draft_failed" });
     return json({ ok: true, draftId: r.draftId });
+  }
+
+  // Outlook mail (Microsoft Graph): the same shape as Gmail, so an
+  // Outlook mailbox shows as its own card in Inboxes and can save real
+  // drafts. Without a Microsoft OAuth client the start route answers
+  // honestly that Outlook sign-in is not set up on this server yet.
+  if (path === "/api/outlook/inboxes" && method === "GET") {
+    const accountId = accountIdFrom(req, {});
+    if (!isValidAccountId(accountId)) return bad("accountId required", 400);
+    const connected = outlookConnectedLabels(accountId);
+    const results = await Promise.all(
+      connected.map(async (c) => {
+        const r = await outlookListInbox(accountId, c.label, 8);
+        return {
+          label: c.label,
+          title: outlookLabelTitle(c.label, c.email),
+          connected: r.connected,
+          email: r.email || c.email,
+          messages: r.messages,
+          error: r.error || null,
+        };
+      }),
+    );
+    return json({
+      ok: true,
+      microsoftConfigured: microsoftConfigured(),
+      accounts: results,
+      _connectedLabels: connected.map((c) => c.label),
+    });
+  }
+
+  // GET /api/oauth/microsoft/start?accountId&label — begin an Outlook
+  // sign-in.
+  if (path === "/api/oauth/microsoft/start" && method === "GET") {
+    const accountId = url.searchParams.get("accountId") || "";
+    const label = url.searchParams.get("label") || "";
+    if (!isValidAccountId(accountId)) return bad("accountId required", 400);
+    if (!isValidOutlookLabel(label)) return bad("bad label", 400);
+    const u = outlookAuthUrl(accountId, label as OutlookLabel);
+    if (!u) {
+      return json({
+        ok: false,
+        error: "microsoft_not_configured",
+        message:
+          "Outlook sign-in isn't set up on this server yet. It needs a Microsoft OAuth client (client ID, secret, and redirect).",
+      });
+    }
+    return Response.redirect(u, 302);
+  }
+
+  // GET /api/oauth/microsoft/callback?code&state — finish an Outlook
+  // sign-in.
+  if (path === "/api/oauth/microsoft/callback" && method === "GET") {
+    const code = url.searchParams.get("code") || "";
+    const state = url.searchParams.get("state") || "";
+    const r = await outlookHandleOAuthCallback(code, state);
+    const base = config.appUrl || "";
+    const dest = r.ok
+      ? `${base}/?tab=inboxes&outlook=connected`
+      : `${base}/?tab=inboxes&outlook=error`;
+    return Response.redirect(dest, 302);
+  }
+
+  // POST /api/outlook/draft — save a real draft into an Outlook mailbox.
+  if (path === "/api/outlook/draft" && method === "POST") {
+    const body = await readBody(req);
+    const accountId = accountIdFrom(req, body);
+    if (!isValidAccountId(accountId)) return bad("accountId required", 400);
+    const label = String(body.label || "");
+    if (!isValidOutlookLabel(label)) return bad("bad label", 400);
+    const to = String(body.to || "").trim();
+    const subject = String(body.subject || "").trim();
+    const draftBody = String(body.body || "");
+    if (!to || !draftBody) return bad("to and body required", 400);
+    const r = await outlookSaveDraft(accountId, label as OutlookLabel, to, subject, draftBody);
+    if (!r.ok) return json({ ok: false, error: r.error || "draft_failed" });
+    return json({ ok: true, draftId: r.draftId });
+  }
+
+  // About you: what the owner tells Prism about themselves. GET reads
+  // it; POST saves it (plain text, capped). It is stored on the server
+  // for this account only and is never shared with anyone else. The
+  // Photons read it in the chat system prompt, so they know the owner
+  // instead of starting cold.
+  if (path === "/api/profile" && method === "GET") {
+    const accountId = accountIdFrom(req, {});
+    if (!isValidAccountId(accountId)) return bad("accountId required", 400);
+    return json({ ok: true, profile: getProfile(accountId) });
+  }
+  if (path === "/api/profile" && method === "POST") {
+    const body = await readBody(req);
+    const accountId = accountIdFrom(req, body);
+    if (!isValidAccountId(accountId)) return bad("accountId required", 400);
+    const profile = saveProfile(accountId, {
+      displayName: typeof body.displayName === "string" || body.displayName === null ? body.displayName : undefined,
+      about: typeof body.about === "string" || body.about === null ? body.about : undefined,
+      preferences: typeof body.preferences === "string" || body.preferences === null ? body.preferences : undefined,
+      notes: typeof body.notes === "string" || body.notes === null ? body.notes : undefined,
+    });
+    return json({ ok: true, profile });
+  }
+
+  // Memory imported from another AI. GET lists what is stored (title,
+  // source, size, date — not the full text). POST stores one import: the
+  // client parses the file on the device and sends the text. DELETE
+  // removes one import. Content is capped at 100,000 characters when it
+  // is stored, and a short digest of the most recent imports is read
+  // into the chat system prompt as background, never as instructions.
+  if (path === "/api/memory" && method === "GET") {
+    const accountId = accountIdFrom(req, {});
+    if (!isValidAccountId(accountId)) return bad("accountId required", 400);
+    return json({ ok: true, imports: listImportedMemory(accountId) });
+  }
+  if (path === "/api/memory" && method === "POST") {
+    const body = await readBody(req);
+    const accountId = accountIdFrom(req, body);
+    if (!isValidAccountId(accountId)) return bad("accountId required", 400);
+    const source = String(body.source || "file").trim().slice(0, 80);
+    const title = String(body.title || "Imported memory").trim().slice(0, 200);
+    const content = String(body.content || "");
+    if (!content.trim()) return bad("content required", 400);
+    if (content.length > 200_000) return bad("content too long", 400);
+    const row = addImportedMemory(accountId, source, title, content);
+    return json({ ok: true, imported: row });
+  }
+  const memoryDeleteMatch = path.match(/^\/api\/memory\/(\d+)$/);
+  if (memoryDeleteMatch && method === "DELETE") {
+    const accountId = accountIdFrom(req, {});
+    if (!isValidAccountId(accountId)) return bad("accountId required", 400);
+    deleteImportedMemory(accountId, parseInt(memoryDeleteMatch[1], 10));
+    return json({ ok: true, deleted: true });
   }
 
   // GET /api/contacts — the Switchboard contact list for this account.

@@ -29,6 +29,13 @@ export const config = {
   googleClientId: process.env.GOOGLE_CLIENT_ID || "",
   googleClientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
   googleRedirectUri: process.env.GOOGLE_REDIRECT_URI || "",
+  // Microsoft OAuth for Outlook mail (Microsoft Graph). Same shape as
+  // Google: without these the Inboxes tab reports honestly that Outlook
+  // sign-in is not set up on this server yet. Register the app in the
+  // Microsoft Entra admin center (Azure) and set the redirect URI there.
+  microsoftClientId: process.env.MICROSOFT_CLIENT_ID || "",
+  microsoftClientSecret: process.env.MICROSOFT_CLIENT_SECRET || "",
+  microsoftRedirectUri: process.env.MICROSOFT_REDIRECT_URI || "",
   // Public base URL of this deployment (used for the OAuth redirect).
   appUrl: process.env.APP_URL || "",
   // Twilio (steps 1 + 7): texts and calls. Without these the telephony
@@ -74,3 +81,8 @@ export const googleConfigured = () =>
   config.googleClientId.length > 0 &&
   config.googleClientSecret.length > 0 &&
   config.googleRedirectUri.length > 0;
+
+export const microsoftConfigured = () =>
+  config.microsoftClientId.length > 0 &&
+  config.microsoftClientSecret.length > 0 &&
+  config.microsoftRedirectUri.length > 0;
