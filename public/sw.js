@@ -1,12 +1,13 @@
 // Prism 5 service worker. Cache-first for the app shell and static assets,
 // network-first for the API (chat, state, and inboxes must always be fresh).
-// CACHE v8: bumped Nov 16, 2026 for the welcome-back splash (opening
-// animation on every open, welcome / welcome back overlay, ten rotating
-// color schemes). New index.html caption, new styles.css schemes, and
-// new main.js splash logic. Bumping the cache makes existing installs
-// fetch the new shell instead of serving the cached v7 shell, which
-// only knew the plain once-per-open splash with no greeting.
-const CACHE = "prism5-v8";
+// CACHE v9: bumped Nov 17, 2026 for the phone shape (rounded frame,
+// safe-area insets on the header, content, and tab bar so the app
+// fits the phone like a native app). New styles.css only; index.html
+// and main.js are unchanged. Bumping the cache makes existing installs
+// fetch the new shell instead of serving the cached v8 shell, whose
+// header ran square into the notch and whose content ran into the
+// curved screen edges.
+const CACHE = "prism5-v9";
 const SHELL = ["/", "/index.html", "/styles.css", "/main.js", "/manifest.json", "/opening-animation-v3.mp4", "/chat-bg/bg-rocket.jpg", "/chat-bg/bg-helmets.jpg", "/chat-bg/bg-starburst.jpg", "/chat-bg/bg-robot.jpg", "/chat-bg/bg-saucer.jpg", "/chat-bg/bg-raygun.jpg", "/chat-bg/bg-car.jpg", "/chat-bg/bg-pilot.jpg", "/chat-bg/bg-moonbase.jpg", "/chat-bg/bg-diner.jpg", "/chat-bg/bg-launchpad.jpg", "/chat-bg/bg-spacestation.jpg"];
 
 self.addEventListener("install", (event) => {
