@@ -1226,11 +1226,10 @@ function renderCalendarSection(): string {
   if (!st) return `<div class="card" id="calendar"><h3>Calendar</h3><p class="fine">Loading…</p></div>`;
   if (!st.connected) {
     return `<div class="card" id="calendar"><h3>Calendar</h3>
-      <p>${esc(st.message || "Calendar isn't connected yet. Sign in with Google to connect it.")}</p>
+      <p>${esc(st.message || "Calendar isn't connected yet.")}</p>
       ${st.googleConfigured === false
         ? ""
-        : `<a class="btn primary" href="/api/oauth/google/start-extra?accountId=${encodeURIComponent(getAccountId())}">Connect Calendar &amp; Drive</a>
-           <p class="fine">One sign-in covers both Calendar and Drive. If you already connected Gmail, you'll sign in once more to add the permission.</p>`}
+        : `<p class="fine">Tap <b>Connect an account</b> above, then choose Google Calendar &amp; Drive. One sign-in covers both Calendar and Drive.</p>`}
     </div>`;
   }
   const events = (state?.calendarEvents || []) as any[];
@@ -1290,11 +1289,10 @@ function renderDriveSection(): string {
   if (!st) return `<div class="card" id="drive"><h3>Drive</h3><p class="fine">Loading…</p></div>`;
   if (!st.connected) {
     return `<div class="card" id="drive"><h3>Drive</h3>
-      <p>${esc(st.message || "Drive isn't connected yet. Sign in with Google to connect it.")}</p>
+      <p>${esc(st.message || "Drive isn't connected yet.")}</p>
       ${st.googleConfigured === false
         ? ""
-        : `<a class="btn primary" href="/api/oauth/google/start-extra?accountId=${encodeURIComponent(getAccountId())}">Connect Calendar &amp; Drive</a>
-           <p class="fine">One sign-in covers both Calendar and Drive.</p>`}
+        : `<p class="fine">Tap <b>Connect an account</b> above, then choose Google Calendar &amp; Drive. One sign-in covers both.</p>`}
     </div>`;
   }
   const files = (state?.driveFiles || []) as any[];
@@ -1392,22 +1390,50 @@ async function openMessengerThread(id: string) {
   render();
 }
 
+// ---------- Connect an account ----------
+// One generic button, not three named slots. Tapping it asks what to
+// connect: a Gmail account (as many as you like, each a separate Google
+// sign-in) or Google Calendar & Drive (one sign-in covers both). Only
+// Google accounts can be connected from the app — other email providers
+// have no supported sign-in here, and texts, calls, and Facebook Page
+// messaging are set up on the server, not from the app. The chooser
+// reuses the character-card modal, so it dismisses the same four ways:
+// the X, the Close button, a tap on the backdrop, or the Escape key.
+function nextGmailLabel(): string {
+  const used = new Set((state?.inboxAccounts || []).map((a: any) => String(a.label || "")));
+  let n = 1;
+  while (used.has(`gmail-${n}`)) n++;
+  return `gmail-${n}`;
+}
+
+function connectChooserHtml(): string {
+  const configured = state?.googleConfigured;
+  const body = configured
+    ? `<p class="card-tagline">Add as many accounts as you like. Each one is a separate sign-in, and each shows up here as its own inbox.</p>
+      <div class="connect-choices">
+        <a class="btn primary" href="/api/oauth/google/start?accountId=${encodeURIComponent(
+          getAccountId(),
+        )}&label=${nextGmailLabel()}">Add a Gmail account</a>
+        <p class="fine">Sign in with Google. That account's inbox and drafts appear below.</p>
+        <a class="btn primary" href="/api/oauth/google/start-extra?accountId=${encodeURIComponent(
+          getAccountId(),
+        )}">Connect Calendar &amp; Drive</a>
+        <p class="fine">One sign-in covers both Calendar and Drive. If you already connected Gmail, you'll sign in once more to add the permission.</p>
+      </div>
+      <p class="fine">Only Google accounts can be connected from the app — other email providers aren't supported yet. Texts, calls, and Facebook Page messaging are set up on the server, not from the app.</p>`
+    : `<p>Account sign-in isn't set up on this server yet. It needs a Google OAuth client (client ID, secret, and redirect).</p>`;
+  return cardShell("Connect an account", body);
+}
+
+function openConnectChooser(opener: HTMLElement | null) {
+  openCard(connectChooserHtml(), opener);
+}
+
 function renderInboxes(): string {
   const accounts = (state?.inboxAccounts || []) as any[];
   const configured = state?.googleConfigured;
-  const cards = (["personal", "contact", "test"] as const)
-    .map((label) => {
-      const acct = accounts.find((a: any) => a.label === label);
-      const title = label === "personal" ? "Personal" : label === "contact" ? "Labs contact" : "Labs test";
-      if (!acct || !acct.connected) {
-        return `<div class="card inbox-card">
-          <h3>${title}</h3>
-          <p>${configured ? "Not connected yet." : "Gmail sign-in isn't set up on this server yet."}</p>
-          ${configured ? `<a class="btn primary" href="/api/oauth/google/start?accountId=${encodeURIComponent(
-            getAccountId(),
-          )}&label=${label}">Connect ${title}</a>` : ""}
-        </div>`;
-      }
+  const cards = accounts
+    .map((acct: any) => {
       const msgs = (acct.messages || [])
         .map(
           (m: any) => `<div class="inbox-msg">
@@ -1418,10 +1444,10 @@ function renderInboxes(): string {
         )
         .join("");
       return `<div class="card inbox-card">
-        <h3>${title}</h3>
+        <h3>${esc(acct.title || acct.email || "Email")}</h3>
         <p class="fine">${esc(acct.email || "")}</p>
         ${msgs || `<p class="fine">Nothing in the inbox right now.</p>`}
-        <form class="draft-form" data-label="${label}">
+        <form class="draft-form" data-label="${esc(String(acct.label || ""))}">
           <h4>Save a draft</h4>
           <input name="to" type="text" placeholder="To" required>
           <input name="subject" type="text" placeholder="Subject">
@@ -1431,17 +1457,21 @@ function renderInboxes(): string {
       </div>`;
     })
     .join("");
+  const emailEmpty = configured
+    ? `<p class="fine">No email accounts connected yet — tap <b>Connect an account</b> above to add one.</p>`
+    : `<p class="fine">Email sign-in isn't set up on this server yet.</p>`;
   return `
   <section>
     <h1 class="page-title">Inboxes</h1>
-    <p class="page-lede">Messages, contacts, calendar, and Drive — plus your three Gmail accounts. Drafts you save here land in that account's Gmail drafts.</p>
+    <p class="page-lede">Messages, contacts, calendar, and Drive — plus your Gmail accounts. Drafts you save here land in that account's Gmail drafts.</p>
+    <div class="connect-bar"><button class="btn primary" data-action="connect-open">Connect an account</button></div>
     <div class="switchboard-strip"><img src="/brand/switchboard.jpg" alt=""><p><b>On Switchboard.</b> Inboxes is where Switchboard lives — every Launch in the Lab, one board.</p></div>
     <div class="inbox-jump" aria-label="Jump to a section">
       <a href="#messages">Messages</a>
       <a href="#contacts">Contacts</a>
       <a href="#calendar">Calendar</a>
       <a href="#drive">Drive</a>
-      <a href="#gmail-accounts">Gmail</a>
+      <a href="#gmail-accounts">Email</a>
     </div>
     ${renderMessagesSection()}
     ${renderSwitchboardContacts()}
@@ -1449,8 +1479,9 @@ function renderInboxes(): string {
     ${renderDriveSection()}
     ${renderMessenger()}
     ${state?.inboxError ? `<p class="chat-error">${esc(state.inboxError)}</p>` : ""}
-    <h2 class="section-title" id="gmail-accounts">Gmail</h2>
+    <h2 class="section-title" id="gmail-accounts">Email</h2>
     <div class="inbox-grid">${cards}</div>
+    ${accounts.length ? "" : emailEmpty}
   </section>`;
 }
 
@@ -2099,6 +2130,10 @@ document.addEventListener("click", async (e) => {
     openTierCard((t.dataset.tier as "supernova" | "satellite" | "upkeep") || "supernova", t);
   } else if (action === "card-close") {
     closeCard();
+  } else if (action === "connect-open") {
+    // The one generic connect button: asks what to connect, then starts
+    // that sign-in. Any number of accounts, any supported type.
+    openConnectChooser(t);
   } else if (action === "card-chat") {
     // Owned Photon: close the card and open the thread.
     const name = t.dataset.photon || "";

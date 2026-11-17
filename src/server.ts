@@ -45,8 +45,8 @@ import {
   saveDraft,
   sendFromAny,
   connectedLabels,
-  GMAIL_LABELS,
-  GMAIL_LABEL_TITLES,
+  isValidGmailLabel,
+  gmailLabelTitle,
   type GmailLabel,
 } from "./server/gmail";
 // Capability steps (design doc): each module owns its own routes and
@@ -585,28 +585,20 @@ async function handleApi(req: Request, path: string): Promise<Response> {
     return await voiceTranscribe(req);
   }
 
-  // GET /api/inboxes — all three Gmail accounts side by side.
+  // GET /api/inboxes — every Gmail account actually connected, as many
+  // as there are, each with its messages. There are no fixed slots any
+  // more: accounts are added through the generic connect button, and a
+  // card appears here once its sign-in finishes.
   if (path === "/api/inboxes" && method === "GET") {
     const accountId = accountIdFrom(req, {});
     if (!isValidAccountId(accountId)) return bad("accountId required", 400);
     const connected = connectedLabels(accountId);
-    const connectedSet = new Set(connected.map((c) => c.label));
     const results = await Promise.all(
-      GMAIL_LABELS.map(async (label) => {
-        const c = connected.find((x) => x.label === label);
-        if (!c) {
-          return {
-            label,
-            title: GMAIL_LABEL_TITLES[label],
-            connected: false,
-            email: null as string | null,
-            messages: [],
-          };
-        }
-        const r = await listInbox(accountId, label, 8);
+      connected.map(async (c) => {
+        const r = await listInbox(accountId, c.label, 8);
         return {
-          label,
-          title: GMAIL_LABEL_TITLES[label],
+          label: c.label,
+          title: gmailLabelTitle(c.label, c.email),
           connected: r.connected,
           email: r.email || c.email,
           messages: r.messages,
@@ -618,7 +610,7 @@ async function handleApi(req: Request, path: string): Promise<Response> {
       ok: true,
       googleConfigured: googleConfigured(),
       accounts: results,
-      _connectedLabels: [...connectedSet],
+      _connectedLabels: connected.map((c) => c.label),
     });
   }
 
@@ -627,7 +619,7 @@ async function handleApi(req: Request, path: string): Promise<Response> {
     const accountId = url.searchParams.get("accountId") || "";
     const label = url.searchParams.get("label") || "";
     if (!isValidAccountId(accountId)) return bad("accountId required", 400);
-    if (!(GMAIL_LABELS as readonly string[]).includes(label)) return bad("bad label", 400);
+    if (!isValidGmailLabel(label)) return bad("bad label", 400);
     const u = authUrl(accountId, label as GmailLabel);
     if (!u) {
       return json({
@@ -759,7 +751,7 @@ async function handleApi(req: Request, path: string): Promise<Response> {
     const accountId = accountIdFrom(req, body);
     if (!isValidAccountId(accountId)) return bad("accountId required", 400);
     const label = String(body.label || "");
-    if (!(GMAIL_LABELS as readonly string[]).includes(label)) return bad("bad label", 400);
+    if (!isValidGmailLabel(label)) return bad("bad label", 400);
     const to = String(body.to || "").trim();
     const subject = String(body.subject || "").trim();
     const draftBody = String(body.body || "");

@@ -14,9 +14,29 @@ import {
 } from "./db";
 
 export const GMAIL_LABELS = ["personal", "contact", "test"] as const;
-export type GmailLabel = (typeof GMAIL_LABELS)[number];
 
-export const GMAIL_LABEL_TITLES: Record<GmailLabel, string> = {
+// A Gmail label is a free-form slug now, not just one of the three
+// original slots. The three legacy labels keep their titles and their
+// send preference order; new accounts get generated labels
+// (gmail-1, gmail-2, …), so anyone can add as many accounts as they
+// like. A label rides in the OAuth state as `accountId:label`, so it
+// must be a safe slug — no colon, no spaces.
+export type GmailLabel = string;
+
+export function isValidGmailLabel(label: string): boolean {
+  if ((GMAIL_LABELS as readonly string[]).includes(label)) return true;
+  return /^gmail-[1-9][0-9]*$/.test(label);
+}
+
+// The card title for an account: the old names for the three original
+// slots, the account's own email for anything added since.
+export function gmailLabelTitle(label: string, email: string | null): string {
+  const t = (GMAIL_LABEL_TITLES as Record<string, string>)[label];
+  if (t) return t;
+  return email || "Gmail account";
+}
+
+export const GMAIL_LABEL_TITLES: Record<string, string> = {
   personal: "Personal",
   contact: "Labs contact",
   test: "Labs test",
@@ -68,7 +88,7 @@ export async function handleOAuthCallback(
   state: string,
 ): Promise<{ ok: boolean; accountId?: string; label?: string; email?: string; error?: string }> {
   const [accountId, label] = state.split(":");
-  if (!accountId || !label || !(GMAIL_LABELS as readonly string[]).includes(label)) {
+  if (!accountId || !label || !isValidGmailLabel(label)) {
     return { ok: false, error: "bad_state" };
   }
   try {
@@ -237,8 +257,9 @@ export async function sendEmail(
   return { ok: true, messageId: d.id };
 }
 
-// Send from whichever Gmail account is connected, preferring Personal,
-// then Labs contact, then Labs test. Returns which label sent it.
+// Send from whichever Gmail account is connected, preferring the three
+// original slots in their old order, then any account added since, in
+// the order it was connected. Returns which label sent it.
 export async function sendFromAny(
   accountId: string,
   to: string,
@@ -247,10 +268,15 @@ export async function sendFromAny(
 ): Promise<{ ok: boolean; label?: GmailLabel; messageId?: string; error?: string }> {
   const connected = getGmailAccounts(accountId);
   if (!connected.length) return { ok: false, error: "not_connected" };
-  for (const label of GMAIL_LABELS) {
-    if (!connected.some((a) => a.label === label)) continue;
-    const r = await sendEmail(accountId, label, to, subject, body);
-    if (r.ok) return { ok: true, label, messageId: r.messageId };
+  const ordered = [
+    ...GMAIL_LABELS.map((l) => connected.find((a) => a.label === l)).filter(
+      (a): a is (typeof connected)[number] => Boolean(a),
+    ),
+    ...connected.filter((a) => !(GMAIL_LABELS as readonly string[]).includes(a.label)),
+  ];
+  for (const a of ordered) {
+    const r = await sendEmail(accountId, a.label, to, subject, body);
+    if (r.ok) return { ok: true, label: a.label, messageId: r.messageId };
     // A token failure on one account is not worth trying the next with
     // the same stale credentials; a hard send failure is worth one retry
     // on the next connected account.
