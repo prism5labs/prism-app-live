@@ -1515,17 +1515,15 @@ function renderSwitchboardContacts(): string {
 
 // ---------- Messages (texts & calls) ----------
 // Status from GET /api/texts/status drives the honest state: until the
-// server says a number is connected, this section says plainly that
-// texts and calls are not connected yet, and never claims they work.
+// server says a number is connected, the section is not shown at all —
+// a "not connected, go fix the server" card is a dead end for the person
+// using the app, and it makes the Inboxes page look unfinished. When
+// Twilio is configured, the section appears with the real texts and calls.
 function renderMessagesSection(): string {
   const st = state?.textsStatus;
   const configured = !!(st && st.ok && st.configured);
-  const notConnected =
-    st && (st.error === "not_connected" || st.configured === false)
-      ? `<p>Texts and calls aren't connected yet. There's no phone number set up on the server, so nothing can be sent or received. Add your Twilio number in the server settings to turn them on.</p>`
-      : `<p>Texts and calls aren't connected yet. There's no phone number set up on the server, so nothing can be sent or received.</p>`;
   if (!st) return `<div class="card" id="messages"><h3>Messages</h3><p class="fine">Loading…</p></div>`;
-  if (!configured) return `<div class="card" id="messages"><h3>Messages</h3>${notConnected}</div>`;
+  if (!configured) return "";
 
   const texts = (state?.texts || []) as any[];
   const calls = (state?.calls || []) as any[];
