@@ -75,6 +75,11 @@ if (named.length !== 46) throw new Error(`expected 46 named links, got ${named.l
 // --- Product descriptions from the product files ---
 const SLUGS: Record<string, string> = {
   "Morning Briefing": "morning-briefing",
+  // Start My Day: product file exists, md rows #11-12 exist with prices,
+  // but its two Stripe payment links are PENDING (see the md note). The
+  // generator picks it up the moment the live URLs are pasted in and the
+  // counts below go 46 -> 48 named links and 23 -> 24 products.
+  "Start My Day": "start-my-day",
   "Bill Reminder List": "bill-reminder-list",
   "Weekly Planner Check": "weekly-planner-check",
   "Find a Time": "find-a-time",

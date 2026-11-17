@@ -94,6 +94,7 @@ import {
   voicemailCallback,
 } from "./server/telephony";
 import { handleProactiveApi, startProactiveScheduler } from "./server/proactive";
+import { handleDayApi } from "./server/startmyday";
 import { handleResearch } from "./server/research";
 import { handleStripeWebhook, handleStripeStatus } from "./server/stripe";
 
@@ -1172,6 +1173,13 @@ async function handleApi(req: Request, path: string): Promise<Response> {
   {
     const proactive = await handleProactiveApi(req, path);
     if (proactive) return proactive;
+  }
+
+  // Start My Day — the morning briefing Plug. The module returns null
+  // for paths it does not own.
+  {
+    const day = await handleDayApi(req, path);
+    if (day) return day;
   }
 
   return bad("not found", 404);

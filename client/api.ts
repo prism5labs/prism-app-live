@@ -173,6 +173,24 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ accountId: getAccountId() }),
     }),
+  // Start My Day — the morning briefing Plug. The briefing is read-only;
+  // dayConfirm is the only call that edits anything, and the client only
+  // calls it after the owner's tap on that item.
+  dayBriefing: (timeMin: string, timeMax: string, date: string) => {
+    const q = new URLSearchParams({ accountId: getAccountId(), timeMin, timeMax, date });
+    return req(`/api/day/briefing?${q.toString()}`);
+  },
+  dayItems: () => req(`/api/day/items?accountId=${encodeURIComponent(getAccountId())}`),
+  dayAddItem: (title: string, detail?: string, due?: string) =>
+    req("/api/day/items", {
+      method: "POST",
+      body: JSON.stringify({ accountId: getAccountId(), title, detail: detail || undefined, due: due || undefined }),
+    }),
+  dayConfirm: (kind: string, id: string, action: string, extra?: Record<string, unknown>) =>
+    req("/api/day/confirm", {
+      method: "POST",
+      body: JSON.stringify({ accountId: getAccountId(), kind, id, action, ...(extra || {}) }),
+    }),
   pushStatus: () => req(`/api/push/status?accountId=${encodeURIComponent(getAccountId())}`),
   pushSubscribe: (subscription: unknown) =>
     req("/api/push/subscribe", {
