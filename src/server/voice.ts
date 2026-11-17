@@ -58,9 +58,9 @@ const ACCEPTED_AUDIO_TYPES = new Set([
 // The app's voice picks are ways of speaking in chat (see
 // src/shared/voices.ts), not ElevenLabs voices. This table maps each pick
 // to one of ElevenLabs' documented default voices, chosen by tone only.
-// The music faces are style homages, never the artist: the mapping picks
-// a tone that fits the style, and the Photon never claims to BE that
-// person.
+// Each named Face gets a distinct default voice, so the spoken voice
+// matches the chat voice the owner picked. There are no musician or
+// celebrity references anywhere in this mapping.
 //
 // Default voices verified against ElevenLabs' published default list:
 //   Rachel 21m00Tcm4TlvDq8ikWAM — warm, friendly
@@ -80,15 +80,10 @@ export const HOUSE_ELEVENLABS_VOICE_ID = "21m00Tcm4TlvDq8ikWAM"; // Rachel
 
 const VOICE_MAP: Record<string, { elevenLabsId: string; elevenLabsName: string }> = {
   house: { elevenLabsId: "21m00Tcm4TlvDq8ikWAM", elevenLabsName: "Rachel" },
-  steady: { elevenLabsId: "pNInz6obpgDQGcFmaJgB", elevenLabsName: "Adam" },
-  lakeshore: { elevenLabsId: "TxGEqnHWrfWFTfGW9XjX", elevenLabsName: "Josh" },
-  boardroom: { elevenLabsId: "ErXwobaYiN019PkySvjV", elevenLabsName: "Antoni" },
-  elvis: { elevenLabsId: "ErXwobaYiN019PkySvjV", elevenLabsName: "Antoni" },
-  cash: { elevenLabsId: "pNInz6obpgDQGcFmaJgB", elevenLabsName: "Adam" },
-  aretha: { elevenLabsId: "MF3mGyEYCl7XYWbV9V6O", elevenLabsName: "Elli" },
-  bowie: { elevenLabsId: "ErXwobaYiN019PkySvjV", elevenLabsName: "Antoni" },
-  dolly: { elevenLabsId: "MF3mGyEYCl7XYWbV9V6O", elevenLabsName: "Elli" },
-  cobain: { elevenLabsId: "TxGEqnHWrfWFTfGW9XjX", elevenLabsName: "Josh" },
+  coverdale: { elevenLabsId: "pNInz6obpgDQGcFmaJgB", elevenLabsName: "Adam" },
+  sinclair: { elevenLabsId: "ErXwobaYiN019PkySvjV", elevenLabsName: "Antoni" },
+  halloway: { elevenLabsId: "TxGEqnHWrfWFTfGW9XjX", elevenLabsName: "Josh" },
+  beaumont: { elevenLabsId: "MF3mGyEYCl7XYWbV9V6O", elevenLabsName: "Elli" },
   // "custom" (design your own) has no single tone to map, so it falls
   // back to the house voice like any unmapped pick.
 };
