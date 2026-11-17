@@ -23,6 +23,11 @@
   --teal-soft: #DDEBE7;
   --meter-track: #EBDCB4;
   --radius: 16px;
+  /* Phone shape: the app sits inside the phone's rounded frame, the
+     way a native app fits — corners follow the screen, content clears
+     the notch, the home indicator, and the curved edges. */
+  --phone-radius: 28px;
+  --phone-radius-sm: 20px;
 }
 
 * { box-sizing: border-box; }
@@ -55,14 +60,26 @@ p { margin: 0 0 10px; }
 a { color: var(--teal); }
 
 /* ---------- Sticky brand header: gallery style, gem signature ---------- */
-.app-top { position: sticky; top: 0; z-index: 40; }
+/* Phone shape: the sticky header extends into the status-bar / notch
+   zone (safe-area-inset-top) on its own card ground, and its bottom
+   corners round like the phone's frame, so the header reads as a
+   rounded card sitting inside the screen, not a square bar fighting
+   the notch. Side padding clears the curved screen edges. */
+.app-top {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  background: var(--card);
+  padding-top: env(safe-area-inset-top);
+  border-radius: 0 0 var(--phone-radius-sm) var(--phone-radius-sm);
+}
 .app-header {
   background: var(--card);
   color: var(--teal);
   display: flex;
   align-items: center;
   gap: 9px;
-  padding: 14px 18px 4px;
+  padding: 14px max(18px, env(safe-area-inset-left)) 4px max(18px, env(safe-area-inset-right));
 }
 .app-header-mark { width: 30px; height: 34px; object-fit: cover; border-radius: 7px; flex: none; }
 .app-header-name {
@@ -94,7 +111,10 @@ a { color: var(--teal); }
   z-index: 1;
   max-width: 720px;
   margin: 0 auto;
-  padding: 20px 16px 120px;
+  /* Phone shape: side padding clears the curved screen edges, and the
+     bottom clears the tab bar plus the home indicator, so content
+     never runs into the phone's square corners. */
+  padding: 20px max(16px, env(safe-area-inset-left)) calc(120px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-right));
 }
 
 /* Page titles: plain Patua, ink. Section titles: small caps Nunito. */
@@ -401,7 +421,9 @@ body.look-night-watch, .thread.look-night-watch, .photon-card.look-night-watch {
   position: absolute;
   left: 0;
   right: 0;
-  bottom: max(9vh, 64px);
+  /* Phone shape: the caption clears the home indicator, so the
+     greeting never sits on it. */
+  bottom: max(9vh, calc(64px + env(safe-area-inset-bottom)));
   z-index: 2;
   display: flex;
   flex-direction: column;
@@ -924,7 +946,10 @@ html.kb-chat body.is-thread .composer-dock #research-results { display: none; }
 .owned-list, .included-list { margin: 0 0 12px; padding-left: 20px; }
 .owned-list li, .included-list li { margin-bottom: 4px; }
 
-/* Bottom nav: gallery tab bar, paper with a hairline top edge. */
+/* Bottom nav: gallery tab bar, paper with a hairline top edge.
+   Phone shape: top corners round like the phone's frame, and the
+   buttons clear the curved screen edges. The bottom edge sits at
+   the screen edge, where the hardware rounds it. */
 .nav {
   position: fixed;
   left: 0;
@@ -934,7 +959,8 @@ html.kb-chat body.is-thread .composer-dock #research-results { display: none; }
   gap: 4px;
   background: var(--card);
   border-top: 1px solid #E7D9B8;
-  padding: 8px 10px calc(10px + env(safe-area-inset-bottom));
+  border-radius: var(--phone-radius-sm) var(--phone-radius-sm) 0 0;
+  padding: 8px max(10px, env(safe-area-inset-left)) calc(10px + env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-right));
   z-index: 40;
 }
 .nav-btn {

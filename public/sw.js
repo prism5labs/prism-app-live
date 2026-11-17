@@ -1,12 +1,13 @@
 // Prism 5 service worker. Cache-first for the app shell and static assets,
 // network-first for the API (chat, state, and inboxes must always be fresh).
-// CACHE v9: bumped Nov 17, 2026 for the keyboard fix (chat thread is a
-// full-height flex column so the keyboard never blocks the chat; new
-// main.js thread logic and styles.css thread rules). Bumping the cache
-// makes existing installs fetch the new shell instead of serving the
-// cached v8 shell, which capped the messages at 55vh and let the
-// keyboard hide the conversation.
-const CACHE = "prism5-v9";
+// CACHE v10: bumped Nov 17, 2026 for the keyboard fix plus the phone
+// shape (chat thread is a full-height flex column so the keyboard never
+// blocks the chat; rounded frame and safe-area insets so the app fits
+// the phone like a native app). New main.js thread logic and new
+// styles.css thread + shape rules. Bumping the cache makes existing
+// installs fetch the new shell instead of serving the cached v9 shell,
+// which still had the square frame and the capped messages.
+const CACHE = "prism5-v10";
 const SHELL = ["/", "/index.html", "/styles.css", "/main.js", "/manifest.json", "/opening-animation-v3.mp4", "/chat-bg/bg-rocket.jpg", "/chat-bg/bg-helmets.jpg", "/chat-bg/bg-starburst.jpg", "/chat-bg/bg-robot.jpg", "/chat-bg/bg-saucer.jpg", "/chat-bg/bg-raygun.jpg", "/chat-bg/bg-car.jpg", "/chat-bg/bg-pilot.jpg", "/chat-bg/bg-moonbase.jpg", "/chat-bg/bg-diner.jpg", "/chat-bg/bg-launchpad.jpg", "/chat-bg/bg-spacestation.jpg"];
 
 self.addEventListener("install", (event) => {
