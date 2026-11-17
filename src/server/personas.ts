@@ -29,6 +29,39 @@ export function voiceStyleFor(c: DbCustomization | null): string | null {
   return voiceById(c.voice).style || null;
 }
 
+// The picked Face's voice, built as a prominent block that sits at the
+// TOP of the system prompt and overrides the default house voice below.
+// A picked voice used to be one weak line ("How you talk: ...") buried
+// at the very end, after the huge APP_TRUTH / APP_ARCHITECTURE blocks,
+// so the house voice won and the tone faded back to generic AI after a
+// couple of messages. This block states the override up front, names
+// the Face, and carries the persistence rule: stay in this voice for
+// EVERY reply, starting with the very next message. The same block
+// wraps a custom-tuned voice, so "Design your own" holds too. Null
+// when no Face is picked, or the pick is the house voice: the house
+// voice is the default and nothing overrides it.
+export function faceVoiceBlock(c: DbCustomization | null): string | null {
+  if (!c) return null;
+  let faceName: string;
+  let style: string | null;
+  if (c.voice === "custom" && c.tuning) {
+    faceName = "your custom-tuned voice";
+    style = tuningStyle(c.tuning as any);
+  } else {
+    const voice = voiceById(c.voice);
+    // The house voice IS the default persona, so it needs no override
+    // block. An old stored id (steady, elvis, and the rest) resolves to
+    // the house voice through voiceById and lands here too, so a Face
+    // removed later degrades gracefully to the house voice.
+    if (voice.id === "house" || !voice.style) return null;
+    faceName = voice.name;
+    style = voice.style;
+  }
+  return `YOUR FACE AND VOICE. THIS OVERRIDES THE DEFAULT VOICE IN THE PERSONA BELOW.
+You are speaking as ${faceName}. ${style}
+This is not a suggestion and not a one-time flavor. Stay in this voice for EVERY reply for the whole conversation, from the very next message onward. Never drift back to a generic AI voice, and never drift back to the default house voice in the persona below. Your very next message must already sound like ${faceName}: the same sentence length, the same words, the same way of opening a reply. If you catch yourself writing a plain generic reply, rewrite it in this voice before sending.`;
+}
+
 export function systemPromptFor(
   photonName: string,
   ownerDisplayName: string,
@@ -36,15 +69,15 @@ export function systemPromptFor(
 ): string {
   const photon = photonByName(photonName);
   if (!photon) return PRISM_PERSONA;
-  const style = voiceStyleFor(c || null);
+  const face = faceVoiceBlock(c || null);
   if (photon.name === "Prism") {
     // The house voice already is the Prism persona; only steer it when the
-    // owner picked something else, and only name a renamed Face.
-    let out = PRISM_PERSONA;
+    // owner picked something else, and only name a renamed Face. A picked
+    // Face goes FIRST, so its voice wins over the house voice below.
+    const out = face ? `${face}\n\n${PRISM_PERSONA}` : PRISM_PERSONA;
     if (c?.faceName && c.faceName !== "Prism") {
-      out += `\n\nYour name is ${c.faceName}. Use that name for yourself. The owner's name is not known to you; never address the owner by your own name.`;
+      return `${out}\n\nYour name is ${c.faceName}. Use that name for yourself. The owner's name is not known to you; never address the owner by your own name.`;
     }
-    if (style && c?.voice !== "house") out += `\n\nHow you talk: ${style}`;
     return out;
   }
   // The owner's name is not known to the Photon. Say the Photon's own
@@ -53,9 +86,8 @@ export function systemPromptFor(
   const ownerLine = ownerDisplayName
     ? `Your name is ${ownerDisplayName}. The owner's name is not known to you; never address the owner by your own name.`
     : "";
-  let out = `${PHOTON_RULE}\n\n${photon.persona}\n${ownerLine}`;
-  if (style) out += `\n\nHow you talk: ${style}`;
-  return out;
+  const base = `${PHOTON_RULE}\n\n${photon.persona}\n${ownerLine}`;
+  return face ? `${face}\n\n${base}` : base;
 }
 
 // What the Photon can and cannot do inside this app. This is the truth
