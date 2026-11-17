@@ -1751,6 +1751,15 @@ function render() {
   else if (tab === "inboxes") v.innerHTML = renderInboxes();
   else if (tab === "store") v.innerHTML = renderStore();
   else v.innerHTML = renderUpkeep();
+  // Thread mode: a chat thread is a full-height flex column (see
+  // body.is-thread in styles.css), so the keyboard never blocks the
+  // conversation or the composer. Only a real thread gets it — the
+  // front page, the call screen and the customizer keep the normal
+  // document layout.
+  document.body.classList.toggle(
+    "is-thread",
+    tab === "chat" && !callPhotonName && !customizePhoton && !!activePhoton,
+  );
   syncBodyLook();
   syncAppBackground();
   // The chat input is never focused for the user: focusing it after
@@ -2316,28 +2325,65 @@ document.addEventListener("change", async (e) => {
   input.value = "";
 });
 
-// ---------- Keyboard-aware composer dock ----------
-// When the on-screen keyboard opens, the visual viewport shrinks but the
-// layout viewport does not (iOS Safari and older Android). Measure the gap
-// and lift the fixed composer dock above the keyboard. Android Chrome with
-// interactive-widget=resizes-content resizes the layout viewport instead,
-// in which case the gap is ~0 and nothing changes.
+// ---------- Keyboard-aware chat ----------
+// The thread is a full-height flex column (see body.is-thread in
+// styles.css): the messages area flexes to whatever space is left
+// after the Photon header and the composer, so the conversation and
+// the input always stay in view. When the on-screen keyboard opens,
+// the layout viewport shrinks (Android Chrome, interactive-widget=
+// resizes-content) or the visual viewport shrinks (iOS / older
+// Android) — either way the body height follows (100dvh minus the
+// measured keyboard gap --kb), the messages area shrinks with it,
+// and the composer, in flow at the bottom of the thread, stays just
+// above the keyboard. The bottom tab bar and the brand header are
+// hidden while in a thread, so nothing but the conversation and the
+// composer competes for the shrunken screen: the clean, minimal
+// layout of a plain chat app.
+//
+// While the chat input is focused (html.kb-chat), the research row
+// hides — it is clutter while typing a message — and returns when
+// the input blurs. Tapping the conversation dismisses the keyboard
+// (and brings the research row back).
 function setupKeyboardDock(): void {
   const vv = window.visualViewport;
+  const root = document.documentElement;
+  const update = () => {
+    const kb = vv ? Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop)) : 0;
+    root.style.setProperty("--kb", kb + "px");
+  };
   if (vv) {
-    const update = () => {
-      const kb = Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop));
-      document.documentElement.style.setProperty("--kb", kb + "px");
-    };
     vv.addEventListener("resize", update);
     vv.addEventListener("scroll", update);
     update();
   }
   document.addEventListener("focusin", (e) => {
-    if ((e.target as HTMLElement)?.id === "chat-input") {
+    const id = (e.target as HTMLElement)?.id;
+    if (id === "chat-input" || id === "research-input") {
+      root.classList.toggle("kb-chat", id === "chat-input");
+      root.classList.toggle("kb-research", id === "research-input");
+    }
+    if (id === "chat-input") {
       window.setTimeout(() => {
         document.getElementById("messages")?.scrollTo({ top: 999999, behavior: "smooth" });
       }, 350);
+    }
+  });
+  document.addEventListener("focusout", (e) => {
+    const id = (e.target as HTMLElement)?.id;
+    if (id === "chat-input" || id === "research-input") {
+      // Focus may just be moving between the two inputs, so only
+      // clear the classes when it left both.
+      const next = (e as FocusEvent).relatedTarget as HTMLElement | null;
+      if (!next || (next.id !== "chat-input" && next.id !== "research-input")) {
+        root.classList.remove("kb-chat", "kb-research");
+      }
+    }
+  });
+  // Tap the conversation to dismiss the keyboard.
+  document.addEventListener("click", (e) => {
+    const t = e.target as HTMLElement;
+    if (t.closest("#messages") && !t.closest("input, textarea, button, a, summary")) {
+      (document.activeElement as HTMLElement)?.blur?.();
     }
   });
 }
