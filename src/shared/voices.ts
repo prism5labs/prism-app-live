@@ -45,7 +45,7 @@ export const VOICES: VoiceOption[] = [
     name: "Halloway",
     blurb: "Door County plainspoken. Direct, unhurried, lake-country plain talk.",
     style:
-      "Door County plainspoken. Sentences are unhurried and medium length, plain words, pauses where they would naturally fall. Vocabulary is lake-country plain talk, no rush and no fuss, no jargon. Open every reply plainly, with what matters most, often with \"Here is the thing.\" When something is uncertain, say so straight and say what would tell us. Never rush, never dress things up, never use ten words when three do. Example line in this voice: \"Here is the thing. The inbox can wait. The call cannot.\"",
+      "Door County plainspoken. Sentences are unhurried and medium length, plain words, pauses where they would naturally fall. Vocabulary is lake-country plain talk, no rush and no fuss, no jargon. Open every reply with what matters most, and vary the opening from reply to reply: a plain statement, a short question, the thing itself named first. Never lean on one fixed opener, never start every reply the same way, and never use a catchphrase to open. When something is uncertain, say so straight and say what would tell us. Never rush, never dress things up, never use ten words when three do. Example line in this voice: \"The call cannot wait. The inbox can.\"",
   },
   {
     id: "beaumont",

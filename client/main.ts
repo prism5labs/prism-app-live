@@ -66,20 +66,15 @@ let callStream: MediaStream | null = null;
 let callChunks: Blob[] = [];
 let callAudio: HTMLAudioElement | null = null;
 
-// Proactive checks, reminders, push (Step 3) and the job plug (Step 8):
-// loaded when the Upkeep tab opens, so the tab shows a loading line
-// instead of stale or empty cards.
+// Proactive checks, reminders, push (Step 3): loaded when the Upkeep
+// tab opens, so the tab shows a loading line instead of stale or empty
+// cards.
 let proactiveData: any = null;
 let proactiveLoading = false;
 let remindersData: any[] | null = null;
 let pushData: any = null;
 let lastCheck: any = null;
 let checkRunning = false;
-let jobsStatusData: any = null;
-let jobsRulesData: any = null;
-let jobsListingsData: any[] | null = null;
-let jobsListingsFilter: "filed" | "skipped" = "filed";
-let jobsRunning = false;
 let upkeepLoading = false;
 
 // Messenger (Step 9): Page threads, loaded with the Inboxes tab.
@@ -315,8 +310,9 @@ function renderChatThread(): string {
   const portrait = portraitNameOf(p);
   const customized = !!(state as any)?.customizations?.[p.name];
   // The owner's chosen look set reskins this Photon's whole chat.
-  // The class lives only on this section, so leaving the thread
-  // restores the default look with no cleanup.
+  // The class lives on this section, and syncBodyLook() puts it on
+  // <body> too, so the whole app follows; leaving the thread clears
+  // the body class and restores the default look with no cleanup.
   const look = lookSetById(customFor(p.name).lookSet || "");
   // A streaming reply shows three dots until the first words land.
   const botMsg = (text: string, streaming = false) =>
@@ -1540,105 +1536,18 @@ async function togglePush() {
   }
 }
 
-// ---------- Job plug (Step 8) ----------
-// Files jobs that fit the owner's rules so they can be reviewed. It never
-// applies to a job, and auto-apply is always off.
-const JOB_BOOL_RULES: { key: string; label: string }[] = [
-  { key: "prefer_remote", label: "Prefer remote work" },
-  { key: "onsite_allowed", label: "Onsite in the Green Bay area is OK" },
-  { key: "hard_no_outbound_sales", label: "Hard no: outbound sales" },
-  { key: "hard_no_cold_calling", label: "Hard no: cold calling" },
-  { key: "hard_no_call_center", label: "Hard no: phone-heavy call centers" },
-  { key: "hard_no_commission_only", label: "Hard no: commission-only outbound" },
-  { key: "hard_no_fedex", label: "Hard no: FedEx, any role" },
-  { key: "hard_no_drug_test", label: "Hard no: postings that require a drug test" },
-  { key: "hard_no_dot_physical", label: "Hard no: postings that require a DOT physical" },
-  { key: "hard_no_thc_testing", label: "Hard no: employers that test for THC" },
-  { key: "allow_background_check", label: "Background-check consent is fine" },
-];
-
-function renderJobs(): string {
-  if (!jobsStatusData) return `<div class="card"><h2>Job plug</h2><p class="fine">Loading…</p></div>`;
-  const s = jobsStatusData;
-  const lastRun = s.lastRun;
-  const rules = (jobsRulesData && jobsRulesData.rules) || s.rules || {};
-  const boolRows = JOB_BOOL_RULES.map(
-    (r) =>
-      `<label class="rule-row"><input type="checkbox" name="${r.key}" ${rules[r.key] === "true" ? "checked" : ""}> ${r.label}</label>`,
-  ).join("");
-  let approved = "";
-  try {
-    const a = JSON.parse(rules.approved_roles || "[]");
-    approved = Array.isArray(a) ? a.join(", ") : "";
-  } catch {
-    approved = "";
-  }
-  const listings = (jobsListingsData || [])
-    .map(
-      (l: any) => `<div class="inbox-msg"><p class="inbox-subject">${esc(l.title)}</p><p class="inbox-meta">${esc(l.company)}${l.location ? ` · ${esc(l.location)}` : ""}${l.pay ? ` · ${esc(l.pay)}` : ""}</p><a class="btn small" href="${esc(l.url)}" target="_blank" rel="noopener">View listing</a></div>`,
-    )
-    .join("");
-  return `<div class="card">
-    <h2>Job plug</h2>
-    <p class="fine">${esc(s.message || "")}</p>
-    <p><b>Auto-apply: off.</b> The plug only files jobs for review — it never applies to one on its own.</p>
-    <p class="fine">${s.sourceConnected ? `Job source connected (${esc(s.source || "feed")}).` : "No job source is connected yet, so it can't search."} ${lastRun ? `Last run ${esc(fmtTime(lastRun.startedAt))}: ${lastRun.found} found, ${lastRun.kept} filed, ${lastRun.skipped} skipped.` : "No run yet."}</p>
-    <div class="row"><button class="btn primary" data-action="jobs-run" ${jobsRunning ? "disabled" : ""}>${jobsRunning ? "Running…" : "Run the job plug now"}</button></div>
-    <form id="jobs-rules-form">
-      <h3>Your rules</h3>
-      ${boolRows}
-      <label class="rule-row">Pay floor, $ a month <input type="number" name="pay_floor_monthly" min="0" step="100" value="${esc(rules.pay_floor_monthly || "3000")}" aria-label="Pay floor per month"></label>
-      <label class="rule-row">Onsite area <input type="text" name="onsite_area" value="${esc(rules.onsite_area || "Green Bay area")}" aria-label="Onsite area"></label>
-      <label class="rule-row">Approved roles for a drug test or DOT physical (titles or URLs, comma-separated) <input type="text" name="approved_roles" value="${esc(approved)}" aria-label="Approved roles"></label>
-      <p class="fine">The plug never signs a drug-test or background-check consent. An approved role is only filed for review, never applied to.</p>
-      <button class="btn primary" type="submit">Save rules</button>
-    </form>
-    <h3>Filed jobs</h3>
-    <div class="row" role="group" aria-label="Filed or skipped">
-      <button class="toggle-btn ${jobsListingsFilter === "filed" ? "active" : ""}" data-action="jobs-filter" data-filter="filed">Filed</button>
-      <button class="toggle-btn ${jobsListingsFilter === "skipped" ? "active" : ""}" data-action="jobs-filter" data-filter="skipped">Skipped</button>
-    </div>
-    ${listings || `<p class="fine">${jobsListingsFilter === "filed" ? "Nothing filed yet." : "Nothing skipped yet."}</p>`}
-  </div>`;
-}
-
-async function runJobs() {
-  if (jobsRunning) return;
-  jobsRunning = true;
-  render();
-  const r = await api.jobsRun();
-  jobsRunning = false;
-  if (r && r.ok) {
-    toast(`Found ${r.found}, filed ${r.kept}, skipped ${r.skipped}. Nothing was applied to.`);
-    const [js, jl] = await Promise.all([api.jobsStatus(), api.jobsListings(jobsListingsFilter)]);
-    if (js && js.ok) jobsStatusData = js;
-    if (jl && jl.ok) jobsListingsData = jl.listings || [];
-  } else if (r?.error === "job_source_not_connected") {
-    toast(r.message || "No job source is connected yet, so the plug can't search.", "err");
-  } else {
-    toast(r?.message || "That run didn't finish. Try again.", "err");
-  }
-  render();
-}
-
 async function loadUpkeep() {
   if (upkeepLoading) return;
   upkeepLoading = true;
   try {
-    const [p, r, pu, js, jr, jl] = await Promise.all([
+    const [p, r, pu] = await Promise.all([
       api.proactiveStatus(),
       api.reminders(),
       api.pushStatus(),
-      api.jobsStatus(),
-      api.jobsRules(),
-      api.jobsListings(jobsListingsFilter),
     ]);
     if (p && p.ok) proactiveData = p;
     if (r && r.ok) remindersData = r.reminders || [];
     if (pu && pu.ok) pushData = pu;
-    if (js && js.ok) jobsStatusData = js;
-    if (jr && jr.ok) jobsRulesData = jr;
-    if (jl && jl.ok) jobsListingsData = jl.listings || [];
   } finally {
     upkeepLoading = false;
   }
@@ -1709,7 +1618,6 @@ function renderUpkeep(): string {
     </div>
 
     ${renderProactive()}
-    ${renderJobs()}
   </section>`;
 }
 
@@ -1731,6 +1639,22 @@ function renderNav() {
   if (headerName) headerName.textContent = state?.displayName || "Prism 5";
 }
 
+// The active Photon's look reskins the whole app, not just the thread:
+// the look class rides on <body> so the header, nav, composer dock and
+// every page follow the same skin, and picking a look matters like a
+// reskin, not a few colors. Leaving the thread (or picking no look)
+// clears the class, so the default gallery look returns. The thread
+// section and the Photon card keep their own look classes too.
+function syncBodyLook() {
+  const p =
+    tab === "chat" && activePhoton && !customizePhoton && !callPhotonName
+      ? PHOTONS.find((x) => x.name === activePhoton)
+      : null;
+  const look = p ? lookSetById(customFor(p.name).lookSet || "") : null;
+  for (const s of LOOK_SETS) document.body.classList.remove(`look-${s.id}`);
+  if (look) document.body.classList.add(`look-${look.id}`);
+}
+
 function render() {
   renderNav();
   const v = view();
@@ -1745,6 +1669,7 @@ function render() {
   else if (tab === "inboxes") v.innerHTML = renderInboxes();
   else if (tab === "store") v.innerHTML = renderStore();
   else v.innerHTML = renderUpkeep();
+  syncBodyLook();
   // The chat input is never focused for the user: focusing it after
   // every render keeps the keyboard up and can scroll the messages
   // around. The owner taps it when they want to write.
@@ -1857,14 +1782,6 @@ document.addEventListener("click", async (e) => {
     });
   } else if (action === "push-toggle") {
     togglePush();
-  } else if (action === "jobs-run") {
-    runJobs();
-  } else if (action === "jobs-filter") {
-    jobsListingsFilter = (t.dataset.filter as "filed" | "skipped") || "filed";
-    api.jobsListings(jobsListingsFilter).then((r: any) => {
-      if (r && r.ok) jobsListingsData = r.listings || [];
-      render();
-    });
   } else if (action === "msg-thread") {
     const id = t.dataset.id || "";
     if (id) openMessengerThread(id);
@@ -2235,26 +2152,6 @@ document.addEventListener("submit", async (e) => {
       toast("Reminder set.");
     } else {
       toast(r?.error || "That reminder didn't save. Try again.", "err");
-    }
-  } else if (form.id === "jobs-rules-form") {
-    e.preventDefault();
-    const fd = new FormData(form);
-    const rules: Record<string, unknown> = {};
-    for (const { key } of JOB_BOOL_RULES) rules[key] = fd.get(key) === "on";
-    const floor = String(fd.get("pay_floor_monthly") || "").trim();
-    if (floor !== "") rules.pay_floor_monthly = Number(floor);
-    const area = String(fd.get("onsite_area") || "").trim();
-    if (area !== "") rules.onsite_area = area;
-    rules.approved_roles = String(fd.get("approved_roles") || "").trim();
-    const r = await api.jobsSaveRules(rules);
-    if (r && r.ok) {
-      jobsRulesData = { rules: r.rules, customized: true };
-      const js = await api.jobsStatus();
-      if (js && js.ok) jobsStatusData = js;
-      render();
-      toast("Rules saved.");
-    } else {
-      toast(r?.error || "Those rules didn't save. Check the values and try again.", "err");
     }
   } else if (form.classList.contains("msg-send-form")) {
     e.preventDefault();

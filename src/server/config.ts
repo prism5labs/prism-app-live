@@ -50,9 +50,6 @@ export const config = {
   vapidPublicKey: process.env.VAPID_PUBLIC_KEY || "",
   vapidPrivateKey: process.env.VAPID_PRIVATE_KEY || "",
   vapidSubject: process.env.VAPID_SUBJECT || "",
-  // Job plug (step 8): URL of a JSON or RSS/Atom job feed. No feed URL
-  // means no job source is connected; the plug never scrapes a board.
-  jobsFeedUrl: process.env.JOBS_FEED_URL || "",
   // Brave Search (step 10): live web research. Without a key the research
   // endpoint answers research_not_connected.
   braveSearchApiKey: process.env.BRAVE_SEARCH_API_KEY || "",

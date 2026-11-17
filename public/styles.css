@@ -113,7 +113,7 @@ a { color: var(--teal); }
 /* Buttons: light pills, Nunito 800. */
 .btn {
   display: inline-block;
-  background: #fff;
+  background: var(--card);
   color: var(--teal);
   border: 1.5px solid var(--teal);
   border-radius: 999px;
@@ -154,6 +154,7 @@ textarea { width: 100%; resize: vertical; }
 /* Cards: light paper, hairline border, no shadow. */
 .card {
   background: var(--card);
+  color: var(--ink);
   border: 1px solid var(--line);
   border-radius: var(--radius);
   padding: 14px 16px;
@@ -226,6 +227,7 @@ textarea { width: 100%; resize: vertical; }
 }
 .photon-card {
   background: var(--card);
+  color: var(--ink);
   border: 1px solid var(--line);
   border-radius: var(--radius);
   padding: 14px 10px;
@@ -247,7 +249,7 @@ textarea { width: 100%; resize: vertical; }
 .portrait img, .portrait svg { display: block; width: 100%; height: 100%; object-fit: cover; }
 
 /* ---------- Chat thread: gallery-quiet, Claude-style replies ---------- */
-.thread { background: var(--cream); }
+.thread { background: var(--cream); color: var(--ink); }
 .thread-head {
   display: flex;
   align-items: center;
@@ -289,12 +291,16 @@ textarea { width: 100%; resize: vertical; }
 .thread-voice { display: block; font-size: 0.72rem; font-weight: 700; color: var(--muted-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* ---------- Look sets: a skin is the whole feel, not a saved label ----------
-   Each set overrides the palette variables on the Photon's thread section
-   (and on its Photon card), so the chat, the composer dock, the menu and
-   the bubbles all follow. No look set chosen means no overrides: the
-   default gallery look is untouched. The class lives only on the thread
-   section and the card, so leaving a thread restores the default. */
-.thread.look-signal-red, .photon-card.look-signal-red {
+   Each set overrides the palette variables for the whole app. The look
+   class rides on <body> (set by the client from the active Photon's
+   look), so the header, nav, composer dock, cards, menus and bubbles
+   all follow, and the thread section and Photon card carry it too.
+   No look set chosen means no overrides: the default gallery look is
+   untouched. Leaving a thread clears the body class, so the default
+   returns. Every skinned surface also sets its own text color from
+   the skin, so text is never left dark on a dark ground (or light on
+   a light one). */
+body.look-signal-red, .thread.look-signal-red, .photon-card.look-signal-red {
   --cream: #0E0E10; --card: #18181B; --field: #1E1E22;
   --ink: #F7F2E7; --ink-soft: #D9D3C3; --muted: #B9B2A2; --muted-2: #A69E8C;
   --teal: #D62828; --teal-deep: #8F1B1B; --teal-soft: #2B1214;
@@ -302,7 +308,7 @@ textarea { width: 100%; resize: vertical; }
   --cherry: #FF3B30; --cherry-dark: #D62828; --butter: #F4C95D;
   --meter-track: #2E1A1C;
 }
-.thread.look-ledger-lake, .photon-card.look-ledger-lake {
+body.look-ledger-lake, .thread.look-ledger-lake, .photon-card.look-ledger-lake {
   --cream: #F7F0DC; --card: #FFFDF4; --field: #FFFDF4;
   --ink: #141210; --ink-soft: #3D3831; --muted: #6E6455; --muted-2: #7D7263;
   --teal: #B01E1E; --teal-deep: #7E1414; --teal-soft: #F3E3D8;
@@ -310,7 +316,7 @@ textarea { width: 100%; resize: vertical; }
   --cherry: #D62828; --cherry-dark: #B01E1E; --butter: #E8B84B;
   --meter-track: #EAD9AE;
 }
-.thread.look-night-watch, .photon-card.look-night-watch {
+body.look-night-watch, .thread.look-night-watch, .photon-card.look-night-watch {
   --cream: #05070A; --card: #0C1116; --field: #10161D;
   --ink: #E9E4D6; --ink-soft: #C4BFAF; --muted: #9AA3AD; --muted-2: #8A94A0;
   --teal: #E0352B; --teal-deep: #5E1410; --teal-soft: #1E1214;
@@ -323,6 +329,23 @@ textarea { width: 100%; resize: vertical; }
 .thread.look-signal-red .thread-head .portrait { box-shadow: 0 0 0 1.5px var(--teal), 0 0 10px rgba(214, 40, 40, 0.35); }
 .thread.look-night-watch .thread-head .portrait { box-shadow: 0 0 0 1.5px var(--teal), 0 0 14px rgba(255, 74, 61, 0.5); }
 .thread.look-night-watch .composer .send { box-shadow: 0 0 14px rgba(255, 74, 61, 0.4); }
+/* A palette change fades in slowly across the whole app, like a
+   Final Fantasy reskin, so picking a look feels like a different
+   world arriving, not a flicker. Skipped for reduced motion. The
+   Photon card and the composer dock keep their own transitions
+   (hover lift, keyboard slide) and gain the fade alongside. */
+@media (prefers-reduced-motion: no-preference) {
+  body, .thread, .app-header, .view, .card, .nav, .messages,
+  .poster-row, .addon-row, .thread-menu-list {
+    transition: background-color 0.9s ease, color 0.9s ease, border-color 0.9s ease;
+  }
+  .photon-card {
+    transition: transform 0.15s, border-color 0.9s ease, background-color 0.9s ease, color 0.9s ease;
+  }
+  .composer-dock {
+    transition: bottom 0.2s ease-out, background-color 0.9s ease, color 0.9s ease, border-color 0.9s ease;
+  }
+}
 /* Menu buttons inside a skinned thread use the skin's card, not white,
    so the overflow menu stays in the same world as the chat. */
 .thread.look-signal-red .thread-menu-list .btn,
@@ -340,16 +363,16 @@ textarea { width: 100%; resize: vertical; }
 /* Customization wizard: name, voice, look. Same gallery look as the rest. */
 .customize { max-width: 720px; margin: 0 auto; }
 .custom-steps { display: flex; gap: 8px; margin: 14px 0; }
-.custom-step-tab { flex: 1; border: 1.5px solid var(--field-line); background: #fff; border-radius: 10px; padding: 9px 6px; font-family: "Nunito", system-ui, sans-serif; font-weight: 800; font-size: 0.85rem; color: var(--ink-soft); cursor: pointer; }
+.custom-step-tab { flex: 1; border: 1.5px solid var(--field-line); background: var(--card); border-radius: 10px; padding: 9px 6px; font-family: "Nunito", system-ui, sans-serif; font-weight: 800; font-size: 0.85rem; color: var(--ink-soft); cursor: pointer; }
 .custom-step-tab.active { background: var(--teal); border-color: var(--teal); color: #fff; }
 .custom-step-tab.done { border-color: var(--teal); color: var(--teal); }
-.voice-opt, .look-pick { display: block; width: 100%; text-align: left; background: #fff; border: 1.5px solid var(--field-line); border-radius: 12px; padding: 10px 14px; margin-bottom: 8px; cursor: pointer; font-family: "Nunito", system-ui, sans-serif; }
+.voice-opt, .look-pick { display: block; width: 100%; text-align: left; background: var(--card); border: 1.5px solid var(--field-line); border-radius: 12px; padding: 10px 14px; margin-bottom: 8px; cursor: pointer; font-family: "Nunito", system-ui, sans-serif; }
 .voice-opt b, .look-pick b { display: block; color: var(--ink); font-size: 0.95rem; font-weight: 800; }
 .voice-opt span, .look-pick span { display: block; font-size: 0.82rem; color: var(--ink-soft); margin-top: 2px; }
 .voice-opt.selected, .look-pick.selected { border-color: var(--teal); background: var(--teal-soft); }
 .tune-row { display: flex; align-items: center; gap: 8px; padding: 10px 0; border-bottom: 1px solid var(--line); }
 .tune-row p { flex: 1; margin: 0; font-weight: 700; font-size: 0.9rem; }
-.tune-yn { border: 1.5px solid var(--field-line); background: #fff; border-radius: 9px; padding: 7px 14px; font-family: "Nunito", system-ui, sans-serif; font-weight: 800; font-size: 0.85rem; color: var(--ink-soft); cursor: pointer; }
+.tune-yn { border: 1.5px solid var(--field-line); background: var(--card); border-radius: 9px; padding: 7px 14px; font-family: "Nunito", system-ui, sans-serif; font-weight: 800; font-size: 0.85rem; color: var(--ink-soft); cursor: pointer; }
 .tune-yn.on { background: var(--teal); border-color: var(--teal); color: #fff; }
 .portrait-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 12px 0; }
 .portrait-pick { background: none; border: 2px solid transparent; border-radius: 14px; padding: 6px 4px; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 4px; }
@@ -390,6 +413,7 @@ textarea { width: 100%; resize: vertical; }
   display: flex;
   gap: 9px;
   padding: 2px 2px 2px 0;
+  color: var(--ink);
 }
 .msg.bot .portrait {
   width: 26px;
@@ -474,7 +498,7 @@ textarea { width: 100%; resize: vertical; }
 .thread-menu-list .btn { justify-content: flex-start; text-align: left; }
 
 .chat-error {
-  background: #FDECEC;
+  background: var(--card);
   border: 1px solid var(--cherry);
   color: var(--cherry);
   border-radius: var(--radius);
@@ -594,7 +618,7 @@ textarea { width: 100%; resize: vertical; }
 .store-jump { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 18px; }
 .store-jump a {
   display: inline-block;
-  background: #fff;
+  background: var(--card);
   border: 1.5px solid var(--teal);
   color: var(--teal);
   border-radius: 999px;
@@ -640,7 +664,7 @@ textarea { width: 100%; resize: vertical; }
 .pricing-body p { font-size: 0.85rem; line-height: 1.55; color: var(--ink-soft); margin: 0 0 10px; }
 .pricing-body p b { color: var(--ink); }
 .pricing-body .pricing-contact {
-  background: #FFF8EA;
+  background: var(--card);
   border: 1px solid var(--butter);
   border-radius: 10px;
   padding: 10px 12px;
@@ -664,13 +688,13 @@ textarea { width: 100%; resize: vertical; }
   justify-content: space-between;
   align-items: center;
   gap: 10px;
-  background: #fff;
+  background: var(--card);
   border: 1px solid var(--line);
   border-radius: 12px;
   padding: 10px 14px;
   margin-bottom: 8px;
 }
-.addon-row.featured { border: 1.5px solid var(--cherry); background: #FFF8EA; }
+.addon-row.featured { border: 1.5px solid var(--cherry); background: var(--card); }
 .addon-row b { font-size: 0.9rem; display: block; }
 .addon-row span { font-size: 0.72rem; color: var(--muted-2); font-weight: 700; }
 .addon-row .pb-desc { display: block; margin-top: 3px; line-height: 1.4; }
@@ -756,25 +780,25 @@ textarea { width: 100%; resize: vertical; }
 
 /* Inboxes extras — client-a (Messages, Contacts, Calendar, Drive). */
 .inbox-jump { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; }
-.inbox-jump a { font-size: 0.8rem; font-weight: 800; color: var(--teal); background: #fff; border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; text-decoration: none; }
+.inbox-jump a { font-size: 0.8rem; font-weight: 800; color: var(--teal); background: var(--card); border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; text-decoration: none; }
 .inbox-jump a:hover { border-color: var(--teal); }
 #messages, #contacts, #calendar, #drive { margin-bottom: 12px; }
 #messages h4, #contacts h4, #calendar h4, #drive h4 { margin: 14px 0 6px; font-size: 0.95rem; }
 .text-form, .book-form { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
 .text-form select, .text-form textarea, .book-form input, .book-form textarea { width: 100%; }
 .field-label { font-size: 0.8rem; font-weight: 700; color: var(--ink-soft); display: flex; flex-direction: column; gap: 4px; }
-.review-box { border: 1.5px solid var(--teal); border-radius: 12px; background: #F2FAF7; padding: 12px; margin-top: 12px; }
+.review-box { border: 1.5px solid var(--teal); border-radius: 12px; background: var(--card); padding: 12px; margin-top: 12px; }
 .review-box h4 { margin-top: 0; }
-.review-body { white-space: pre-wrap; background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 10px; }
+.review-body { white-space: pre-wrap; background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 10px; }
 .import-box { border-top: 1px solid var(--line); margin-top: 14px; padding-top: 10px; }
 .import-box .btn { display: inline-block; margin: 4px 0 8px; cursor: pointer; }
 .drive-file { display: block; width: 100%; text-align: left; background: none; border: none; padding: 0; cursor: pointer; font-family: inherit; }
 .drive-file .inbox-subject { display: block; color: var(--teal); }
 .drive-file .inbox-meta { display: block; }
 .drive-read { border-top: 1px solid var(--line); margin-top: 12px; padding-top: 10px; }
-.drive-content { white-space: pre-wrap; word-break: break-word; background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 12px; font-size: 13px; line-height: 1.5; max-height: 50vh; overflow: auto; margin: 8px 0; }
+.drive-content { white-space: pre-wrap; word-break: break-word; background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 12px; font-size: 13px; line-height: 1.5; max-height: 50vh; overflow: auto; margin: 8px 0; }
 
-/* --- Client-B: live voice, proactive/reminders/push, job plug, Messenger,
+/* --- Client-B: live voice, proactive/reminders/push, Messenger,
        research, Stripe unlock status (Nov 15, 2026). One block, appended. --- */
 
 /* Live voice call screen (turn-based). */
@@ -814,14 +838,6 @@ textarea { width: 100%; resize: vertical; }
 .check-result li { margin-bottom: 4px; font-size: 14px; }
 .reminder-form { flex-wrap: wrap; }
 .reminder-form input { flex: 1 1 160px; min-width: 0; }
-
-/* Job plug rules editor. */
-.rule-row { display: flex; align-items: center; gap: 8px; margin: 8px 0; font-size: 15px; }
-.rule-row input[type="checkbox"] { width: 20px; height: 20px; flex: none; accent-color: var(--teal); }
-.rule-row input[type="number"], .rule-row input[type="text"] {
-  flex: 1; min-width: 0; padding: 8px 10px; border: 1px solid var(--field-line);
-  border-radius: 10px; background: var(--field); font: inherit; font-size: 14px;
-}
 
 /* Messenger threads: whole-row buttons. */
 .msg-thread {

@@ -179,20 +179,6 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ accountId: getAccountId(), subscription }),
     }),
-  // Job plug (Step 8). Files jobs for review; never applies to one.
-  jobsStatus: () => req(`/api/jobs/status?accountId=${encodeURIComponent(getAccountId())}`),
-  jobsRules: () => req(`/api/jobs/rules?accountId=${encodeURIComponent(getAccountId())}`),
-  jobsSaveRules: (rules: Record<string, unknown>) =>
-    req("/api/jobs/rules", {
-      method: "POST",
-      body: JSON.stringify({ accountId: getAccountId(), rules }),
-    }),
-  jobsListings: (status: "filed" | "skipped") =>
-    req(
-      `/api/jobs/listings?accountId=${encodeURIComponent(getAccountId())}&status=${status}&limit=50`,
-    ),
-  jobsRun: () =>
-    req("/api/jobs/run", { method: "POST", body: JSON.stringify({ accountId: getAccountId() }) }),
   // Messenger, Facebook Pages only (Step 9). Personal Messenger has no
   // supported API, so there is no route for it.
   messengerStatus: () =>

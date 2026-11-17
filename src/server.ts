@@ -76,7 +76,6 @@ import {
   voicemailCallback,
 } from "./server/telephony";
 import { handleProactiveApi, startProactiveScheduler } from "./server/proactive";
-import { handleJobsApi, startJobPlugScheduler } from "./server/jobs";
 import { handleResearch } from "./server/research";
 import { handleStripeWebhook, handleStripeStatus } from "./server/stripe";
 
@@ -1017,12 +1016,6 @@ async function handleApi(req: Request, path: string): Promise<Response> {
     if (proactive) return proactive;
   }
 
-  // Step 8 — the job plug. handleJobsApi returns null for non-jobs paths.
-  if (path.startsWith("/api/jobs")) {
-    const jobsResponse = await handleJobsApi(req, path);
-    if (jobsResponse) return jobsResponse;
-  }
-
   return bad("not found", 404);
 }
 
@@ -1088,8 +1081,7 @@ console.log(`Brain: ${brainProvider()} (set ANTHROPIC_API_KEY for Claude, GEMINI
 console.log(`Google OAuth configured: ${googleConfigured()}`);
 console.log(`Data dir: ${config.dataDir}`);
 
-// Schedulers (capability steps 3 and 8). Neither auto-starts on import;
-// both run only while the server is awake, so on the free tier they run
-// while the app is in use and stop when it sleeps.
+// Schedulers (capability step 3). It does not auto-start on import; it
+// runs only while the server is awake, so on the free tier it runs
+// while the app is in use and stops when it sleeps.
 startProactiveScheduler();
-startJobPlugScheduler();
