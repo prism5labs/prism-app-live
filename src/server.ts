@@ -135,6 +135,7 @@ const CONTENT_TYPES: Record<string, string> = {
   ".png": "image/png",
   ".svg": "image/svg+xml",
   ".ico": "image/x-icon",
+  ".mp4": "video/mp4",
 };
 
 function json(data: unknown, status = 200): Response {

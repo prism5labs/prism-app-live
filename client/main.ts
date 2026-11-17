@@ -2259,8 +2259,41 @@ function setupKeyboardDock(): void {
   });
 }
 
+// ---------- Opening splash ----------
+// The v3 opening animation plays once on app open, then fades to the
+// chat. The chat renders underneath while it plays, so nothing waits
+// on it, and it never touches settings or the chosen Face — it is only
+// a full-screen overlay that removes itself. Reduced motion skips it
+// entirely (the CSS hides it too, so it never shows even before this
+// runs). Tap skips it early: the owner never has to wait out the
+// full 5.6s.
+function playOpeningSplash(): void {
+  const splash = document.getElementById("opening-splash");
+  const video = document.getElementById("opening-splash-video") as HTMLVideoElement | null;
+  if (!splash || !video) return;
+  const dismiss = () => {
+    if (!splash.isConnected) return;
+    splash.classList.add("is-fading");
+    window.setTimeout(() => splash.remove(), 800);
+  };
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    splash.remove();
+    return;
+  }
+  splash.addEventListener("click", dismiss, { once: true });
+  video.addEventListener("ended", dismiss, { once: true });
+  // Fallback: if the ended event never fires, do not trap the owner
+  // behind the splash.
+  window.setTimeout(dismiss, 8000);
+  const p = video.play();
+  if (p) p.catch(() => dismiss());
+  // If the video already finished before this ran, dismiss now.
+  if (video.ended) dismiss();
+}
+
 // ---------- Boot ----------
 (async function init() {
+  playOpeningSplash();
   setupKeyboardDock();
   const params = new URLSearchParams(location.search);
   const t = params.get("tab");
