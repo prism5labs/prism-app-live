@@ -1,13 +1,13 @@
 // Prism 5 service worker. Cache-first for the app shell and static assets,
 // network-first for the API (chat, state, and inboxes must always be fresh).
-// CACHE v5: bumped Nov 16, 2026 for the opening animation (v3 splash
-// video + new main.js/index.html/styles.css). The Photon intro shipped
-// without a cache bump once before, and existing installs kept serving
-// the cached pre-intro shell; bumping the cache makes them fetch the
-// new shell instead. The splash video is precached too, so the
-// animation plays on first open after the update.
-const CACHE = "prism5-v5";
-const SHELL = ["/", "/index.html", "/styles.css", "/main.js", "/manifest.json", "/opening-animation-v3.mp4"];
+// CACHE v6: bumped Nov 16, 2026 for the chat redesign (Photon-specific
+// poster backgrounds + new main.js/index.html/styles.css). The Photon
+// intro shipped without a cache bump once before, and existing installs
+// kept serving the cached pre-intro shell; bumping the cache makes them
+// fetch the new shell instead. The background art is precached too, so
+// the chat room shows its poster on first open after the update.
+const CACHE = "prism5-v6";
+const SHELL = ["/", "/index.html", "/styles.css", "/main.js", "/manifest.json", "/opening-animation-v3.mp4", "/chat-bg/bg-rocket.jpg", "/chat-bg/bg-helmets.jpg", "/chat-bg/bg-starburst.jpg"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(

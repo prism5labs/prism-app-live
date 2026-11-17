@@ -316,7 +316,7 @@ function renderChatThread(): string {
   const look = lookSetById(customFor(p.name).lookSet || "");
   // A streaming reply shows three dots until the first words land.
   const botMsg = (text: string, streaming = false) =>
-    `<div class="msg bot${streaming ? " streaming" : ""}">${portraitHtml(portrait, 26)}<div><p>${text ? esc(text) : '<span class="typing"><span></span><span></span><span></span></span>'}</p></div></div>`;
+    `<div class="msg bot${streaming ? " streaming" : ""}">${portraitHtml(portrait, 28)}<div><p>${text ? esc(text) : '<span class="typing"><span></span><span></span><span></span></span>'}</p></div></div>`;
   const msgs = threadMessages.length
     ? threadMessages
         .map((m: any) =>
@@ -333,9 +333,10 @@ function renderChatThread(): string {
   <section class="thread${look ? ` look-${look.id}` : ""}">
     <div class="thread-head">
       <button class="back-btn" data-action="back-to-front">← <span>All Photons</span></button>
-      ${portraitHtml(portrait, 38)}
+      ${portraitHtml(portrait, 56)}
       <div class="thread-title">
         <h2>${esc(face)}</h2>
+        <span class="thread-tag">${esc(p.tagline)}</span>
         ${customized ? `<span class="thread-voice">Voice: ${esc(voiceNameOf(p.name))}</span>` : ""}
       </div>
       <details class="thread-menu">
@@ -1655,6 +1656,58 @@ function syncBodyLook() {
   if (look) document.body.classList.add(`look-${look.id}`);
 }
 
+// ---------- Chat backgrounds: the room you talk in ----------
+// On-brand poster art behind the chat, specific to the Photon (or tab)
+// you are with, rotating every 2 days so the room stays fresh instead
+// of two black boxes talking to each other. Deterministic by date, so
+// every device sees the same art on the same day and it changes without
+// any server state. Switching tabs (or Photons) slides the background
+// along with the view: it fades and shifts out, the art swaps mid-fade,
+// and it slides back in.
+const CHAT_BACKGROUNDS = ["/chat-bg/bg-rocket.jpg", "/chat-bg/bg-helmets.jpg", "/chat-bg/bg-starburst.jpg"];
+const BG_ROTATION_DAYS = 2;
+const TAB_ORDER: Tab[] = ["chat", "inboxes", "store", "upkeep"];
+let lastBgKey = "";
+let lastTab: Tab = "chat";
+let bgSwapTimer: number | null = null;
+
+function bgPeriod(): number {
+  return Math.floor(Date.now() / 86400000 / BG_ROTATION_DAYS);
+}
+
+function bgIndexFor(seed: string): number {
+  let h = 0;
+  const s = seed + ":" + bgPeriod();
+  for (const c of s) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  return h % CHAT_BACKGROUNDS.length;
+}
+
+function bgSeed(): string {
+  if (tab === "chat") return activePhoton ? "photon:" + activePhoton : "chat-front";
+  return "tab:" + tab;
+}
+
+function syncAppBackground(): void {
+  const bg = document.getElementById("app-bg") as HTMLElement | null;
+  if (!bg) return;
+  const key = bgSeed();
+  const url = CHAT_BACKGROUNDS[bgIndexFor(key)];
+  // Slide direction follows the tab order: moving right through the tabs
+  // slides the art in from the right, moving back slides it from the left.
+  const dir = TAB_ORDER.indexOf(tab) >= TAB_ORDER.indexOf(lastTab) ? 1 : -1;
+  const changed = key !== lastBgKey;
+  lastBgKey = key;
+  lastTab = tab;
+  if (!changed && bg.style.backgroundImage) return;
+  if (bgSwapTimer) window.clearTimeout(bgSwapTimer);
+  bg.classList.add("is-sliding");
+  bg.style.setProperty("--bg-shift", `${dir * 48}px`);
+  bgSwapTimer = window.setTimeout(() => {
+    bg.style.backgroundImage = `url("${url}")`;
+    bg.classList.remove("is-sliding");
+  }, 220);
+}
+
 function render() {
   renderNav();
   const v = view();
@@ -1670,6 +1723,7 @@ function render() {
   else if (tab === "store") v.innerHTML = renderStore();
   else v.innerHTML = renderUpkeep();
   syncBodyLook();
+  syncAppBackground();
   // The chat input is never focused for the user: focusing it after
   // every render keeps the keyboard up and can scroll the messages
   // around. The owner taps it when they want to write.

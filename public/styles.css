@@ -90,6 +90,8 @@ a { color: var(--teal); }
 @media (max-width: 420px) { .app-header-tag { display: none; } }
 
 .view {
+  position: relative;
+  z-index: 1;
   max-width: 720px;
   margin: 0 auto;
   padding: 20px 16px 120px;
@@ -249,7 +251,7 @@ textarea { width: 100%; resize: vertical; }
 .portrait img, .portrait svg { display: block; width: 100%; height: 100%; object-fit: cover; }
 
 /* ---------- Chat thread: gallery-quiet, Claude-style replies ---------- */
-.thread { background: var(--cream); color: var(--ink); }
+.thread { background: transparent; color: var(--ink); }
 .thread-head {
   display: flex;
   align-items: center;
@@ -260,8 +262,8 @@ textarea { width: 100%; resize: vertical; }
   border-image: linear-gradient(90deg, transparent, #B9BDC2, #7E858C, #B9BDC2, transparent) 1;
 }
 .thread-head .portrait {
-  width: 38px;
-  height: 38px;
+  width: 56px;
+  height: 56px;
   border-radius: 50%;
   box-shadow: 0 0 0 1.5px var(--teal);
 }
@@ -281,13 +283,14 @@ textarea { width: 100%; resize: vertical; }
 .thread-title h2 {
   font-family: "Nunito", sans-serif;
   font-weight: 800;
-  font-size: 0.95rem;
+  font-size: 1.05rem;
   color: var(--ink);
   margin-bottom: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.thread-tag { display: block; font-size: 0.72rem; font-weight: 700; color: var(--muted-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .thread-voice { display: block; font-size: 0.72rem; font-weight: 700; color: var(--muted-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* ---------- Look sets: a skin is the whole feel, not a saved label ----------
@@ -343,7 +346,7 @@ body.look-night-watch, .thread.look-night-watch, .photon-card.look-night-watch {
     transition: transform 0.15s, border-color 0.9s ease, background-color 0.9s ease, color 0.9s ease;
   }
   .composer-dock {
-    transition: bottom 0.2s ease-out, background-color 0.9s ease, color 0.9s ease, border-color 0.9s ease;
+    transition: bottom 0.28s cubic-bezier(0.2, 0.8, 0.2, 1), background-color 0.9s ease, color 0.9s ease, border-color 0.9s ease;
   }
 }
 /* Opening splash: the v3 animation plays once on app open, then fades
@@ -372,6 +375,43 @@ body.look-night-watch, .thread.look-night-watch, .photon-card.look-night-watch {
 .opening-splash.is-fading { opacity: 0; pointer-events: none; }
 @media (prefers-reduced-motion: reduce) {
   .opening-splash { display: none; }
+}
+/* ---------- Chat backgrounds: the room you talk in ---------- */
+/* A fixed poster-art layer behind the whole app, specific to the Photon
+   (or tab) you are with, rotating every 2 days. The scrim keeps the art
+   muted so text stays readable, and follows the active look set through
+   --cream, so dark skins get a dark scrim. Switching tabs (or Photons)
+   slides the art along: the layer fades and shifts out, the art swaps
+   mid-fade, and it slides back in. Reduced motion shows the art with
+   no slide. */
+.app-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  background-color: var(--cream);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  pointer-events: none;
+  opacity: 1;
+  transform: translateX(0);
+  transition: opacity 0.45s ease, transform 0.45s ease;
+}
+.app-bg.is-sliding {
+  opacity: 0;
+  transform: translateX(var(--bg-shift, 48px));
+}
+.app-bg-scrim {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(rgba(255, 243, 220, 0.8), rgba(255, 243, 220, 0.88));
+  background: linear-gradient(
+    color-mix(in srgb, var(--cream) 78%, transparent),
+    color-mix(in srgb, var(--cream) 88%, transparent)
+  );
+}
+@media (prefers-reduced-motion: reduce) {
+  .app-bg { transition: none; }
 }
 /* Menu buttons inside a skinned thread use the skin's card, not white,
    so the overflow menu stays in the same world as the chat. */
@@ -443,8 +483,8 @@ body.look-night-watch, .thread.look-night-watch, .photon-card.look-night-watch {
   color: var(--ink);
 }
 .msg.bot .portrait {
-  width: 26px;
-  height: 26px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
   flex: none;
   margin-top: 2px;
@@ -484,11 +524,11 @@ body.look-night-watch, .thread.look-night-watch, .photon-card.look-night-watch {
   transform: translateX(-50%);
   bottom: calc(70px + env(safe-area-inset-bottom) + var(--kb, 0px));
   width: min(688px, calc(100% - 32px));
-  background: var(--cream);
+  background: var(--card);
   border-top: 1px solid var(--line);
   padding: 8px 0 10px;
   z-index: 30;
-  transition: bottom 0.2s ease-out;
+  transition: bottom 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 .composer-dock .chat-error { margin-bottom: 8px; }
 /* The header's overflow menu: everything that is not the chat lives
