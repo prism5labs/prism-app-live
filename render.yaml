@@ -6,10 +6,10 @@ services:
     plan: starter
     domains:
       - app.prism5labs.com
-    disks:
-      - name: prism-app-data
-        mountPath: /data
-        sizeGB: 1
+    disk:
+      name: prism-app-data
+      mountPath: /data
+      sizeGB: 1
     envVars:
       - key: NODE_ENV
         value: production

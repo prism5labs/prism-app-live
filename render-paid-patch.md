@@ -30,10 +30,10 @@ services:
     plan: starter
     domains:
       - app.prism5labs.com
-    disks:
-      - name: prism-app-data
-        mountPath: /data
-        sizeGB: 1
+    disk:
+      name: prism-app-data
+      mountPath: /data
+      sizeGB: 1
     envVars:
       - key: NODE_ENV
         value: production
@@ -66,10 +66,10 @@ services:
 -      - prism5labs.com
 -      - www.prism5labs.com
 +      - app.prism5labs.com
-+    disks:
-+      - name: prism-app-data
-+        mountPath: /data
-+        sizeGB: 1
++    disk:
++      name: prism-app-data
++      mountPath: /data
++      sizeGB: 1
      envVars:
        - key: NODE_ENV
          value: production
@@ -85,7 +85,7 @@ services:
   plan change and the disk go together — one without the other does not
   work. **Confirm the price shown in the Render dashboard before
   confirming.** No price is stated here because Render sets it.
-- `disks:` — one persistent disk, `prism-app-data`, mounted at `/data`,
+- `disk:` — one persistent disk, `prism-app-data`, mounted at `/data`,
   `sizeGB: 1` (the minimum size; raise it later if the database ever
   outgrows it — chat history and Gmail tokens are small, 1 GB is ample
   to start). Once the disk exists, redeploys and restarts keep whatever
