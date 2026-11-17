@@ -422,7 +422,7 @@ export async function listCalendarEvents(
 
 export async function bookCalendarEvent(
   accountId: string,
-  input: { title?: string; start?: string; end?: string; description?: string; attendees?: string[] },
+  input: { title?: string; start?: string; end?: string; description?: string; location?: string; attendees?: string[] },
 ): Promise<
   | { ok: true; event: CalendarEvent }
   | { ok: false; error: string; message: string }
@@ -461,6 +461,7 @@ export async function bookCalendarEvent(
     end: { dateTime: new Date(endMs).toISOString() },
   };
   if (input.description) body.description = String(input.description);
+  if (input.location) body.location = String(input.location);
   if (attendees.length) body.attendees = attendees;
   const r = await googleFetch(
     accountId,

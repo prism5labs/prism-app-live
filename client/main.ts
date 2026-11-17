@@ -77,6 +77,18 @@ let lastCheck: any = null;
 let checkRunning = false;
 let upkeepLoading = false;
 
+// Start My Day — the morning briefing Plug. dayOpen is a sub-view of
+// the Chat tab, like the thread and the customizer. dayData is the last
+// briefing response; the server is the source of truth, so every confirm
+// re-fetches and the next item is always items[0]. dayHandled counts
+// the items confirmed in this briefing session.
+let dayOpen = false;
+let dayData: any = null;
+let dayLoading = false;
+let dayBusy = false;
+let dayHandled = 0;
+let dayMoveOpen = false;
+
 // Messenger (Step 9): Page threads, loaded with the Inboxes tab.
 let messengerStatusData: any = null;
 let messengerThreadsData: any[] | null = null;
@@ -462,6 +474,177 @@ function photonCard(p: any, size = 220): string {
   </button>`;
 }
 
+// ---------- Start My Day — the morning briefing Plug ----------
+// The briefing walks the day top to bottom, one item at a time. The
+// server is the source of truth: every confirm re-fetches, so the next
+// item is always items[0]. Nothing is edited until the owner taps a
+// choice on that item; dayConfirm is the only call that edits anything.
+function ownsStartMyDay(): boolean {
+  return state?.freeCode === true || (state?.ownedProducts || []).includes("start-my-day");
+}
+
+function todayWindow(): { timeMin: string; timeMax: string; date: string } {
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+  const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+  const date = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, "0")}-${String(start.getDate()).padStart(2, "0")}`;
+  return { timeMin: start.toISOString(), timeMax: end.toISOString(), date };
+}
+
+async function loadDayBriefing() {
+  if (dayLoading) return;
+  dayLoading = true;
+  render();
+  const w = todayWindow();
+  const r = await api.dayBriefing(w.timeMin, w.timeMax, w.date);
+  dayLoading = false;
+  if (r && r.ok) {
+    dayData = r;
+    dayMoveOpen = false;
+  } else {
+    toast(r?.error || "The briefing didn't come back. Try again.", "err");
+  }
+  render();
+}
+
+async function dayConfirmCurrent(action: string, extra?: Record<string, unknown>) {
+  if (!dayData || dayBusy) return;
+  const item = (dayData.items || [])[0];
+  if (!item) return;
+  dayBusy = true;
+  const r = await api.dayConfirm(item.kind, item.id, action, extra);
+  dayBusy = false;
+  if (r && r.ok) {
+    dayHandled++;
+    dayMoveOpen = false;
+    toast(r.message || "Done.");
+    await loadDayBriefing();
+  } else {
+    toast(r?.message || "That didn't save. Try again.", "err");
+    render();
+  }
+}
+
+function dayMoveWith(start: Date) {
+  const item = (dayData?.items || [])[0];
+  if (!item) return;
+  if (Number.isNaN(start.getTime())) {
+    toast("That time doesn't work. Pick another.", "err");
+    return;
+  }
+  if (item.kind === "event") {
+    // Keep the event's length: end moves by the same amount as start.
+    const dur =
+      item.when && item.end ? Date.parse(item.end) - Date.parse(item.when) : 60 * 60 * 1000;
+    const end = new Date(start.getTime() + Math.max(dur, 15 * 60 * 1000));
+    dayConfirmCurrent("move", {
+      start: start.toISOString(),
+      end: end.toISOString(),
+      title: item.title,
+      description: item.description || undefined,
+      location: item.location || undefined,
+      attendees: item.attendees || [],
+    });
+  } else {
+    dayConfirmCurrent("move", { when: start.toISOString() });
+  }
+}
+
+function dayMoveQuick(when: string) {
+  const item = (dayData?.items || [])[0];
+  if (!item) return;
+  const now = new Date();
+  if (when === "later") {
+    // Two hours from the item's time, or from now if it already started.
+    const base = item.when ? new Date(item.when) : now;
+    const from = new Date(Math.max(base.getTime(), now.getTime()));
+    dayMoveWith(new Date(from.getTime() + 2 * 60 * 60 * 1000));
+  } else {
+    // Tomorrow: same time as the item, or 9 AM when it has no time.
+    const base = item.when ? new Date(item.when) : null;
+    if (base && !Number.isNaN(base.getTime())) {
+      dayMoveWith(new Date(base.getTime() + 24 * 60 * 60 * 1000));
+    } else {
+      dayMoveWith(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 9, 0, 0));
+    }
+  }
+}
+
+function renderDayBriefing(): string {
+  const back = `<button class="back-btn" data-action="day-back">← Back to chat</button>`;
+  if (dayLoading || !dayData) {
+    return `<section class="front">${back}<div class="card"><h2>Start My Day</h2><p class="fine">Gathering today's items…</p></div></section>`;
+  }
+  const items = dayData.items || [];
+  const counts = dayData.counts || { events: 0, reminders: 0, added: 0, total: 0 };
+  const dateLabel = dayData.date ? fmtDateOnly(dayData.date) : "Today";
+  const progress = `${dayHandled} handled · ${items.length} left`;
+  const calNote =
+    dayData.calendar && !dayData.calendar.connected
+      ? `<p class="fine">${esc(dayData.calendar.message || "Calendar is not connected yet.")}</p><div class="row"><button class="btn" data-action="goto" data-tab="inboxes">Go to Inboxes</button></div>`
+      : dayData.calendar && dayData.calendar.message
+        ? `<p class="fine">${esc(dayData.calendar.message)}</p>`
+        : "";
+  let body = "";
+  if (items.length) {
+    const item = items[0];
+    const whenLabel = item.when ? fmtTime(item.when) : "No set time";
+    const endLabel = item.end ? ` — ${fmtTime(item.end)}` : "";
+    const buttons =
+      item.kind === "event"
+        ? `<button class="btn primary" data-action="day-confirm" data-confirm="keep" ${dayBusy ? "disabled" : ""}>That's right</button>
+           <button class="btn" data-action="day-move-show" ${dayBusy ? "disabled" : ""}>Move it</button>
+           <button class="btn" data-action="day-confirm" data-confirm="cancel" ${dayBusy ? "disabled" : ""}>Cancel it</button>`
+        : `<button class="btn primary" data-action="day-confirm" data-confirm="done" ${dayBusy ? "disabled" : ""}>Done</button>
+           <button class="btn" data-action="day-move-show" ${dayBusy ? "disabled" : ""}>Move it</button>
+           <button class="btn" data-action="day-confirm" data-confirm="skip" ${dayBusy ? "disabled" : ""}>Skip</button>`;
+    const moveForm = dayMoveOpen
+      ? `<div class="card day-move">
+           <h3>Move it to when?</h3>
+           <div class="row">
+             <button class="btn small" data-action="day-move-quick" data-when="later">In 2 hours</button>
+             <button class="btn small" data-action="day-move-quick" data-when="tomorrow">Tomorrow</button>
+           </div>
+           <div class="row">
+             <input id="day-move-when" type="datetime-local" aria-label="New time">
+             <button class="btn primary" data-action="day-move-custom">Move it</button>
+           </div>
+           <button class="btn small" data-action="day-move-show">Never mind</button>
+         </div>`
+      : "";
+    body = `
+      <div class="day-item">
+        <p class="kind">${esc(item.source)}</p>
+        <p class="day-when">${esc(whenLabel)}${esc(endLabel)}</p>
+        <h3>${esc(item.title)}</h3>
+        ${item.detail ? `<p>${esc(item.detail)}</p>` : ""}
+      </div>
+      <div class="row">${buttons}</div>
+      ${moveForm}`;
+  } else {
+    body = `
+      <h3>That's the day.</h3>
+      <p>${dayHandled ? `You handled ${dayHandled} item${dayHandled === 1 ? "" : "s"} in this briefing.` : "Nothing on today's list."}${dayData.doneAddedToday ? ` ${dayData.doneAddedToday} added item${dayData.doneAddedToday === 1 ? "" : "s"} done today.` : ""}</p>`;
+  }
+  return `<section class="front">
+    ${back}
+    <div class="card day-card">
+      <h2>Start My Day</h2>
+      <p class="fine">${esc(dateLabel)} · ${esc(progress)}</p>
+      <p class="fine">Today: ${counts.events} event${counts.events === 1 ? "" : "s"} · ${counts.reminders} reminder${counts.reminders === 1 ? "" : "s"} · ${counts.added} added</p>
+      ${calNote}
+      ${body}
+      <h3>Add to today</h3>
+      <form id="day-add-form" class="row day-add-form">
+        <input id="day-add-title" type="text" maxlength="200" placeholder="Add something to today…" required aria-label="Item title">
+        <input id="day-add-when" type="datetime-local" aria-label="When (optional)">
+        <button class="btn primary" type="submit">Add to today</button>
+      </form>
+      <p class="fine">Anything you add joins today's plan and shows up here the next time you open the briefing.</p>
+    </div>
+  </section>`;
+}
+
 // ---------- Chat front page ----------
 function renderChatFront(): string {
   const owned = (state?.photons || []).filter((p: any) => p.owned);
@@ -486,6 +669,13 @@ function renderChatFront(): string {
       <p class="tagline">Truly Atomic AI Assistants</p>
       <p class="front-lede">One assistant that does it all, and becomes a second you. Pick a Photon and start talking.</p>
     </div>
+    ${ownsStartMyDay()
+      ? `<div class="card day-card">
+          <h2>Start My Day</h2>
+          <p>Your morning briefing, like a project manager for your day. It walks today top to bottom, one item at a time, and edits each item once you confirm it.</p>
+          <button class="btn primary" data-action="day-start">Start My Day</button>
+        </div>`
+      : ""}
     ${ownedHtml}
     <div class="card make-yours">
       <h2>Make it yours</h2>
@@ -1546,6 +1736,23 @@ function renderStore(): string {
 
   const sparkCount = PRODUCTS.filter((p) => p.kind === "Spark").length;
   const plugCount = PRODUCTS.filter((p) => p.kind === "Plug").length;
+  // Start My Day is built and priced, but its two Stripe payment links
+  // are not created yet, so the catalog generator skips it and it is not
+  // in PRODUCTS. Until the links land it shows here as a coming-soon
+  // card, with its price and an honest note instead of a Buy button.
+  // The moment the links exist and the catalog is regenerated, this card
+  // disappears and the standard product card takes its place.
+  const startMyDayListed = PRODUCTS.some((p) => p.slug === "start-my-day");
+  const plugShown = plugCount + (startMyDayListed ? 0 : 1);
+  const startMyDaySoon = startMyDayListed
+    ? ""
+    : `<h3 class="cat-title">Everyday Life</h3><div class="product-grid"><div class="card product-card">
+        <h3>Start My Day</h3>
+        <p class="kind">Plug</p>
+        <p>A morning briefing that walks your day top to bottom, one item at a time. Confirm each item and it gets done, moved, or cleared, and anything you add during the day joins the plan.</p>
+        <p class="price">${storeVariant === "personal" ? "$39.00" : "$59.00"} <span class="fine">(${storeVariant === "personal" ? "$40.17" : "$60.77"} at checkout)</span></p>
+        <p class="fine">Checkout links are being set up — the plug itself is ready. There is no Buy button until its two Stripe links exist.</p>
+      </div></div>`;
 
   return `
   <section>
@@ -1611,9 +1818,10 @@ function renderStore(): string {
       ${kindGroups("Spark")}
     </details>
     <details class="store-group" id="store-plugs" ${storeOpen.plugs ? "open" : ""}>
-      <summary><span class="summary-title">Plugs</span><span class="fine">${plugCount} · runs on its own · tap to browse</span></summary>
+      <summary><span class="summary-title">Plugs</span><span class="fine">${plugShown} · runs on its own · tap to browse</span></summary>
       <p class="page-lede">${esc(TIER_COPY.plug.body)} ${esc(TIER_COPY.plug.hours)}</p>
       ${kindGroups("Plug")}
+      ${startMyDaySoon}
     </details>
     <div class="store-foot">Questions about any price? Email <a href="mailto:prism5labscontact@gmail.com">prism5labscontact@gmail.com</a> or call <a href="tel:+19203937294">(920) 393-7294</a>.<br>Let us handle the noise so you can focus on what you want and need to do.<br>© 2026 Prism 5 Labs · Green Bay, Wisconsin</div>
   </section>`;
@@ -1979,9 +2187,11 @@ function render() {
       ? renderCallScreen()
       : customizePhoton
         ? renderCustomize()
-        : activePhoton
-          ? renderChatThread()
-          : renderChatFront();
+        : dayOpen
+          ? renderDayBriefing()
+          : activePhoton
+            ? renderChatThread()
+            : renderChatFront();
   else if (tab === "inboxes") v.innerHTML = renderInboxes();
   else if (tab === "store") v.innerHTML = renderStore();
   else v.innerHTML = renderUpkeep();
@@ -2082,6 +2292,7 @@ document.addEventListener("click", async (e) => {
     tab = t.dataset.tab as Tab;
     activePhoton = null;
     customizePhoton = null;
+    dayOpen = false;
     // Ending a call leaves the thread; the call screen is chat-only.
     if (callPhotonName) endCall();
     if (tab === "inboxes") loadInboxes().then(render);
@@ -2106,6 +2317,35 @@ document.addEventListener("click", async (e) => {
         toast("That didn't save. Try again.", "err");
       }
     });
+  } else if (action === "day-start") {
+    if (!ownsStartMyDay()) {
+      toast("Start My Day is a Plug — find it in the Store.", "err");
+      return;
+    }
+    dayOpen = true;
+    dayHandled = 0;
+    dayData = null;
+    dayMoveOpen = false;
+    loadDayBriefing();
+  } else if (action === "day-back") {
+    dayOpen = false;
+    dayData = null;
+    render();
+  } else if (action === "day-confirm") {
+    dayConfirmCurrent(t.dataset.confirm || "");
+  } else if (action === "day-move-show") {
+    dayMoveOpen = !dayMoveOpen;
+    render();
+  } else if (action === "day-move-quick") {
+    dayMoveQuick(t.dataset.when || "later");
+  } else if (action === "day-move-custom") {
+    const input = document.getElementById("day-move-when") as HTMLInputElement | null;
+    const value = input?.value || "";
+    if (!value) {
+      toast("Pick a time first.", "err");
+      return;
+    }
+    dayMoveWith(new Date(value));
   } else if (action === "push-toggle") {
     togglePush();
   } else if (action === "msg-thread") {
@@ -2119,6 +2359,7 @@ document.addEventListener("click", async (e) => {
     }
   } else if (action === "open-photon") {
     const name = t.dataset.photon || "";
+    dayOpen = false;
     if (name) openPhoton(name);
   } else if (action === "photon-info") {
     // A Photon portrait in the Store: the character card, not the chat.
@@ -2142,6 +2383,7 @@ document.addEventListener("click", async (e) => {
   } else if (action === "back-to-front") {
     activePhoton = null;
     customizePhoton = null;
+    dayOpen = false;
     render();
   } else if (action === "call") {
     callPhoton(t.dataset.photon || "");
@@ -2497,6 +2739,20 @@ document.addEventListener("submit", async (e) => {
       toast("Reminder set.");
     } else {
       toast(r?.error || "That reminder didn't save. Try again.", "err");
+    }
+  } else if (form.id === "day-add-form") {
+    e.preventDefault();
+    const titleInput = document.getElementById("day-add-title") as HTMLInputElement;
+    const whenInput = document.getElementById("day-add-when") as HTMLInputElement;
+    const title = titleInput.value.trim();
+    if (!title) return;
+    const due = whenInput.value ? new Date(whenInput.value).toISOString() : undefined;
+    const r = await api.dayAddItem(title, undefined, due);
+    if (r && r.ok) {
+      toast("Added to today's plan.");
+      await loadDayBriefing();
+    } else {
+      toast(r?.error || "That didn't save. Try again.", "err");
     }
   } else if (form.classList.contains("msg-send-form")) {
     e.preventDefault();

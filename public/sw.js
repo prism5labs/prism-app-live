@@ -1,13 +1,11 @@
 // Prism 5 service worker. Cache-first for the app shell and static assets,
 // network-first for the API (chat, state, and inboxes must always be fresh).
-// CACHE v13: bumped Nov 17, 2026 for the Photon diversity portraits
-// (eleven of the twelve portraits were replaced with new 1950s
-// pulp-poster portraits showing a genuine range of races and
-// backgrounds; Barnstormer is unchanged). The portraits are fetched
-// on demand and runtime-cached by the fetch handler, so bumping the
-// cache makes existing installs drop the cached v12 portraits and
-// fetch the new ones instead of serving the old all-white set.
-const CACHE = "prism5-v13";
+// CACHE v14: bumped Nov 17, 2026 for the Start My Day Plug (the morning
+// briefing: it walks the day one item at a time, edits each item after the
+// owner confirms it, and tracks items added during the day). New client
+// code and a new server module; the cache bump makes existing installs
+// fetch the new main.js instead of serving the cached one.
+const CACHE = "prism5-v14";
 const SHELL = ["/", "/index.html", "/styles.css", "/main.js", "/manifest.json", "/opening-animation-v3.mp4", "/chat-bg/bg-rocket.jpg", "/chat-bg/bg-helmets.jpg", "/chat-bg/bg-starburst.jpg", "/chat-bg/bg-robot.jpg", "/chat-bg/bg-saucer.jpg", "/chat-bg/bg-raygun.jpg", "/chat-bg/bg-car.jpg", "/chat-bg/bg-pilot.jpg", "/chat-bg/bg-moonbase.jpg", "/chat-bg/bg-diner.jpg", "/chat-bg/bg-launchpad.jpg", "/chat-bg/bg-spacestation.jpg"];
 
 self.addEventListener("install", (event) => {

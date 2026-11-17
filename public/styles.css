@@ -1073,6 +1073,17 @@ html.kb-chat body.is-thread .composer-dock #research-results { display: none; }
 .reminder-form { flex-wrap: wrap; }
 .reminder-form input { flex: 1 1 160px; min-width: 0; }
 
+/* Start My Day — the morning briefing Plug. One item at a time, top level. */
+.day-item { border-top: 1px solid var(--line); padding: 12px 0; }
+.day-item:first-of-type { border-top: none; }
+.day-item h3 { margin: 4px 0; }
+.day-item p { margin: 4px 0; }
+.day-when { font-weight: 800; font-size: 15px; }
+.day-move { background: var(--teal-soft); margin: 12px 0; }
+.day-move .row { margin: 8px 0; }
+.day-add-form { flex-wrap: wrap; }
+.day-add-form input { flex: 1 1 160px; min-width: 0; }
+
 /* Messenger threads: whole-row buttons. */
 .msg-thread {
   display: block; width: 100%; text-align: left; background: none; border: none;
