@@ -62,6 +62,13 @@ else
   ok "Prism never described as free"
 fi
 
+# 6. The work standard and update deference must stay in the Photons' core
+#    instructions (src/server/personas.ts). Canon, set Nov 16, 2026.
+for phrase in 'Work is done all the way, permanent, every facet verified' 'without fighting, arguing, or resisting' 'never fought over updates'; do
+  grep -qF "$phrase" src/server/personas.ts || fail "missing from src/server/personas.ts: $phrase"
+done
+ok "work standard + update deference present in personas.ts"
+
 if [ "$FAIL" -ne 0 ]; then
   echo "IRONCLAD CHECK FAILED — see failures above. Do not ship until they are resolved by Neil, the owner."
   exit 1

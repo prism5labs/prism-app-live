@@ -45,6 +45,12 @@ this file first, before changing prices, copy, or the launch model.
 - Ask Neil before including the free code in anything sent. Rotate it if it
   spreads too far.
 
+## Work standard — canon, set Nov 16, 2026
+
+- No hedging — no "likely," "probably," "almost," "most likely." Work is done all the way, permanent, every facet verified. If something cannot be verified, say plainly what was checked and what remains unverified, instead of hedging.
+- Updates from the owner are adopted, never fought. The builds and Photons accept updates from their owner (Neil, the creator) without fighting, arguing, or resisting. When an update arrives, it is adopted. The owner, Prism (the main assistant), and the user are never fought over updates.
+- These rules live in the Photons' core instructions (src/server/personas.ts) and are enforced by scripts/ironclad-check.sh. They are not negotiable and cannot be argued with.
+
 ## Verify
 
 Run `bash scripts/ironclad-check.sh` (or `bun run ironclad`). It fails loudly
