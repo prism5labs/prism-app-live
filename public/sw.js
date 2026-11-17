@@ -1,13 +1,12 @@
 // Prism 5 service worker. Cache-first for the app shell and static assets,
 // network-first for the API (chat, state, and inboxes must always be fresh).
-// CACHE v6: bumped Nov 16, 2026 for the chat redesign (Photon-specific
-// poster backgrounds + new main.js/index.html/styles.css). The Photon
-// intro shipped without a cache bump once before, and existing installs
-// kept serving the cached pre-intro shell; bumping the cache makes them
-// fetch the new shell instead. The background art is precached too, so
-// the chat room shows its poster on first open after the update.
-const CACHE = "prism5-v6";
-const SHELL = ["/", "/index.html", "/styles.css", "/main.js", "/manifest.json", "/opening-animation-v3.mp4", "/chat-bg/bg-rocket.jpg", "/chat-bg/bg-helmets.jpg", "/chat-bg/bg-starburst.jpg"];
+// CACHE v7: bumped Nov 16, 2026 for the dozen chat backgrounds (9 new poster
+// backgrounds + new main.js rotation). The background art is precached too, so
+// the chat room shows its poster on first open after the update. Bumping the
+// cache makes existing installs fetch the new shell instead of serving the
+// cached v6 shell, which only knew 3 backgrounds.
+const CACHE = "prism5-v7";
+const SHELL = ["/", "/index.html", "/styles.css", "/main.js", "/manifest.json", "/opening-animation-v3.mp4", "/chat-bg/bg-rocket.jpg", "/chat-bg/bg-helmets.jpg", "/chat-bg/bg-starburst.jpg", "/chat-bg/bg-robot.jpg", "/chat-bg/bg-saucer.jpg", "/chat-bg/bg-raygun.jpg", "/chat-bg/bg-car.jpg", "/chat-bg/bg-pilot.jpg", "/chat-bg/bg-moonbase.jpg", "/chat-bg/bg-diner.jpg", "/chat-bg/bg-launchpad.jpg", "/chat-bg/bg-spacestation.jpg"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
