@@ -1,13 +1,13 @@
 // Prism 5 service worker. Cache-first for the app shell and static assets,
 // network-first for the API (chat, state, and inboxes must always be fresh).
-// CACHE v12: bumped Nov 17, 2026 for the generic connect button (one
-// "Connect an account" button instead of three named Gmail slots; the
-// chooser offers a Gmail account or Google Calendar & Drive, and the
-// server accepts as many Gmail accounts as you add). New main.js
-// connect logic and new styles.css connect rules. Bumping the cache
-// makes existing installs fetch the new shell instead of serving the
-// cached v11 shell, which still showed the three named slots.
-const CACHE = "prism5-v12";
+// CACHE v13: bumped Nov 17, 2026 for the Photon diversity portraits
+// (eleven of the twelve portraits were replaced with new 1950s
+// pulp-poster portraits showing a genuine range of races and
+// backgrounds; Barnstormer is unchanged). The portraits are fetched
+// on demand and runtime-cached by the fetch handler, so bumping the
+// cache makes existing installs drop the cached v12 portraits and
+// fetch the new ones instead of serving the old all-white set.
+const CACHE = "prism5-v13";
 const SHELL = ["/", "/index.html", "/styles.css", "/main.js", "/manifest.json", "/opening-animation-v3.mp4", "/chat-bg/bg-rocket.jpg", "/chat-bg/bg-helmets.jpg", "/chat-bg/bg-starburst.jpg", "/chat-bg/bg-robot.jpg", "/chat-bg/bg-saucer.jpg", "/chat-bg/bg-raygun.jpg", "/chat-bg/bg-car.jpg", "/chat-bg/bg-pilot.jpg", "/chat-bg/bg-moonbase.jpg", "/chat-bg/bg-diner.jpg", "/chat-bg/bg-launchpad.jpg", "/chat-bg/bg-spacestation.jpg"];
 
 self.addEventListener("install", (event) => {
