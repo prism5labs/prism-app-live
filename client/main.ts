@@ -2343,17 +2343,60 @@ function setupKeyboardDock(): void {
 }
 
 // ---------- Opening splash ----------
-// The v3 opening animation plays once on app open, then fades to the
+// The v3 opening animation plays on every app open, then fades to the
 // chat. The chat renders underneath while it plays, so nothing waits
 // on it, and it never touches settings or the chosen Face — it is only
 // a full-screen overlay that removes itself. Reduced motion skips it
 // entirely (the CSS hides it too, so it never shows even before this
 // runs). Tap skips it early: the owner never has to wait out the
 // full 5.6s.
+//
+// First ever open reads "Welcome"; every open after that reads
+// "Welcome back" — same video either way, the words are an overlay
+// because the video itself is fixed. The coloring around the animation
+// rotates through ten schemes, one per open, cycling in order: the
+// open count lives in localStorage (prism5.splashOpens) and the scheme
+// is SPLASH_SCHEME_IDS[(count - 1) % 10]. The scheme colors live in
+// public/styles.css as [data-scheme] rules on .opening-splash.
+// Order: 1 Diner Classic, 2 Cherry Soda, 3 Midnight Launch,
+// 4 Jukebox Mint, 5 Atomic Sunset, 6 Bubblegum Chrome,
+// 7 Drive-In Aqua, 8 Golden Rocket, 9 Starlight Lilac,
+// 10 Checkered Flag.
+const SPLASH_SCHEME_IDS = [
+  "diner-classic",
+  "cherry-soda",
+  "midnight-launch",
+  "jukebox-mint",
+  "atomic-sunset",
+  "bubblegum-chrome",
+  "drive-in-aqua",
+  "golden-rocket",
+  "starlight-lilac",
+  "checkered-flag",
+] as const;
+const SPLASH_OPENS_KEY = "prism5.splashOpens";
 function playOpeningSplash(): void {
   const splash = document.getElementById("opening-splash");
   const video = document.getElementById("opening-splash-video") as HTMLVideoElement | null;
+  const greeting = document.getElementById("opening-splash-greeting");
   if (!splash || !video) return;
+  // Count this open, then pick the greeting and the scheme from it.
+  // If storage is unavailable (private mode), fall back to open 1.
+  let opens = 0;
+  try {
+    opens = Number(localStorage.getItem(SPLASH_OPENS_KEY) || "0") || 0;
+  } catch {
+    opens = 0;
+  }
+  opens += 1;
+  try {
+    localStorage.setItem(SPLASH_OPENS_KEY, String(opens));
+  } catch {
+    // Storage unavailable: the splash still plays, just as open 1.
+  }
+  const isFirst = opens === 1;
+  splash.setAttribute("data-scheme", SPLASH_SCHEME_IDS[(opens - 1) % SPLASH_SCHEME_IDS.length]);
+  if (greeting) greeting.textContent = isFirst ? "Welcome" : "Welcome back";
   const dismiss = () => {
     if (!splash.isConnected) return;
     splash.classList.add("is-fading");

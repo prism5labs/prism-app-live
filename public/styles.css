@@ -349,28 +349,95 @@ body.look-night-watch, .thread.look-night-watch, .photon-card.look-night-watch {
     transition: bottom 0.28s cubic-bezier(0.2, 0.8, 0.2, 1), background-color 0.9s ease, color 0.9s ease, border-color 0.9s ease;
   }
 }
-/* Opening splash: the v3 animation plays once on app open, then fades
+/* Opening splash: the v3 animation plays on every app open, then fades
    to the chat. It never touches settings or the chosen Face — it is a
    full-screen overlay above the app, and the chat loads underneath
    while it plays. The video itself fades in from black and out to
-   black, so the overlay is black too and the handoff is seamless.
-   Reduced motion skips it entirely (see the rule below and the
-   matchMedia check in client/main.ts). */
+   black; the overlay background is the active color scheme, so the
+   handoff stays seamless. First ever open reads "Welcome", every open
+   after that reads "Welcome back" — same video either way, the words
+   are an overlay (client/main.ts sets them). Reduced motion skips it
+   entirely (see the rule below and the matchMedia check in
+   client/main.ts). */
 .opening-splash {
   position: fixed;
   inset: 0;
   z-index: 100;
-  background: #000;
+  background: var(--splash-bg, #000);
   display: flex;
   align-items: center;
   justify-content: center;
   transition: opacity 0.75s ease;
 }
+/* Ten splash color schemes, one per open, cycling in order
+   (client/main.ts picks the scheme from the open count). All start
+   from the diner palette and stay in the same atomic/diner spirit: a
+   deep background, a light readable ink, and two bright accents.
+   1 Diner Classic — the canonical palette. 2 Cherry Soda. 3 Midnight
+   Launch. 4 Jukebox Mint. 5 Atomic Sunset. 6 Bubblegum Chrome.
+   7 Drive-In Aqua. 8 Golden Rocket. 9 Starlight Lilac.
+   10 Checkered Flag. */
+.opening-splash[data-scheme="diner-classic"] { --splash-bg: #0f5257; --splash-ink: #fff3dc; --splash-accent: #d62828; --splash-accent2: #f4c95d; }
+.opening-splash[data-scheme="cherry-soda"] { --splash-bg: #64101f; --splash-ink: #fff3dc; --splash-accent: #f4c95d; --splash-accent2: #2a9d8f; }
+.opening-splash[data-scheme="midnight-launch"] { --splash-bg: #0e1e3e; --splash-ink: #e8f1ff; --splash-accent: #f4c95d; --splash-accent2: #d62828; }
+.opening-splash[data-scheme="jukebox-mint"] { --splash-bg: #0b3d2e; --splash-ink: #effdf5; --splash-accent: #f4c95d; --splash-accent2: #ff6b5e; }
+.opening-splash[data-scheme="atomic-sunset"] { --splash-bg: #431407; --splash-ink: #fff3dc; --splash-accent: #fb923c; --splash-accent2: #d62828; }
+.opening-splash[data-scheme="bubblegum-chrome"] { --splash-bg: #3b0a2e; --splash-ink: #ffe9f6; --splash-accent: #ff8fb1; --splash-accent2: #f4c95d; }
+.opening-splash[data-scheme="drive-in-aqua"] { --splash-bg: #07332f; --splash-ink: #e6fff9; --splash-accent: #2dd4bf; --splash-accent2: #f4c95d; }
+.opening-splash[data-scheme="golden-rocket"] { --splash-bg: #4a2c00; --splash-ink: #fff3dc; --splash-accent: #ffb703; --splash-accent2: #0f5257; }
+.opening-splash[data-scheme="starlight-lilac"] { --splash-bg: #221645; --splash-ink: #f0e9ff; --splash-accent: #c4b5fd; --splash-accent2: #f4c95d; }
+.opening-splash[data-scheme="checkered-flag"] { --splash-bg: #1c1c1e; --splash-ink: #fff3dc; --splash-accent: #d62828; --splash-accent2: #f4c95d; }
 .opening-splash-video {
   width: 100%;
   height: 100%;
   object-fit: cover;
   display: block;
+}
+/* Welcome / welcome back caption: an overlay at the bottom of the
+   splash, in the active scheme's colors. It fades in just after the
+   video starts so it never fights the fade from black, and rides the
+   splash's own fade out. Text-shadow keeps it readable over the art. */
+.opening-splash-caption {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: max(9vh, 64px);
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  pointer-events: none;
+  animation: splash-caption-in 0.9s ease 0.7s both;
+}
+.opening-splash-eyebrow {
+  font-family: Nunito, sans-serif;
+  font-weight: 800;
+  font-size: 0.8rem;
+  letter-spacing: 0.35em;
+  text-transform: uppercase;
+  color: var(--splash-accent2, #f4c95d);
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.6);
+}
+.opening-splash-greeting {
+  font-family: "Patua One", serif;
+  font-size: clamp(2rem, 9vw, 3.2rem);
+  line-height: 1.05;
+  color: var(--splash-ink, #fff3dc);
+  text-shadow: 0 2px 18px rgba(0, 0, 0, 0.65);
+}
+.opening-splash-greeting::after {
+  content: "";
+  display: block;
+  width: 64px;
+  height: 4px;
+  margin: 10px auto 0;
+  border-radius: 2px;
+  background: var(--splash-accent, #d62828);
+}
+@keyframes splash-caption-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
 }
 .opening-splash.is-fading { opacity: 0; pointer-events: none; }
 @media (prefers-reduced-motion: reduce) {
