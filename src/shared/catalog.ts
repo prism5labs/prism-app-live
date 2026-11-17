@@ -137,6 +137,23 @@ export const PRODUCTS: CatalogProduct[] = [
     }
   },
   {
+    "slug": "start-my-day",
+    "name": "Start My Day",
+    "kind": "Plug",
+    "category": "Everyday Life",
+    "description": "a morning briefing that walks your day top to bottom, one item at a time. Confirm each item and it gets done, moved, or cleared, and anything you add during the day joins the plan.",
+    "personal": {
+      "price": "$39.00",
+      "total": "$40.17",
+      "url": "https://buy.stripe.com/7sYaEW9oYaeA1sy3jUfQI1a"
+    },
+    "business": {
+      "price": "$59.00",
+      "total": "$60.77",
+      "url": "https://buy.stripe.com/fZu3cu0Ss5Yk4EKcUufQI1b"
+    }
+  },
+  {
     "slug": "inbox-sorting-drafts",
     "name": "Inbox Sorting Drafts",
     "kind": "Plug",

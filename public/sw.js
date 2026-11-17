@@ -1,12 +1,11 @@
 // Prism 5 service worker. Cache-first for the app shell and static assets,
 // network-first for the API (chat, state, and inboxes must always be fresh).
-// CACHE v16: bumped Nov 17, 2026 for the Inboxes Messages fix (the
-// "texts and calls aren't connected yet, add your Twilio number in the
-// server settings" card is gone — the Messages section is not shown at
-// all until a number is actually connected) on top of the v15 home-hero
-// fix (Sputnik alone, no Prism portrait). The cache bump makes existing
-// installs fetch the new main.js instead of serving the cached one.
-const CACHE = "prism5-v16";
+// CACHE v17: bumped Nov 17, 2026 for the Start My Day Stripe links
+// (its two payment links are live and verified, so the catalog now
+// carries it as a real product with Buy buttons and the coming-soon card
+// is gone) on top of the v16 Inboxes Messages fix. The cache bump makes
+// existing installs fetch the new main.js instead of serving the cached one.
+const CACHE = "prism5-v17";
 const SHELL = ["/", "/index.html", "/styles.css", "/main.js", "/manifest.json", "/opening-animation-v3.mp4", "/chat-bg/bg-rocket.jpg", "/chat-bg/bg-helmets.jpg", "/chat-bg/bg-starburst.jpg", "/chat-bg/bg-robot.jpg", "/chat-bg/bg-saucer.jpg", "/chat-bg/bg-raygun.jpg", "/chat-bg/bg-car.jpg", "/chat-bg/bg-pilot.jpg", "/chat-bg/bg-moonbase.jpg", "/chat-bg/bg-diner.jpg", "/chat-bg/bg-launchpad.jpg", "/chat-bg/bg-spacestation.jpg"];
 
 self.addEventListener("install", (event) => {

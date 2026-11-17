@@ -70,15 +70,14 @@ for (let ci = 0; ci < categories.length; ci++) {
     }
   }
 }
-if (named.length !== 46) throw new Error(`expected 46 named links, got ${named.length}`);
+if (named.length !== 48) throw new Error(`expected 48 named links, got ${named.length}`);
 
 // --- Product descriptions from the product files ---
 const SLUGS: Record<string, string> = {
   "Morning Briefing": "morning-briefing",
-  // Start My Day: product file exists, md rows #11-12 exist with prices,
-  // but its two Stripe payment links are PENDING (see the md note). The
-  // generator picks it up the moment the live URLs are pasted in and the
-  // counts below go 46 -> 48 named links and 23 -> 24 products.
+  // Start My Day: live since Nov 17, 2026 — its two Stripe payment links
+  // (rows #11-12) are in place, so the generator picks it up as a real
+  // product with Buy buttons. Counts are 48 named links, 24 products.
   "Start My Day": "start-my-day",
   "Bill Reminder List": "bill-reminder-list",
   "Weekly Planner Check": "weekly-planner-check",
@@ -159,7 +158,7 @@ for (const row of named) {
   else prod.business = v;
 }
 const products = [...byKey.values()];
-if (products.length !== 23) throw new Error(`expected 23 products, got ${products.length}`);
+if (products.length !== 24) throw new Error(`expected 24 products, got ${products.length}`);
 for (const p of products) {
   if (!p.personal.url || !p.business.url) throw new Error("missing variant for " + p.name);
 }
@@ -247,7 +246,7 @@ export const ALL_CHECKOUT_URLS: string[] = [
 
 writeFileSync(OUT, out);
 console.log(`wrote ${OUT}`);
-console.log(`products: ${products.length}, named links: ${named.length}, total checkout URLs: ${9 + 46}`);
+console.log(`products: ${products.length}, named links: ${named.length}, total checkout URLs: ${9 + 48}`);
 console.log(`supernova ${supernova.url} total ${supernova.total}`);
 console.log(`satellite ${satellite.url} total ${satellite.total}`);
 console.log(`upkeep ${upkeep.url} total ${upkeep.total}`);
