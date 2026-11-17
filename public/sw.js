@@ -1,11 +1,13 @@
 // Prism 5 service worker. Cache-first for the app shell and static assets,
 // network-first for the API (chat, state, and inboxes must always be fresh).
-// CACHE v17: bumped Nov 17, 2026 for the Start My Day Stripe links
-// (its two payment links are live and verified, so the catalog now
-// carries it as a real product with Buy buttons and the coming-soon card
-// is gone) on top of the v16 Inboxes Messages fix. The cache bump makes
-// existing installs fetch the new main.js instead of serving the cached one.
-const CACHE = "prism5-v17";
+// CACHE v18: bumped Nov 17, 2026 for the Sputnik hero image fix (the
+// source sputnik.jpg had a 20px white strip down its right edge — and
+// 21px on the left — so the hero showed a white sliver; the image is
+// cropped to the emblem, 659px wide, no white edge) on top of the v17
+// Start My Day Stripe links. The cache bump makes existing installs
+// fetch the new main.js and the new sputnik.jpg instead of serving the
+// cached ones.
+const CACHE = "prism5-v18";
 const SHELL = ["/", "/index.html", "/styles.css", "/main.js", "/manifest.json", "/opening-animation-v3.mp4", "/chat-bg/bg-rocket.jpg", "/chat-bg/bg-helmets.jpg", "/chat-bg/bg-starburst.jpg", "/chat-bg/bg-robot.jpg", "/chat-bg/bg-saucer.jpg", "/chat-bg/bg-raygun.jpg", "/chat-bg/bg-car.jpg", "/chat-bg/bg-pilot.jpg", "/chat-bg/bg-moonbase.jpg", "/chat-bg/bg-diner.jpg", "/chat-bg/bg-launchpad.jpg", "/chat-bg/bg-spacestation.jpg"];
 
 self.addEventListener("install", (event) => {
