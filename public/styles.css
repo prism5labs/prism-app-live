@@ -1077,3 +1077,80 @@ html.kb-chat body.is-thread .composer-dock #research-results { display: none; }
 
 /* Stripe webhook status line in the Store. */
 .stripe-line { margin: 0 0 4px; }
+
+/* ---------- Character cards: pop-up "more info" for every product ---------- */
+/* Tap a Photon portrait (or More info on a Spark, a Plug, a tier, or the
+   Personality Builder) and the card opens over the Store. Dismiss it with
+   the X, the Close button, a tap on the backdrop, or the Escape key. */
+.card-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgba(46, 38, 32, 0.55);
+  padding: 16px 16px calc(16px + env(safe-area-inset-bottom));
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+.card-modal.open { opacity: 1; }
+.card-modal[hidden] { display: none; }
+.card-sheet {
+  position: relative;
+  background: var(--card);
+  color: var(--ink);
+  border: 1px solid var(--card-line);
+  border-radius: var(--phone-radius-sm);
+  box-shadow: 0 18px 48px rgba(46, 38, 32, 0.35);
+  width: 100%;
+  max-width: 520px;
+  max-height: calc(100dvh - 48px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  overflow-y: auto;
+  padding: 18px;
+  transform: translateY(12px);
+  transition: transform 0.2s ease;
+}
+.card-modal.open .card-sheet { transform: none; }
+.card-x {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1.5px solid var(--line);
+  background: var(--card);
+  color: var(--ink);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  flex: none;
+}
+.card-hero { text-align: center; margin-bottom: 8px; }
+.card-hero .portrait { border-radius: 20px; }
+.card-poster { width: 100%; max-width: 320px; border-radius: 12px; display: block; margin: 0 auto; }
+.card-title { font-family: "Patua One", Georgia, serif; font-size: 1.5rem; color: var(--ink); margin: 4px 0 2px; text-align: center; }
+.card-kind { text-align: center; font-size: 12px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; color: var(--ink-soft); margin: 0 0 10px; }
+.card-tagline { font-size: 15px; }
+.card-intro { font-style: italic; color: var(--ink-soft); }
+.card-stats { margin: 12px 0; }
+.card-stats div { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-top: 1px solid var(--line); font-size: 14px; }
+.card-stats div:first-child { border-top: none; }
+.card-stats dt { font-weight: 800; color: var(--ink); flex: none; }
+.card-stats dd { margin: 0; text-align: right; color: var(--ink-soft); }
+.card-actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin: 14px 0 10px; }
+.card-close-btn { width: 100%; }
+
+/* The portrait is the tap target on a Photon store card: a button with no
+   chrome of its own, so the portrait looks exactly as it did. */
+.portrait-btn { display: block; width: 100%; padding: 0; border: 0; background: none; cursor: pointer; font: inherit; text-align: inherit; }
+.portrait-btn:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+/* The poster is the tap target on a tier row and the Upkeep card. */
+.poster-btn { display: block; padding: 0; border: 0; background: none; cursor: pointer; flex: none; }
+.poster-btn img { display: block; }
+.poster-btn:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .card-modal, .card-sheet { transition: none; }
+}

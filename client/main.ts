@@ -4,7 +4,7 @@
 import { api, getAccountId } from "./api";
 import { portraitHtml } from "./ui";
 import { SUPERNOVA, SATELLITE, UPKEEP, PRODUCTS, CATEGORIES } from "../src/shared/catalog";
-import { TIER_COPY, UPKEEP_COPY } from "../src/shared/tiers";
+import { TIER_COPY, UPKEEP_COPY, FREE_CHATS_COPY } from "../src/shared/tiers";
 import { PHOTONS } from "../src/shared/photons";
 import { VOICES, TUNING_QUESTIONS, LOOK_SETS, voiceById, lookSetById, tuningStyle } from "../src/shared/voices";
 
@@ -118,6 +118,206 @@ function toast(msg: string, kind: "ok" | "err" = "ok") {
     t.className = "toast";
   }, 4500);
 }
+
+// ---------- Character cards ----------
+// A pop-up card for every product in the Store: tap a Photon portrait (or
+// the More info button on a Spark, a Plug, a tier, or the Personality
+// Builder) and the card opens with the stats and specifics, Amazon-style.
+// The card lives in a persistent node outside #view, so a Store re-render
+// behind it never wipes it, and it is opened and closed by direct DOM
+// work, never through render(). Everything shown comes from the app's own
+// product data — nothing is invented. Dismissal: the X, the Close button,
+// a tap on the backdrop, or the Escape key.
+let cardOpener: HTMLElement | null = null;
+
+function cardModal(): HTMLElement {
+  return document.getElementById("card-modal") as HTMLElement;
+}
+
+function openCard(html: string, opener: HTMLElement | null) {
+  const m = cardModal();
+  cardOpener = opener;
+  m.innerHTML = html;
+  m.hidden = false;
+  // The card pops in; the backdrop locks the page behind it.
+  requestAnimationFrame(() => m.classList.add("open"));
+  document.body.style.overflow = "hidden";
+  const x = m.querySelector<HTMLButtonElement>("[data-action='card-close']");
+  if (x) x.focus();
+}
+
+function closeCard() {
+  const m = cardModal();
+  if (m.hidden) return;
+  m.classList.remove("open");
+  m.hidden = true;
+  m.innerHTML = "";
+  document.body.style.overflow = "";
+  if (cardOpener && document.contains(cardOpener)) cardOpener.focus();
+  cardOpener = null;
+}
+
+function cardShell(title: string, bodyHtml: string): string {
+  return `<div class="card-sheet" role="dialog" aria-modal="true" aria-label="${esc(title)}">
+    <button class="card-x" data-action="card-close" aria-label="Close">✕</button>
+    ${bodyHtml}
+    <button class="btn card-close-btn" data-action="card-close">Close</button>
+  </div>`;
+}
+
+function cardStats(rows: [string, string][]): string {
+  return `<dl class="card-stats">${rows
+    .map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`)
+    .join("")}</dl>`;
+}
+
+function photonCardHtml(p: (typeof PHOTONS)[number]): string {
+  const owned = state?.freeCode === true || (state?.ownedPhotons || []).includes(p.name);
+  const face = faceNameOf(p);
+  const body = `
+    <div class="card-hero">${portraitHtml(portraitNameOf(p), 140)}</div>
+    <h2 class="card-title">${esc(face)}</h2>
+    <p class="card-kind">Photon · Supernova · ${esc(p.pronoun)}</p>
+    <p class="card-tagline">${esc(p.tagline)}</p>
+    <p><b>What ${esc(face)} does out of the box:</b> ${esc(p.focus)}</p>
+    <p class="card-intro">“${esc(p.intro.replaceAll("{name}", face))}”</p>
+    ${cardStats([
+      ["Price", "$499.00 ($514.00 at checkout)"],
+      ["Or monthly", "$49/mo · $39/mo on a 2-year plan · $539/yr"],
+      ["Built from", "About 90,000 lines of instructions"],
+      ["Inside", "30 specialists, plus five tuning dials set to what matters to you"],
+      ["Build time", "About 300 hours, about 37 working days"],
+      ["Chats", "300 chats a month, free forever — no subscription needed"],
+    ])}
+    <p class="fine">A Supernova is unlimited in usefulness: each Photon has a focus out of the box but does far more, and becomes you through use.</p>
+    <div class="card-actions">
+      ${owned ? `<span class="owned-badge">Owned — yours already</span><button class="btn primary" data-action="card-chat" data-photon="${esc(p.name)}">Start chatting</button>` : buyButton(buyUrl(SUPERNOVA.url, "Photon-" + p.name), "$514.00", false)}
+    </div>`;
+  return cardShell(face, body);
+}
+
+function productCardHtml(p: (typeof PRODUCTS)[number]): string {
+  const v = storeVariant === "personal" ? p.personal : p.business;
+  const other = storeVariant === "personal" ? p.business : p.personal;
+  const owned = state?.freeCode === true || (state?.ownedProducts || []).includes(p.slug);
+  const isSpark = p.kind === "Spark";
+  const body = `
+    <h2 class="card-title">${esc(p.name)}</h2>
+    <p class="card-kind">${esc(p.kind)} · ${esc(p.category)}</p>
+    <p class="card-tagline">${esc(p.description)}</p>
+    <p><b>How it works:</b> ${isSpark ? "One button, one job. You press it, it does that one job, and you can press it again as often as you like. It never runs out and it never dies." : "One job, fully automated. You do not press anything — it runs on its own, in the background, and does its job without being asked."}</p>
+    ${cardStats([
+      ["Kind", isSpark ? "Spark — one button, one job" : "Plug — runs on its own"],
+      ["Category", p.category],
+      ["Built from", isSpark ? "About 7,500 lines of instructions" : "About 15,000 lines of instructions"],
+      ["Build time", isSpark ? "About 25 hours, about 3 working days" : "About 50 hours, about 6 working days"],
+      ["Personal", `${v.price} (${v.total} at checkout)`],
+      ["Business", `${other.price} (${other.total} at checkout)`],
+    ])}
+    <p class="fine">Yours forever once bought — nothing is deleted and nothing is chased if you stop paying for anything monthly.</p>
+    <div class="card-actions">
+      ${buyButton(buyUrl(v.url, p.slug + "-" + storeVariant), v.total, owned)}
+    </div>`;
+  return cardShell(p.name, body);
+}
+
+function tierCardHtml(tier: "supernova" | "satellite" | "upkeep"): string {
+  if (tier === "supernova") {
+    const owned = state?.freeCode === true || (state?.ownedProducts || []).includes("supernova");
+    return cardShell(
+      "Supernova",
+      `<div class="card-hero"><img class="card-poster" src="/brand/poster-supernova.jpg" alt="Supernova poster, the whole front office"></div>
+      <h2 class="card-title">Supernova</h2>
+      <p class="card-kind">The full helper · one Brain, one Face, every job duty</p>
+      <p>${esc(TIER_COPY.supernova.body)}</p>
+      ${cardStats([
+        ["Price", "$499.00 ($514.00 at checkout)"],
+        ["Or monthly", "$49/mo · $39/mo on a 2-year plan · $539/yr"],
+        ["Built from", "About 90,000 lines of instructions"],
+        ["Inside", "30 specialists, plus five tuning dials"],
+        ["Build time", "About 300 hours, about 37 working days"],
+        ["Chats", "300 chats a month, free forever — no subscription needed"],
+      ])}
+      <p class="fine">The whole front office in one: messages, calendar, paperwork, and anything else that comes up — and it learns how you like things done.</p>
+      <div class="card-actions">${buyButton(buyUrl(SUPERNOVA.url, "supernova"), "$514.00", owned)}</div>`,
+    );
+  }
+  if (tier === "satellite") {
+    const owned = state?.freeCode === true || (state?.ownedProducts || []).includes("satellite");
+    return cardShell(
+      "Satellite",
+      `<div class="card-hero"><img class="card-poster" src="/brand/poster-satellite.jpg" alt="Satellite poster, one Brain, one Face, one job duty"></div>
+      <h2 class="card-title">Satellite</h2>
+      <p class="card-kind">The smaller build · one Brain, one Face, one job duty</p>
+      <p>${esc(TIER_COPY.satellite.body)}</p>
+      ${cardStats([
+        ["Price", "$99.00 ($101.97 at checkout)"],
+        ["Or monthly", "$33/mo · $26/mo on a 2-year plan · $363/yr"],
+        ["Built from", "About 45,000 lines of instructions"],
+        ["Build time", "About 150 hours, about 19 working days"],
+        ["Chats", "300 chats a month, free forever — no subscription needed"],
+      ])}
+      <div class="card-actions">${buyButton(buyUrl(SATELLITE.url, "satellite"), "$101.97", owned)}</div>`,
+    );
+  }
+  const owned = state?.upkeep === true;
+  return cardShell(
+    "Upkeep",
+    `<div class="card-hero"><img class="card-poster" src="/brand/starburst.jpg" alt="Upkeep starburst"></div>
+    <h2 class="card-title">Upkeep</h2>
+    <p class="card-kind">The care that keeps your Launch alive · $29.00/month</p>
+    <p>${esc(UPKEEP_COPY.body)}</p>
+    ${cardStats([
+      ["Price", "$29.00/month ($29.87 at checkout)"],
+      ["Includes", UPKEEP_COPY.included.join(" · ")],
+      ["Required?", "Never — every purchase already includes 300 chats a month, free forever"],
+    ])}
+    <div class="card-actions">${buyButton(buyUrl(UPKEEP.url, "upkeep"), "$29.87", owned)}</div>`,
+  );
+}
+
+function personalityCardHtml(): string {
+  return cardShell(
+    "Personality Builder",
+    `<h2 class="card-title">Personality Builder</h2>
+    <p class="card-kind">Spark · one button, one job</p>
+    <p class="card-tagline">The extra attribute that builds a personality for your interface — for a Spark or Plug that doesn't come with one.</p>
+    ${cardStats([
+      ["Kind", "Spark — one button, one job"],
+      ["Price", "$19–$25"],
+      ["Built from", "About 7,500 lines of instructions"],
+      ["Build time", "About 25 hours, about 3 working days"],
+    ])}`,
+  );
+}
+
+function openPhotonCard(name: string, opener: HTMLElement | null) {
+  const p = PHOTONS.find((x) => x.name === name);
+  if (p) openCard(photonCardHtml(p), opener);
+}
+
+function openProductCard(slug: string, opener: HTMLElement | null) {
+  if (slug === "personality-builder") {
+    openCard(personalityCardHtml(), opener);
+    return;
+  }
+  const p = PRODUCTS.find((x) => x.slug === slug);
+  if (p) openCard(productCardHtml(p), opener);
+}
+
+function openTierCard(tier: "supernova" | "satellite" | "upkeep", opener: HTMLElement | null) {
+  openCard(tierCardHtml(tier), opener);
+}
+
+// Dismissal: a tap on the backdrop itself (not on the sheet), and the
+// Escape key. The X and Close buttons go through the click handler.
+document.addEventListener("click", (e) => {
+  const m = cardModal();
+  if (!m.hidden && e.target === m) closeCard();
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") closeCard();
+});
 
 // ---------- Inboxes extras: Messages, Contacts, Calendar, Drive ----------
 // Draft-first state: nothing sends, books, or cancels until the owner
@@ -1277,7 +1477,10 @@ function productCard(p: (typeof PRODUCTS)[number]): string {
     <p class="kind">${esc(p.kind)}</p>
     <p>${esc(p.description)}</p>
     <p class="price">${esc(v.price)} <span class="fine">(${esc(v.total)} at checkout)</span></p>
-    ${buyButton(buyUrl(v.url, p.slug + "-" + storeVariant), v.total, owned)}
+    <div class="row card-row">
+      ${buyButton(buyUrl(v.url, p.slug + "-" + storeVariant), v.total, owned)}
+      <button class="btn small more-info" data-action="product-info" data-slug="${esc(p.slug)}">More info</button>
+    </div>
   </div>`;
 }
 
@@ -1301,7 +1504,7 @@ function renderStore(): string {
   const photonCards = PHOTONS.map((p) => {
     const owned = allOwned || ownedPhotons.includes(p.name);
     return `<div class="card product-card photon-store">
-      ${portraitHtml(p.name, 220)}
+      <button class="portrait-btn" data-action="photon-info" data-photon="${esc(p.name)}" aria-label="More about ${esc(p.name)}">${portraitHtml(p.name, 220)}</button>
       <h3 class="photon-name">${esc(p.name)}</h3>
       <p>${esc(p.tagline)}</p>
       <p class="fine">${esc(p.focus)} And so much more.</p>
@@ -1344,13 +1547,13 @@ function renderStore(): string {
     </div>
 
     <h2 class="section-title">Launches</h2>
-    <div class="poster-row" id="store-supernova"><img src="/brand/poster-supernova.jpg" alt="Supernova poster, the whole front office"><div class="pr-txt"><b>Supernova</b><span class="desc">${esc(TIER_COPY.supernova.body)}</span><span class="desc">${esc(TIER_COPY.supernova.hours)}</span><span class="price">$499.00</span><span class="at">$514.00 at checkout</span>${buyButton(buyUrl(SUPERNOVA.url, "supernova"), "$514.00", allOwned || ownedProducts.includes("supernova"))}<p class="fine">Or pay monthly:</p><div class="row monthly-row">
+    <div class="poster-row" id="store-supernova"><button class="poster-btn" data-action="tier-info" data-tier="supernova" aria-label="More about Supernova"><img src="/brand/poster-supernova.jpg" alt="Supernova poster, the whole front office"></button><div class="pr-txt"><b>Supernova</b><span class="desc">${esc(TIER_COPY.supernova.body)}</span><span class="desc">${esc(TIER_COPY.supernova.hours)}</span><span class="price">$499.00</span><span class="at">$514.00 at checkout</span>${buyButton(buyUrl(SUPERNOVA.url, "supernova"), "$514.00", allOwned || ownedProducts.includes("supernova"))}<p class="fine">Or pay monthly:</p><div class="row monthly-row">
         <a class="btn small" href="${esc(buyUrl(SUPERNOVA.monthly.url, "supernova-monthly"))}" target="_blank" rel="noopener">$49/mo</a>
         <a class="btn small" href="${esc(buyUrl(SUPERNOVA.twoYear.url, "supernova-two-year"))}" target="_blank" rel="noopener">$39/mo · 2-year</a>
         <a class="btn small" href="${esc(buyUrl(SUPERNOVA.annual.url, "supernova-annual"))}" target="_blank" rel="noopener">$539/yr</a>
       </div></div></div>
 
-    <div class="poster-row" id="store-satellite"><img src="/brand/poster-satellite.jpg" alt="Satellite poster, one Brain, one Face, one job duty"><div class="pr-txt"><b>Satellite</b><span class="desc">${esc(TIER_COPY.satellite.body)}</span><span class="desc">${esc(TIER_COPY.satellite.hours)}</span><span class="price">$99.00</span><span class="at">$101.97 at checkout</span>${buyButton(buyUrl(SATELLITE.url, "satellite"), "$101.97", allOwned || ownedProducts.includes("satellite"))}<p class="fine">Or pay monthly:</p><div class="row monthly-row">
+    <div class="poster-row" id="store-satellite"><button class="poster-btn" data-action="tier-info" data-tier="satellite" aria-label="More about Satellite"><img src="/brand/poster-satellite.jpg" alt="Satellite poster, one Brain, one Face, one job duty"></button><div class="pr-txt"><b>Satellite</b><span class="desc">${esc(TIER_COPY.satellite.body)}</span><span class="desc">${esc(TIER_COPY.satellite.hours)}</span><span class="price">$99.00</span><span class="at">$101.97 at checkout</span>${buyButton(buyUrl(SATELLITE.url, "satellite"), "$101.97", allOwned || ownedProducts.includes("satellite"))}<p class="fine">Or pay monthly:</p><div class="row monthly-row">
         <a class="btn small" href="${esc(buyUrl(SATELLITE.monthly.url, "satellite-monthly"))}" target="_blank" rel="noopener">$33/mo</a>
         <a class="btn small" href="${esc(buyUrl(SATELLITE.twoYear.url, "satellite-two-year"))}" target="_blank" rel="noopener">$26/mo · 2-year</a>
         <a class="btn small" href="${esc(buyUrl(SATELLITE.annual.url, "satellite-annual"))}" target="_blank" rel="noopener">$363/yr</a>
@@ -1362,7 +1565,7 @@ function renderStore(): string {
       <div class="product-grid">${photonCards}</div>
     </details>
 
-    <div class="card upkeep-card" id="store-upkeep"><img src="/brand/starburst.jpg" alt=""><div><h2>Upkeep</h2><p>${esc(UPKEEP_COPY.body)}</p><p class="price">$29.00/month <span class="fine">($29.87 at checkout)</span></p><div class="row">${buyButton(buyUrl(UPKEEP.url, "upkeep"), "$29.87", state?.upkeep === true)}</div></div></div>
+    <div class="card upkeep-card" id="store-upkeep"><button class="poster-btn upkeep-poster-btn" data-action="tier-info" data-tier="upkeep" aria-label="More about Upkeep"><img src="/brand/starburst.jpg" alt=""></button><div><h2>Upkeep</h2><p>${esc(UPKEEP_COPY.body)}</p><p class="price">$29.00/month <span class="fine">($29.87 at checkout)</span></p><div class="row">${buyButton(buyUrl(UPKEEP.url, "upkeep"), "$29.87", state?.upkeep === true)}<button class="btn small more-info" data-action="tier-info" data-tier="upkeep">More info</button></div></div></div>
 
     <h2 class="section-title" id="store-sparks-plugs">Sparks &amp; Plugs</h2>
     <p class="page-lede">One job each. A Spark is a single button for one job, push it and it does the thing. A Plug is a Spark that runs on its own.</p>
@@ -1373,7 +1576,7 @@ function renderStore(): string {
     <details class="store-group" id="store-sparks" ${storeOpen.sparks ? "open" : ""}>
       <summary><span class="summary-title">Sparks</span><span class="fine">${sparkCount} · one button, one job · tap to browse</span></summary>
       <p class="page-lede">${esc(TIER_COPY.spark.body)} ${esc(TIER_COPY.spark.hours)}</p>
-      <div class="addon-row featured"><div><b>Personality Builder</b><span>Spark · one button, one job</span><span class="pb-desc">The extra attribute that builds a personality for your interface — for a Spark or Plug that doesn't come with one.</span></div><div class="price">$19–$25</div></div>
+      <div class="addon-row featured"><div><b>Personality Builder</b><span>Spark · one button, one job</span><span class="pb-desc">The extra attribute that builds a personality for your interface — for a Spark or Plug that doesn't come with one.</span></div><div class="price">$19–$25</div><button class="btn small more-info" data-action="product-info" data-slug="personality-builder">More info</button></div>
       ${kindGroups("Spark")}
     </details>
     <details class="store-group" id="store-plugs" ${storeOpen.plugs ? "open" : ""}>
@@ -1885,6 +2088,21 @@ document.addEventListener("click", async (e) => {
     }
   } else if (action === "open-photon") {
     const name = t.dataset.photon || "";
+    if (name) openPhoton(name);
+  } else if (action === "photon-info") {
+    // A Photon portrait in the Store: the character card, not the chat.
+    // The Chat front keeps its own tap-to-open-thread behavior.
+    openPhotonCard(t.dataset.photon || "", t);
+  } else if (action === "product-info") {
+    openProductCard(t.dataset.slug || "", t);
+  } else if (action === "tier-info") {
+    openTierCard((t.dataset.tier as "supernova" | "satellite" | "upkeep") || "supernova", t);
+  } else if (action === "card-close") {
+    closeCard();
+  } else if (action === "card-chat") {
+    // Owned Photon: close the card and open the thread.
+    const name = t.dataset.photon || "";
+    closeCard();
     if (name) openPhoton(name);
   } else if (action === "back-to-front") {
     activePhoton = null;
