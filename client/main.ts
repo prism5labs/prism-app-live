@@ -849,7 +849,6 @@ function renderChatFront(): string {
   <section class="front">
     <div class="sputnik-hero">
       <img class="sp-img" src="/brand/sputnik.jpg" alt="Sputnik emblem — gold crystal and orbit rings on deep teal, PRISM 5 LABS in gold">
-      <span class="round-portrait-wrap">${portraitHtml("Prism", 104)}</span>
     </div>
     <div class="front-body">
       <h3 class="greeting">Howdy, <span class="greeting-accent">neighbor!</span></h3>
