@@ -3,12 +3,18 @@ services:
     name: prism-app-live
     runtime: docker
     dockerfilePath: ./Dockerfile
-    plan: free
+    plan: starter
     domains:
       - app.prism5labs.com
+    disks:
+      - name: prism-app-data
+        mountPath: /data
+        sizeGB: 1
     envVars:
       - key: NODE_ENV
         value: production
+      - key: DATA_DIR
+        value: /data
       # ANTHROPIC_API_KEY: set in the Render dashboard (never in this file).
       # Enables live chat replies. Without it the app serves the shell and
       # chat history, and new replies answer "brain not connected".
