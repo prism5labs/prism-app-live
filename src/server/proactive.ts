@@ -460,15 +460,25 @@ async function sendPushToSubscription(
 // Send a push to every subscribed device for one account. Only ever called
 // with the owner's own devices, and only to surface what a check found.
 // Returns counts; a dead subscription (410/404) is removed.
+// The face that goes with a Prism push: Prism's own portrait, same-origin
+// so the phone can fetch it. Absolute when APP_URL is set, else the
+// root-relative path (the service worker resolves it against the origin).
+const PRISM_PUSH_IMAGE_PATH = "/photons/Prism.png";
+function pushImageUrl(path: string): string {
+  const base = (config.appUrl || "").replace(/\/$/, "");
+  return base ? `${base}${path}` : path;
+}
+
 export async function sendPush(
   accountId: string,
   title: string,
   body: string,
+  image?: string,
 ): Promise<{ configured: boolean; attempted: number; sent: number; failed: number; removed: number }> {
   const result = { configured: pushConfigured(), attempted: 0, sent: 0, failed: 0, removed: 0 };
   if (!result.configured) return result;
   const subs = listPushSubscriptions(accountId);
-  const payload = JSON.stringify({ title, body });
+  const payload = JSON.stringify({ title, body, ...(image ? { image } : {}) });
   for (const sub of subs) {
     result.attempted += 1;
     const outcome = await sendPushToSubscription(sub, payload);
@@ -595,7 +605,7 @@ export async function runCheckCycle(accountId: string): Promise<CheckResult> {
       newTotal === 1
         ? gmail.newItems[0]?.summary || texts.newItems[0]?.summary || calendar.newItems[0]?.summary || remindersDue[0]?.summary || "Something needs you."
         : `${newTotal} things need your attention.`;
-    push = await sendPush(accountId, "Prism 5", summary);
+    push = await sendPush(accountId, "Prism 5", summary, pushImageUrl(PRISM_PUSH_IMAGE_PATH));
   }
 
   return { accountId, checkedAt, gmail, texts, calendar, remindersDue, newTotal, push };

@@ -47,20 +47,23 @@ self.addEventListener("fetch", (event) => {
 });
 
 // Web Push (Step 3): show the tap when a proactive check finds something
-// new. The payload is only ever a title and a body from the owner's own
-// server, for the owner's own account.
+// new. The payload is a title and a body from the owner's own server, for
+// the owner's own account — plus an image when the server sends one, so the
+// picture and the message arrive as one notification.
 self.addEventListener("push", (event) => {
   let data = { title: "Prism 5", body: "Something needs you." };
   try {
     if (event.data) data = { ...data, ...event.data.json() };
   } catch {}
-  event.waitUntil(
-    self.registration.showNotification(data.title, {
-      body: data.body,
-      icon: "/icons/icon-192.png",
-      tag: "prism5-proactive",
-    }),
-  );
+  const options = {
+    body: data.body,
+    icon: "/icons/icon-192.png",
+    tag: "prism5-proactive",
+  };
+  // The picture that goes with the message: shown big in the notification
+  // when the server sends one; the app icon stays when it does not.
+  if (typeof data.image === "string" && data.image) options.image = data.image;
+  event.waitUntil(self.registration.showNotification(data.title, options));
 });
 
 self.addEventListener("notificationclick", (event) => {
