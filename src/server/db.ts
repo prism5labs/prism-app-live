@@ -122,7 +122,12 @@ CREATE TABLE IF NOT EXISTS imported_memory (
   imported_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_imported_memory_account ON imported_memory (account_id, imported_at);
-CREATE INDEX IF NOT EXISTS idx_imported_memory_group ON imported_memory (account_id, group_id);
+-- NOTE: the group index is NOT created here. Older databases have
+-- imported_memory without group_id, and creating this index before the
+-- migration below adds the column crashed the boot (Render deploy
+-- 73c7772, Nov 18, 2026: SQLiteError no such column: group_id, thrown
+-- from the db.exec above before the migration ever ran). It is created
+-- after the columns, in the migration block below.
 CREATE TABLE IF NOT EXISTS customizations (
   account_id TEXT NOT NULL,
   photon TEXT NOT NULL,
@@ -169,6 +174,12 @@ try {
   const _names = new Set(_cols.map((c) => c.name));
   if (!_names.has("section")) db.exec(`ALTER TABLE imported_memory ADD COLUMN section TEXT`);
   if (!_names.has("group_id")) db.exec(`ALTER TABLE imported_memory ADD COLUMN group_id TEXT`);
+  // Only now that the column is guaranteed to exist: the group index
+  // crashed the boot when it lived in the schema block above, because
+  // older databases reach this file with imported_memory lacking
+  // group_id. Creating it here keeps any failure inside this catch, so
+  // the server still starts (the index is a lookup aid, not data).
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_imported_memory_group ON imported_memory (account_id, group_id)`);
   migrateUnsectionedSelfExports();
 } catch (err) {
   console.error("imported_memory migration failed:", err);
