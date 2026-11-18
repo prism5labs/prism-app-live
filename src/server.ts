@@ -596,7 +596,10 @@ async function handleApi(req: Request, path: string): Promise<Response> {
       });
     }
     const a = getOrCreateAccount(accountId);
-    if (!a.upkeep) {
+    // The free code is Upkeep-equivalent: redeeming it unlocks live
+    // voice just like a paid Upkeep subscription, so the free code's
+    // "everything's yours now" is literally true.
+    if (!isUnlimited(a)) {
       return json({
         ok: false,
         error: "needs_upkeep",

@@ -2733,6 +2733,10 @@ document.addEventListener("click", async (e) => {
     // App sign-in with Google. The server redirects to Google and back;
     // the return lands on Upkeep with a one-time session token.
     location.href = `/api/oauth/google/start-signin?accountId=${encodeURIComponent(getAccountId())}`;
+  } else if (action === "landing-skip") {
+    // First-run landing: continue into the app without an account.
+    // The landing stays dismissed on this device from here on.
+    dismissLanding();
   } else if (action === "signout") {
     // Sign-out is local only: drop this device's account id and start
     // a fresh anonymous one. Everything stays on the server, and
@@ -3542,10 +3546,14 @@ function playOpeningSplash(): void {
   const dismiss = () => {
     if (!splash.isConnected) return;
     splash.classList.add("is-fading");
-    window.setTimeout(() => splash.remove(), 800);
+    window.setTimeout(() => {
+      splash.remove();
+      maybeShowLanding();
+    }, 800);
   };
   if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
     splash.remove();
+    maybeShowLanding();
     return;
   }
   splash.addEventListener("click", dismiss, { once: true });
@@ -3575,6 +3583,65 @@ function playOpeningSplash(): void {
   if (video.ended) dismiss();
 }
 
+// ---------- First-run landing ----------
+// Shown once, after the opening film, only when the account has never
+// signed in and the owner has never dismissed it. It exists so the
+// account benefits are offered up front instead of hiding at the
+// bottom of Upkeep: the sign-in is the same Google flow as the
+// Upkeep card (same endpoint, same return), and skipping is always
+// possible — nothing here forces an account.
+const LANDING_DISMISSED_KEY = "prism.landingDismissed";
+let landingShown = false;
+function landingDismissed(): boolean {
+  try {
+    return localStorage.getItem(LANDING_DISMISSED_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+function maybeShowLanding(): void {
+  if (landingShown) return;
+  // State is not loaded yet (the reduced-motion path dismisses the
+  // film before refreshState finishes): init calls this again after
+  // render, so returning here loses nothing.
+  if (!state || (state as any)?.auth?.signedIn) return;
+  if (landingDismissed()) return;
+  // The film is still playing: its dismiss calls this again when it
+  // goes away, so the landing never covers the film.
+  if (document.getElementById("opening-splash")?.isConnected) return;
+  landingShown = true;
+  const el = document.createElement("div");
+  el.id = "landing";
+  el.className = "landing";
+  el.innerHTML = `<div class="landing-card">
+    <img class="landing-mark" src="/brand/gem.jpg" alt="">
+    <h1>Prism 5</h1>
+    <p class="landing-lede">One assistant that does it all, and becomes a second you.</p>
+    <ul class="landing-benefits">
+      <li>A backstory for every Photon, written with your name.</li>
+      <li>15% off your first order, revealed once you sign up.</li>
+      <li>Signing up also signs you up for the newsletter, with exclusive rotating offers of merch and more.</li>
+      <li>Your Photons, chats, and purchases follow you to any device.</li>
+      <li>Restore purchases anywhere, just by signing back in.</li>
+    </ul>
+    <button class="btn primary landing-signin" data-action="signin">Sign in or create account with Google</button>
+    <p class="fine">Signing in with Google creates your account. No password, no form — we see only your name and email.</p>
+    <button class="landing-skip" data-action="landing-skip">Continue without signing in</button>
+  </div>`;
+  document.body.appendChild(el);
+}
+function hideLanding(): void {
+  document.getElementById("landing")?.remove();
+}
+function dismissLanding(): void {
+  try {
+    localStorage.setItem(LANDING_DISMISSED_KEY, "1");
+  } catch {
+    // Storage unavailable: the landing still goes away for this open.
+  }
+  hideLanding();
+}
+
 // ---------- Boot ----------
 (async function init() {
   playOpeningSplash();
@@ -3587,6 +3654,7 @@ function playOpeningSplash(): void {
   if (tab === "upkeep") await loadUpkeep();
   if (tab === "store") await loadStripeStatus();
   render();
+  maybeShowLanding();
   const gmail = params.get("gmail");
   if (gmail === "connected") toast("Gmail account connected.");
   if (gmail === "error") toast("Gmail sign-in didn't finish. Try again.", "err");
@@ -3606,6 +3674,10 @@ function playOpeningSplash(): void {
       // is one sign-in away from the same account.
       setAccountId(r.accountId);
       state = r;
+      // The landing must not sit over a freshly signed-in account:
+      // the film is still playing on the way back from Google, so the
+      // landing cannot have shown yet, but if it did, take it down.
+      hideLanding();
       const name = r.auth?.name || r.auth?.email || "";
       toast(
         r.isNew

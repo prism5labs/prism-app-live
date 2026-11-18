@@ -257,6 +257,11 @@ export function ownProduct(accountId: string, ref: string): void {
 
 export function redeemFreeCode(accountId: string): void {
   const now = new Date().toISOString();
+  // The row must exist first: UPDATE touches zero rows on an account
+  // the server has never seen (a redeem that arrives before the first
+  // state call), and the flag would silently stay off while the
+  // Photons still unlocked — the worst kind of half-redeem.
+  getOrCreateAccount(accountId);
   db.query(`UPDATE accounts SET free_code = 1 WHERE id = ?`).run(accountId);
   for (const name of PHOTON_NAMES) ownPhoton(accountId, name);
   // The free code unlocks everything: all Photons and all catalog products.

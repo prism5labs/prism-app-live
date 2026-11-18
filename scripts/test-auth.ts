@@ -5,7 +5,7 @@
 // link/migrate/perk/backstory/session logic, and the client render.
 //
 // Run: DATA_DIR=/tmp/prism-auth-test GOOGLE_CLIENT_ID=x
-//   GOOGLE_CLIENT_SECRET=y
+//   GOOGLE_CLIENT_SECRET=y OWNER_EMAILS=prism5labscontact@gmail.com,aode1282@gmail.com
 //   GOOGLE_REDIRECT_URI=http://localhost:3111/api/oauth/google/callback
 //   bun scripts/test-auth.ts
 // The server boots on :3111 with the same DATA_DIR; the function tests
@@ -113,7 +113,7 @@ try {
   console.log("Link + perks + backstories");
   const { linkGoogleIdentity, authStatus, getPerk, getBackstories, createSigninSession, exchangeSigninSession, markPerkUsed } =
     await import("../src/server/auth");
-  const { getOrCreateAccount, setCustomName, ownPhoton, addMessage, setGmailAccount, getOwned, getThread, getGmailAccounts } =
+  const { getOrCreateAccount, setCustomName, setUpkeep, ownPhoton, addMessage, setGmailAccount, getOwned, getThread, getGmailAccounts } =
     await import("../src/server/db");
   const { db } = await import("../src/server/db");
 
@@ -129,6 +129,7 @@ try {
   const daysOut = perk1 ? (Date.parse(perk1.expiresAt) - Date.parse(perk1.createdAt)) / 86400000 : 0;
   check("welcome perk lasts 10 days", Math.abs(daysOut - 10) < 0.001, `got ${daysOut}`);
   check("welcome perk starts active", perk1?.active === true);
+  check("non-owner sign-in does not grant Upkeep", getOrCreateAccount(deviceA).upkeep === false);
   const stories = getBackstories(deviceA, "Test Person", getOrCreateAccount(deviceA).created_at);
   check("backstories exist for all 12 Photons", Object.keys(stories).length === 12, `got ${Object.keys(stories).length}`);
   check(
@@ -165,6 +166,25 @@ try {
   );
   const gone = db.query(`SELECT COUNT(*) AS n FROM accounts WHERE id = ?`).get(deviceB) as { n: number };
   check("old device account row is gone after migration", gone.n === 0);
+
+  // --- Owner Upkeep grant: an owner signing in gets Upkeep free ---
+  console.log("Owner Upkeep grant");
+  const deviceD = "acc_deviceD0123456789gh";
+  const linkedOwner = linkGoogleIdentity(deviceD, { sub: "google-sub-owner-1", email: "prism5labscontact@gmail.com", name: "Owner" }, null);
+  check("owner sign-in is a new link", linkedOwner.isNew === true && linkedOwner.accountId === deviceD);
+  check("owner sign-in grants Upkeep", getOrCreateAccount(deviceD).upkeep === true);
+  // Re-sign-in re-grants: take Upkeep away by hand, link again.
+  setUpkeep(deviceD, false);
+  check("Upkeep taken away by hand reads off", getOrCreateAccount(deviceD).upkeep === false);
+  linkGoogleIdentity(deviceD, { sub: "google-sub-owner-1", email: "prism5labscontact@gmail.com", name: "Owner" }, null);
+  check("owner re-sign-in re-grants Upkeep", getOrCreateAccount(deviceD).upkeep === true);
+  // Case-insensitive match, and the second owner email.
+  const deviceE = "acc_deviceE0123456789ij";
+  linkGoogleIdentity(deviceE, { sub: "google-sub-owner-2", email: "Prism5LabsContact@Gmail.com", name: "Owner Case" }, null);
+  check("owner email matches case-insensitively", getOrCreateAccount(deviceE).upkeep === true);
+  const deviceF = "acc_deviceF0123456789kl";
+  linkGoogleIdentity(deviceF, { sub: "google-sub-owner-3", email: "aode1282@gmail.com", name: "Owner Personal" }, null);
+  check("second owner email grants Upkeep", getOrCreateAccount(deviceF).upkeep === true);
 
   // --- Functions: sessions ---
   console.log("Sessions");
@@ -272,6 +292,74 @@ console.log("Client render");
     buyLink.includes("prefilled_promo_code=WELCOME15") && buyLink.includes("client_reference_id="),
     buyLink.slice(0, 120),
   );
+
+  // --- Client render (jsdom): first-run landing ---
+  const unsignedState = {
+    ...signedInState,
+    auth: { signedIn: false },
+    perk: null,
+    backstories: {},
+    upkeep: false,
+    freeCode: false,
+  };
+  async function bootLandingDom(dismissed: boolean) {
+    const dom = new JSDOM(html, { url: `${BASE}/?tab=chat`, runScripts: "outside-only", pretendToBeVisual: true });
+    const { window } = dom as any;
+    (window as any).matchMedia = () => ({
+      matches: false,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    });
+    (window as any).fetch = async (input: any) => {
+      const url = String(input);
+      if (url.includes("/api/state")) return new Response(JSON.stringify(unsignedState), { headers: { "content-type": "application/json" } });
+      return new Response(JSON.stringify({ ok: true }), { headers: { "content-type": "application/json" } });
+    };
+    (window as any).localStorage.setItem("prism5.accountId", "acc_deviceA0123456789ab");
+    if (dismissed) (window as any).localStorage.setItem("prism.landingDismissed", "1");
+    (window as any).eval(js);
+    await new Promise((r) => setTimeout(r, 800));
+    // The film dismisses itself in jsdom (the video cannot play, so
+    // the fallback dismisses); tap the splash too if it is still there.
+    const splash = window.document.getElementById("opening-splash");
+    if (splash && splash.isConnected) (splash as any).click();
+    await new Promise((r) => setTimeout(r, 1100));
+    return window;
+  }
+  const landWin = await bootLandingDom(false);
+  const landing = landWin.document.getElementById("landing");
+  check("landing shows for a never-signed-in account", !!landing);
+  check(
+    "landing names the account benefits, without giving the code away",
+    !(landing?.textContent || "").includes("WELCOME15") &&
+      (landing?.textContent || "").includes("15% off your first order") &&
+      (landing?.textContent || "").includes("newsletter") &&
+      (landing?.textContent || "").includes("follow you to any device"),
+  );
+  check(
+    "landing sign-in button reuses the Google flow",
+    !!landing?.querySelector('[data-action="signin"]') &&
+      (landing?.querySelector('[data-action="signin"]')?.textContent || "").includes(
+        "Sign in or create account with Google",
+      ),
+  );
+  check("landing offers a quiet skip", !!landing?.querySelector('[data-action="landing-skip"]'));
+  // Skip: the landing goes away and stays dismissed on this device.
+  (landing?.querySelector('[data-action="landing-skip"]') as any)?.click();
+  await new Promise((r) => setTimeout(r, 100));
+  check("skipping removes the landing", !landWin.document.getElementById("landing"));
+  check(
+    "skipping sets the dismiss flag",
+    landWin.localStorage.getItem("prism.landingDismissed") === "1",
+  );
+  const dismissedWin = await bootLandingDom(true);
+  check("dismissed landing does not show again", !dismissedWin.document.getElementById("landing"));
+  // Signed-in account: no landing even after the film goes away.
+  const signedWin = await bootDom("chat");
+  const signedSplash = signedWin.document.getElementById("opening-splash");
+  if (signedSplash && signedSplash.isConnected) (signedSplash as any).click();
+  await new Promise((r) => setTimeout(r, 1100));
+  check("signed-in account never sees the landing", !signedWin.document.getElementById("landing"));
 }
 
 console.log(`\n${passed} passed, ${failed} failed`);

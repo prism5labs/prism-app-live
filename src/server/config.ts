@@ -24,6 +24,14 @@ export const config = {
   // Render dashboard (the value itself is handed out by Neil, never
   // committed). When it is unset, no free code works.
   freeCode: process.env.FREE_CODE || "",
+  // Owner emails: Google accounts that get Upkeep free, so the owner
+  // can test the app with the upgraded features. Comma-separated,
+  // matched case-insensitively. Set OWNER_EMAILS in the Render
+  // dashboard; empty when unset.
+  ownerEmails: (process.env.OWNER_EMAILS || "")
+    .split(",")
+    .map((e) => e.trim().toLowerCase())
+    .filter((e) => e.length > 0),
   // Google OAuth for the Inboxes tab (Gmail read + drafts). Without these the
   // Inboxes tab reports honestly that no accounts are connected.
   googleClientId: process.env.GOOGLE_CLIENT_ID || "",
@@ -81,6 +89,11 @@ export const googleConfigured = () =>
   config.googleClientId.length > 0 &&
   config.googleClientSecret.length > 0 &&
   config.googleRedirectUri.length > 0;
+
+// True when the Google account's email belongs to the owner: those
+// accounts get Upkeep free (see the owner grant in auth.ts).
+export const isOwnerEmail = (email: string): boolean =>
+  config.ownerEmails.includes(email.trim().toLowerCase());
 
 export const microsoftConfigured = () =>
   config.microsoftClientId.length > 0 &&

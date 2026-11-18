@@ -24,7 +24,7 @@
 // Per-minute voice charges apply; the exact rate is set by ElevenLabs and
 // must be confirmed at build time — this module states no price.
 
-import { getOrCreateAccount, ownsPhoton, getCustomization } from "./db";
+import { getOrCreateAccount, ownsPhoton, getCustomization, isUnlimited } from "./db";
 import { config } from "./config";
 import { photonByName } from "../shared/photons";
 import { voiceById } from "../shared/voices";
@@ -169,7 +169,11 @@ async function gateVoice(
     };
   }
   const a = getOrCreateAccount(accountId);
-  if (!a.upkeep) {
+  // The free code is Upkeep-equivalent here too (same rule as the
+  // /api/voice gate in server.ts): the say/transcribe endpoints are
+  // the ones that actually speak, so they must not reject an account
+  // the gate just let through.
+  if (!isUnlimited(a)) {
     return {
       error: json({
         ok: false,
@@ -237,14 +241,18 @@ export async function voiceStatus(req: Request): Promise<Response> {
   if (!isValidAccountId(accountId)) return bad("accountId required", 400);
   const a = getOrCreateAccount(accountId);
   const configured = voiceConfigured();
+  // `upkeep` here means "this account has voice access": a paid
+  // Upkeep subscription or the free code. The call screen reads this
+  // field, so it must agree with the gate above.
+  const hasVoice = isUnlimited(a);
   return json({
     ok: true,
     configured,
-    upkeep: a.upkeep,
+    upkeep: hasVoice,
     turnBased: true,
     message: !configured
       ? "Live voice isn't set up yet — the server needs an ElevenLabs key."
-      : !a.upkeep
+      : !hasVoice
         ? "Live voice is set up, and it comes with Upkeep."
         : "Live voice is ready. Voice is turn-based for now: you talk, then I answer — not a live two-way call yet.",
   });

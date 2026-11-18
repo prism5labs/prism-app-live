@@ -40,8 +40,8 @@
 //     itself. The webhook marks the perk used when a discounted
 //     checkout lands.
 
-import { db, getOrCreateAccount } from "./db";
-import { config, googleConfigured } from "./config";
+import { db, getOrCreateAccount, setUpkeep } from "./db";
+import { config, googleConfigured, isOwnerEmail } from "./config";
 import { BACKSTORIES, renderBackstory } from "../shared/backstories";
 import { PHOTON_NAMES } from "../shared/photons";
 
@@ -364,6 +364,9 @@ export function linkGoogleIdentity(
         identity.sub,
       );
     }
+    // Owner grant: an owner signing in gets Upkeep free, so the app
+    // can be tested with the upgraded features. A re-sign-in re-grants.
+    if (isOwnerEmail(identity.email)) setUpkeep(accountId, true);
     return { accountId, isNew: false, migrated };
   }
   getOrCreateAccount(deviceAccountId);
@@ -381,6 +384,8 @@ export function linkGoogleIdentity(
   );
   createPerk(deviceAccountId);
   createBackstories(deviceAccountId);
+  // Owner grant: see the existing-identity branch above.
+  if (isOwnerEmail(identity.email)) setUpkeep(deviceAccountId, true);
   return { accountId: deviceAccountId, isNew: true, migrated: 0 };
 }
 
