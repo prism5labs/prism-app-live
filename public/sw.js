@@ -1,5 +1,14 @@
 // Prism 5 service worker. Cache-first for the app shell and static assets,
 // network-first for the API (chat, state, and inboxes must always be fresh).
+// CACHE v25: bumped Nov 18, 2026 for the memory import fix — the app
+// stored the self-export but only ever showed the brain its first 1,500
+// characters (the table of contents), and the 100,000-character cap cut
+// the file's tail. Imports are now stored whole, split into sections,
+// the owner's identity rides in every prompt, the matching sections
+// answer each message, and Prism is seeded from the export's SOUL and
+// IDENTITY. Old whole-file imports are split in place on boot. The
+// cache bump makes existing installs fetch the new main.js and server
+// code instead of serving the cached ones.
 // CACHE v24: bumped Nov 18, 2026 for the owner Upkeep grant, the free-code
 // voice fix, and the first-run landing screen (code held back until after
 // sign-up, newsletter line added). The cache bump makes existing installs
@@ -24,7 +33,7 @@
 // Start My Day Stripe links. The cache bump makes existing installs
 // fetch the new main.js and the new sputnik.jpg instead of serving the
 // cached ones.
-const CACHE = "prism5-v24";
+const CACHE = "prism5-v25";
 const SHELL = ["/", "/index.html", "/styles.css", "/main.js", "/manifest.json", "/opening-animation-v3.mp4", "/chat-bg/bg-rocket.jpg", "/chat-bg/bg-helmets.jpg", "/chat-bg/bg-starburst.jpg", "/chat-bg/bg-robot.jpg", "/chat-bg/bg-saucer.jpg", "/chat-bg/bg-raygun.jpg", "/chat-bg/bg-car.jpg", "/chat-bg/bg-pilot.jpg", "/chat-bg/bg-moonbase.jpg", "/chat-bg/bg-diner.jpg", "/chat-bg/bg-launchpad.jpg", "/chat-bg/bg-spacestation.jpg"];
 
 self.addEventListener("install", (event) => {

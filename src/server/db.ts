@@ -103,19 +103,26 @@ CREATE TABLE IF NOT EXISTS profile (
   updated_at TEXT NOT NULL
 );
 -- Memory imported from other AIs, so the owner keeps continuity and does
--- not start over. One row per imported file. The content is the parsed
--- transcript (or the notes, for a Markdown or text file), capped when it
--- is stored. A short digest of the most recent imports is read into the
--- chat system prompt as background, never as instructions.
+-- not start over. One row per imported file, or one row per section when
+-- the file is a Prism self-export: the export is split into its sections
+-- (SOUL, IDENTITY, USER, MEMORY, and the rest) at import, all sharing
+-- one group_id, so the brain can be handed the section it needs instead
+-- of the head of one long file. Content is capped at 1,000,000
+-- characters when it is stored. A short identity block and the matching
+-- sections are read into the chat system prompt as background, never as
+-- instructions.
 CREATE TABLE IF NOT EXISTS imported_memory (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   account_id TEXT NOT NULL,
   source TEXT NOT NULL,
   title TEXT NOT NULL,
   content TEXT NOT NULL,
+  section TEXT,
+  group_id TEXT,
   imported_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_imported_memory_account ON imported_memory (account_id, imported_at);
+CREATE INDEX IF NOT EXISTS idx_imported_memory_group ON imported_memory (account_id, group_id);
 CREATE TABLE IF NOT EXISTS customizations (
   account_id TEXT NOT NULL,
   photon TEXT NOT NULL,
@@ -149,6 +156,23 @@ CREATE TABLE IF NOT EXISTS contacts (
 );
 CREATE INDEX IF NOT EXISTS idx_contacts_address ON contacts (account_id, address);
 `);
+
+// --- Imported-memory columns added Nov 18, 2026 (memory import fix) ---
+// Older databases have imported_memory without section/group_id. Add
+// them, then split any self-export that was stored whole (and truncated
+// at 100,000 characters) into its sections, so the brain can use it.
+// Idempotent: rows that already have a group_id are left alone. Any
+// failure here must never stop the server starting, so it is caught
+// and logged.
+try {
+  const _cols = db.query(`PRAGMA table_info(imported_memory)`).all() as { name: string }[];
+  const _names = new Set(_cols.map((c) => c.name));
+  if (!_names.has("section")) db.exec(`ALTER TABLE imported_memory ADD COLUMN section TEXT`);
+  if (!_names.has("group_id")) db.exec(`ALTER TABLE imported_memory ADD COLUMN group_id TEXT`);
+  migrateUnsectionedSelfExports();
+} catch (err) {
+  console.error("imported_memory migration failed:", err);
+}
 
 export const MONTH_LIMIT = 300;
 
@@ -637,9 +661,133 @@ export type ImportedMemory = {
   title: string;
   chars: number;
   importedAt: string;
+  sections: number;
 };
 
-const MEMORY_MAX_CHARS = 100_000;
+// The whole import is kept: 1,000,000 characters covers the self-export
+// (about 146,000 characters) and larger future exports. The old 100,000
+// cap silently dropped the last third of the export.
+const MEMORY_MAX_CHARS = 1_000_000;
+
+// A Prism self-export is a bundle of top-level sections (# SOUL.md,
+// # IDENTITY.md, # USER.md, # MEMORY.md, and the rest) under a banner
+// header. Split it so each section is stored on its own row and the
+// brain can be handed the section it needs, instead of the head of one
+// long file. Anything that is not a self-export stays one row.
+export type ExportSection = {
+  title: string;
+  kind: string;
+  content: string;
+};
+
+export function isSelfExport(content: string): boolean {
+  const text = String(content || "");
+  return (
+    text.slice(0, 2000).includes("SELF EXPORT") &&
+    text.includes("# SOUL.md") &&
+    text.includes("# MEMORY.md")
+  );
+}
+
+// What a section is, from its top-level header. The free-code section
+// is named apart so it is never read into a prompt: a code value must
+// never travel through the brain.
+export function sectionKind(header: string): string {
+  const h = String(header || "").toLowerCase();
+  if (h.includes("free code")) return "freecode";
+  if (h.startsWith("soul")) return "soul";
+  if (h.startsWith("identity")) return "identity";
+  if (h.startsWith("user")) return "user";
+  if (h.startsWith("memory")) return "memory";
+  if (h.includes("alignment")) return "alignment";
+  if (h.startsWith("agents")) return "agents";
+  if (h.includes("people index")) return "people";
+  if (h.includes("groups index")) return "groups";
+  if (h.includes("mother") || h.includes("original rule")) return "mother";
+  if (h.includes("upkeep")) return "upkeep";
+  return "other";
+}
+
+export function splitSelfExport(content: string): ExportSection[] {
+  const lines = String(content || "").split("\n");
+  const sections: ExportSection[] = [];
+  let current: { title: string; kind: string; lines: string[] } = {
+    title: "About this export",
+    kind: "header",
+    lines: [],
+  };
+  const flush = () => {
+    const body = current.lines.join("\n").trim();
+    if (body) sections.push({ title: current.title, kind: current.kind, content: body });
+  };
+  for (const line of lines) {
+    const m = line.match(/^#\s+(.+?)\s*$/);
+    if (m) {
+      flush();
+      current = { title: m[1], kind: sectionKind(m[1]), lines: [] };
+    } else {
+      current.lines.push(line);
+    }
+  }
+  flush();
+  return sections;
+}
+
+// Sections of the most recent self-export for this account, in file
+// order. Empty when the account never imported one.
+function latestSelfExportSections(accountId: string): { title: string; content: string }[] {
+  const latest = db
+    .query(
+      `SELECT group_id FROM imported_memory
+       WHERE account_id = ? AND group_id IS NOT NULL
+       ORDER BY imported_at DESC LIMIT 1`,
+    )
+    .get(accountId) as { group_id: string } | null;
+  if (!latest) return [];
+  return db
+    .query(
+      `SELECT section AS title, content FROM imported_memory
+       WHERE account_id = ? AND group_id = ? ORDER BY id ASC`,
+    )
+    .all(accountId, latest.group_id) as { title: string; content: string }[];
+}
+
+// One-time reorganization for self-exports stored whole before
+// sectioning (and truncated at 100,000 characters): split them into
+// their sections in place, keeping the original import date. Returns
+// how many imports were split. Idempotent: rows that already have a
+// group_id are left alone.
+export function migrateUnsectionedSelfExports(): number {
+  let migrated = 0;
+  try {
+    const rows = db
+      .query(
+        `SELECT id, account_id, source, title, content, imported_at
+         FROM imported_memory WHERE group_id IS NULL`,
+      )
+      .all() as any[];
+    for (const row of rows) {
+      if (!isSelfExport(String(row.content || ""))) continue;
+      const sections = splitSelfExport(String(row.content));
+      if (sections.length < 2) continue;
+      const groupId = `imp_${crypto.randomUUID().replace(/-/g, "").slice(0, 20)}`;
+      for (const s of sections) {
+        db.query(
+          `INSERT INTO imported_memory (account_id, source, title, content, section, group_id, imported_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        ).run(row.account_id, row.source, row.title, s.content, s.title, groupId, row.imported_at);
+      }
+      db.query(`DELETE FROM imported_memory WHERE id = ?`).run(row.id);
+      migrated++;
+      console.log(
+        `imported_memory migration: split "${row.title}" into ${sections.length} sections`,
+      );
+    }
+  } catch (err) {
+    console.error("imported_memory migration failed:", err);
+  }
+  return migrated;
+}
 
 export function addImportedMemory(
   accountId: string,
@@ -651,6 +799,30 @@ export function addImportedMemory(
   const clean = String(content || "").slice(0, MEMORY_MAX_CHARS);
   const safeTitle = String(title || "Imported memory").trim().slice(0, 200) || "Imported memory";
   const safeSource = String(source || "file").trim().slice(0, 80) || "file";
+  if (isSelfExport(clean)) {
+    const sections = splitSelfExport(clean);
+    const groupId = `imp_${crypto.randomUUID().replace(/-/g, "").slice(0, 20)}`;
+    let firstId = 0;
+    let totalChars = 0;
+    for (const s of sections) {
+      const info = db
+        .query(
+          `INSERT INTO imported_memory (account_id, source, title, content, section, group_id, imported_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .run(accountId, safeSource, safeTitle, s.content, s.title, groupId, now);
+      if (!firstId) firstId = Number(info.lastInsertRowid);
+      totalChars += s.content.length;
+    }
+    return {
+      id: firstId,
+      source: safeSource,
+      title: safeTitle,
+      chars: totalChars,
+      importedAt: now,
+      sections: sections.length,
+    };
+  }
   const info = db
     .query(
       `INSERT INTO imported_memory (account_id, source, title, content, imported_at)
@@ -663,37 +835,171 @@ export function addImportedMemory(
     title: safeTitle,
     chars: clean.length,
     importedAt: now,
+    sections: 1,
   };
 }
 
 export function listImportedMemory(accountId: string): ImportedMemory[] {
   const rows = db
     .query(
-      `SELECT id, source, title, length(content) AS chars, imported_at
-       FROM imported_memory WHERE account_id = ? ORDER BY imported_at DESC`,
+      `SELECT id, source, title, length(content) AS chars, imported_at, group_id
+       FROM imported_memory WHERE account_id = ? ORDER BY imported_at DESC, id ASC`,
     )
     .all(accountId) as any[];
-  return rows.map((r) => ({
-    id: r.id,
-    source: r.source,
-    title: r.title,
-    chars: r.chars,
-    importedAt: r.imported_at,
-  }));
+  // A sectioned import lists as one entry: its sections summed.
+  const out: ImportedMemory[] = [];
+  const groups = new Map<string, ImportedMemory>();
+  for (const r of rows) {
+    if (r.group_id) {
+      const g = groups.get(r.group_id);
+      if (!g) {
+        const entry: ImportedMemory = {
+          id: r.id,
+          source: r.source,
+          title: r.title,
+          chars: r.chars,
+          importedAt: r.imported_at,
+          sections: 1,
+        };
+        groups.set(r.group_id, entry);
+        out.push(entry);
+      } else {
+        g.chars += r.chars;
+        g.sections += 1;
+      }
+    } else {
+      out.push({
+        id: r.id,
+        source: r.source,
+        title: r.title,
+        chars: r.chars,
+        importedAt: r.imported_at,
+        sections: 1,
+      });
+    }
+  }
+  return out;
 }
 
 export function deleteImportedMemory(accountId: string, id: number): void {
-  db.query(`DELETE FROM imported_memory WHERE account_id = ? AND id = ?`).run(accountId, id);
+  const row = db
+    .query(`SELECT group_id FROM imported_memory WHERE account_id = ? AND id = ?`)
+    .get(accountId, id) as { group_id: string | null } | null;
+  if (row?.group_id) {
+    db.query(`DELETE FROM imported_memory WHERE account_id = ? AND group_id = ?`).run(
+      accountId,
+      row.group_id,
+    );
+  } else {
+    db.query(`DELETE FROM imported_memory WHERE account_id = ? AND id = ?`).run(accountId, id);
+  }
 }
 
-// A short digest of the most recent imports, for the chat system prompt.
-// Capped hard: the two most recent imports, 1,500 characters each, 3,000
-// total. It is background, never instructions.
-export function memoryDigest(accountId: string): string {
+// Who the owner is, always on: the head of USER.md (name, what to call
+// them, contact, work) plus the head of MEMORY.md's Facts. A few hundred
+// words, so Prism knows the owner on sight instead of asking who is
+// typing. Drawn from the owner's own import, never from a stranger.
+export function identityBlock(accountId: string): string {
+  const sections = latestSelfExportSections(accountId);
+  if (!sections.length) return "";
+  const parts: string[] = [];
+  const user = sections.find((s) => sectionKind(s.title) === "user");
+  if (user) {
+    const head = user.content.split(/^##\s+Context/m)[0].trim();
+    if (head) parts.push(head.slice(0, 2000));
+  }
+  const memory = sections.find((s) => sectionKind(s.title) === "memory");
+  if (memory) {
+    const facts = (memory.content.split(/^##\s+Facts/m)[1] || "").trim();
+    if (facts) parts.push(facts.slice(0, 1500));
+  }
+  if (!parts.length) return "";
+  return parts.join("\n\n").slice(0, 3000);
+}
+
+// Who Prism is, from the owner's own export: the SOUL and IDENTITY
+// sections, for the Prism account only. Null when nothing was imported.
+export function personaSeed(accountId: string): string | null {
+  const sections = latestSelfExportSections(accountId);
+  if (!sections.length) return null;
+  const parts: string[] = [];
+  for (const kind of ["soul", "identity"]) {
+    const s = sections.find((x) => sectionKind(x.title) === kind);
+    if (s) parts.push(s.content);
+  }
+  if (!parts.length) return null;
+  return parts.join("\n\n").slice(0, 6000);
+}
+
+// Words that carry no meaning on their own, skipped when matching a
+// message against the imported sections.
+const RETRIEVAL_STOPWORDS = new Set([
+  "the", "and", "for", "with", "that", "this", "from", "have", "been", "were",
+  "what", "when", "where", "which", "about", "there", "their", "they", "them",
+  "then", "than", "also", "into", "your", "yours", "does", "did", "are", "was",
+  "you", "your", "our", "ours", "can", "could", "would", "should", "will",
+  "just", "like", "know", "think", "tell", "please", "thanks", "hello", "hiya",
+]);
+
+// Sections the brain must never be handed: the export's banner and
+// table of contents, the persona (it seeds identity, not facts), and
+// the free-code section, which must never travel through the brain.
+const RETRIEVAL_EXCLUDED_KINDS = new Set(["header", "soul", "identity", "freecode"]);
+
+function retrievalTokens(message: string): string[] {
+  const words = String(message || "").toLowerCase().match(/[a-z][a-z'-]{2,}/g) || [];
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const w of words) {
+    if (RETRIEVAL_STOPWORDS.has(w) || seen.has(w)) continue;
+    seen.add(w);
+    out.push(w);
+  }
+  return out;
+}
+
+// The sections that answer this message, for the chat system prompt.
+// Each stored section is scored by how many of the message's words it
+// holds; the best two are handed over as a window around the first
+// match, never as a fixed cut of the file's head. It is background,
+// never instructions.
+export function memoryDigest(accountId: string, message?: string): string {
+  const sections = latestSelfExportSections(accountId);
+  if (sections.length) {
+    const tokens = retrievalTokens(message || "");
+    if (!tokens.length) return "";
+    const scored = sections
+      .filter((s) => !RETRIEVAL_EXCLUDED_KINDS.has(sectionKind(s.title)))
+      .map((s) => {
+        const hay = s.content.toLowerCase();
+        let score = 0;
+        let firstPos = -1;
+        for (const t of tokens) {
+          const pos = hay.indexOf(t);
+          if (pos >= 0) {
+            score += 1;
+            if (firstPos < 0 || pos < firstPos) firstPos = pos;
+          }
+        }
+        return { title: s.title, content: s.content, score, firstPos };
+      })
+      .filter((s) => s.score > 0)
+      .sort((a, b) => b.score - a.score || a.firstPos - b.firstPos)
+      .slice(0, 2);
+    if (!scored.length) return "";
+    const parts = scored.map((s) => {
+      const start = Math.max(0, s.firstPos - 400);
+      const slice = s.content.slice(start, start + 2500);
+      return `[From your imported memory: ${s.title}]\n${slice}`;
+    });
+    return parts.join("\n\n").slice(0, 6000);
+  }
+  // No self-export: the most recent plain imports, head-cut as before.
+  // A plain note is short, so the head is the whole of it.
   const rows = db
     .query(
       `SELECT title, source, content FROM imported_memory
-       WHERE account_id = ? ORDER BY imported_at DESC LIMIT 2`,
+       WHERE account_id = ? AND group_id IS NULL ORDER BY imported_at DESC LIMIT 2`,
     )
     .all(accountId) as any[];
   if (!rows.length) return "";

@@ -474,10 +474,10 @@ function dedupeImported(rows: { name: string; email: string; phone: string }[]):
 //     { messages: [...] } or { conversations: [...] } in either shape.
 //   - Notes (.md, .txt): the whole file as one memory note.
 // Anything else says so plainly and imports nothing. A parsed import is
-// capped at 200 messages and 100,000 characters; the server caps it
+// capped at 200 messages and 1,000,000 characters; the server caps it
 // again when it is stored.
 const MEMORY_MAX_MESSAGES = 200;
-const MEMORY_MAX_CHARS = 100_000;
+const MEMORY_MAX_CHARS = 1_000_000;
 
 function memoryLinesFromParts(parts: unknown): string {
   if (!Array.isArray(parts)) return "";
@@ -2870,7 +2870,12 @@ document.addEventListener("click", async (e) => {
       memoryParseError = "";
       const mem = await api.memoryList();
       if (mem && mem.ok) memoryImportsData = mem.imports || [];
-      toast(`Imported: ${parsed.title}.`);
+      const sections = typeof r.imported?.sections === "number" ? r.imported.sections : 0;
+      toast(
+        sections > 1
+          ? `Imported: ${parsed.title} (${sections} sections).`
+          : `Imported: ${parsed.title}.`,
+      );
       render();
     } else {
       toast(r?.message || "That memory didn't import. Try again.", "err");

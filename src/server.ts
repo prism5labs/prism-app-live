@@ -32,6 +32,8 @@ import {
   addImportedMemory,
   deleteImportedMemory,
   memoryDigest,
+  identityBlock,
+  personaSeed,
   type Contact,
 } from "./server/db";
 import { chat as brainChat } from "./server/anthropic";
@@ -275,15 +277,23 @@ async function prepareChat(
   // What the owner told Prism about themselves, and what they brought
   // from another AI. Both ride in the system prompt so the Photons know
   // the owner instead of starting cold. The profile is the owner's own
-  // words; the memory digest is a capped excerpt of what they imported,
-  // framed as background, never as instructions.
+  // words; the identity block is the always-on core of their import
+  // (who they are, so Prism knows them on sight); the digest is the
+  // sections that answer this message, framed as background, never as
+  // instructions; and the persona seed is who Prism is to them, from
+  // their own export. The owner's name falls back to the name on their
+  // signed-in Google identity when they never filled in a display name,
+  // so a signed-in owner is never a stranger.
   const profile = getProfile(accountId);
+  const auth = authStatus(accountId);
   const ownerContext: OwnerContext = {
-    name: profile.displayName,
+    name: profile.displayName || auth.name || null,
     about: profile.about,
     preferences: profile.preferences,
     notes: profile.notes,
-    memoryDigest: memoryDigest(accountId),
+    memoryDigest: memoryDigest(accountId, message),
+    personaSeed: personaSeed(accountId),
+    identityBlock: identityBlock(accountId),
   };
   const system = systemPromptFor(photon, c?.faceName || a.custom_name || photon, c, ownerContext);
   return { accountId, photon, message, system, history };
@@ -968,8 +978,9 @@ async function handleApi(req: Request, path: string): Promise<Response> {
   // Memory imported from another AI. GET lists what is stored (title,
   // source, size, date — not the full text). POST stores one import: the
   // client parses the file on the device and sends the text. DELETE
-  // removes one import. Content is capped at 100,000 characters when it
-  // is stored, and a short digest of the most recent imports is read
+  // removes one import. Content is capped at 1,000,000 characters when
+  // it is stored; a self-export is split into its sections, and a short
+  // identity block plus the sections that answer the message are read
   // into the chat system prompt as background, never as instructions.
   if (path === "/api/memory" && method === "GET") {
     const accountId = accountIdFrom(req, {});
@@ -984,7 +995,7 @@ async function handleApi(req: Request, path: string): Promise<Response> {
     const title = String(body.title || "Imported memory").trim().slice(0, 200);
     const content = String(body.content || "");
     if (!content.trim()) return bad("content required", 400);
-    if (content.length > 200_000) return bad("content too long", 400);
+    if (content.length > 1_000_000) return bad("content too long", 400);
     const row = addImportedMemory(accountId, source, title, content);
     return json({ ok: true, imported: row });
   }
