@@ -3484,18 +3484,19 @@ function setupKeyboardDock(): void {
 }
 
 // ---------- Opening splash ----------
-// The v3 opening animation plays on every app open, then fades to the
+// The v4 opening film plays on every app open, then fades to the
 // chat. The chat renders underneath while it plays, so nothing waits
 // on it, and it never touches settings or the chosen Face — it is only
 // a full-screen overlay that removes itself. Reduced motion skips it
 // entirely (the CSS hides it too, so it never shows even before this
 // runs). Tap skips it early: the owner never has to wait out the
-// full 5.6s.
+// full 10s. If the v4 film fails to load, the v3 opening plays
+// instead; if that fails too, the splash just goes away.
 //
 // First ever open reads "Welcome"; every open after that reads
-// "Welcome back" — same video either way, the words are an overlay
-// because the video itself is fixed. The coloring around the animation
-// rotates through ten schemes, one per open, cycling in order: the
+// "Welcome back" — same film either way, the words are an overlay
+// because the film itself carries no text. The coloring around the
+// animation rotates through ten schemes, one per open, cycling in order: the
 // open count lives in localStorage (prism5.splashOpens) and the scheme
 // is SPLASH_SCHEME_IDS[(count - 1) % 10]. The scheme colors live in
 // public/styles.css as [data-scheme] rules on .opening-splash.
@@ -3549,11 +3550,27 @@ function playOpeningSplash(): void {
   }
   splash.addEventListener("click", dismiss, { once: true });
   video.addEventListener("ended", dismiss, { once: true });
+  // If the v4 film fails to load or play, fall back to the v3 opening
+  // instead of a black screen. If that fails too, dismiss — the chat
+  // is already rendered underneath.
+  let fellBack = false;
+  const tryV3Fallback = () => {
+    if (fellBack) {
+      dismiss();
+      return;
+    }
+    fellBack = true;
+    video.src = "/opening-animation-v3.mp4";
+    video.load();
+    const q = video.play();
+    if (q) q.catch(() => dismiss());
+  };
+  video.addEventListener("error", tryV3Fallback);
   // Fallback: if the ended event never fires, do not trap the owner
-  // behind the splash.
-  window.setTimeout(dismiss, 8000);
+  // behind the splash. The film is 10s, so the cutoff sits past it.
+  window.setTimeout(dismiss, 13000);
   const p = video.play();
-  if (p) p.catch(() => dismiss());
+  if (p) p.catch(() => tryV3Fallback());
   // If the video already finished before this ran, dismiss now.
   if (video.ended) dismiss();
 }
