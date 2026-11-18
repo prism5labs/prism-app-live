@@ -1,5 +1,11 @@
 // Prism 5 service worker. Cache-first for the app shell and static assets,
 // network-first for the API (chat, state, and inboxes must always be fresh).
+// CACHE v20: bumped Nov 18, 2026 for the new Prism portrait — Prism's
+// face is now Prism 5 herself (the approved Jeeves avatar: Florence
+// Pugh face, spiky blue-black faux hawk, vibrant blue eyes, red
+// lipstick), same still, same teal crystalline bodysuit, red cape, and
+// light beam. The cache bump makes existing installs fetch the new
+// Prism.png instead of serving the cached one.
 // CACHE v19: bumped Nov 18, 2026 for the chat composer fix — the
 // thread header's nowrap tagline forced Chrome to expand the layout
 // viewport past the screen (menu and send button off the right edge,
@@ -14,7 +20,7 @@
 // Start My Day Stripe links. The cache bump makes existing installs
 // fetch the new main.js and the new sputnik.jpg instead of serving the
 // cached ones.
-const CACHE = "prism5-v19";
+const CACHE = "prism5-v20";
 const SHELL = ["/", "/index.html", "/styles.css", "/main.js", "/manifest.json", "/opening-animation-v3.mp4", "/chat-bg/bg-rocket.jpg", "/chat-bg/bg-helmets.jpg", "/chat-bg/bg-starburst.jpg", "/chat-bg/bg-robot.jpg", "/chat-bg/bg-saucer.jpg", "/chat-bg/bg-raygun.jpg", "/chat-bg/bg-car.jpg", "/chat-bg/bg-pilot.jpg", "/chat-bg/bg-moonbase.jpg", "/chat-bg/bg-diner.jpg", "/chat-bg/bg-launchpad.jpg", "/chat-bg/bg-spacestation.jpg"];
 
 self.addEventListener("install", (event) => {

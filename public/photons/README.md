@@ -12,7 +12,9 @@ back to a generated placeholder tile (initial + triangle) when it does not.
 All twelve are in place (Nov 17, 2026): eleven are new 1950s
 pulp-poster portraits showing a genuine range of races and
 backgrounds, each keeping its role's costume, emblem, and prop —
-Prism (Black woman, crystalline bodysuit, light beam), Juniper
+Prism (Prism 5 herself — the approved Jeeves avatar face: Florence
+Pugh base, fair freckled skin, spiky blue-black faux hawk, vibrant blue
+eyes, red lipstick; same still, crystalline bodysuit, light beam), Juniper
 (Latina woman, juniper emblem, wooden box), Encore (Black woman,
 mandolin), Zero (East Asian person, gold "O", letters), Proof
 (South Asian woman, magnifying glass, checkmark), Blueprint (Black
