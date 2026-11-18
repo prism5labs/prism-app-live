@@ -1,5 +1,12 @@
 // Prism 5 service worker. Cache-first for the app shell and static assets,
 // network-first for the API (chat, state, and inboxes must always be fresh).
+// CACHE v19: bumped Nov 18, 2026 for the chat composer fix — the
+// thread header's nowrap tagline forced Chrome to expand the layout
+// viewport past the screen (menu and send button off the right edge,
+// keyboard math corrupted), and the body height subtracted the
+// keyboard gap from 100dvh, which already shrinks with the keyboard,
+// collapsing the thread to a sliver. The cache bump makes existing
+// installs fetch the new styles.css instead of serving the cached one.
 // CACHE v18: bumped Nov 17, 2026 for the Sputnik hero image fix (the
 // source sputnik.jpg had a 20px white strip down its right edge — and
 // 21px on the left — so the hero showed a white sliver; the image is
@@ -7,7 +14,7 @@
 // Start My Day Stripe links. The cache bump makes existing installs
 // fetch the new main.js and the new sputnik.jpg instead of serving the
 // cached ones.
-const CACHE = "prism5-v18";
+const CACHE = "prism5-v19";
 const SHELL = ["/", "/index.html", "/styles.css", "/main.js", "/manifest.json", "/opening-animation-v3.mp4", "/chat-bg/bg-rocket.jpg", "/chat-bg/bg-helmets.jpg", "/chat-bg/bg-starburst.jpg", "/chat-bg/bg-robot.jpg", "/chat-bg/bg-saucer.jpg", "/chat-bg/bg-raygun.jpg", "/chat-bg/bg-car.jpg", "/chat-bg/bg-pilot.jpg", "/chat-bg/bg-moonbase.jpg", "/chat-bg/bg-diner.jpg", "/chat-bg/bg-launchpad.jpg", "/chat-bg/bg-spacestation.jpg"];
 
 self.addEventListener("install", (event) => {

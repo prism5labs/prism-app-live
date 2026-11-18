@@ -299,7 +299,15 @@ textarea { width: 100%; resize: vertical; }
   flex: none;
 }
 .thread-head .btn.call { margin-left: auto; }
-.thread-title { flex: 1 1 auto; min-width: 0; }
+.thread-title { flex: 1 1 auto; min-width: 0; width: 0; }
+/* The width: 0 matters: the tagline and voice lines below are
+   white-space: nowrap, so without a definite width the title's
+   preferred width is the full tagline (~424px). That forced Chrome
+   to expand the layout viewport past the screen, which pushed the
+   header menu and the composer's send button off the right edge and
+   corrupted the keyboard math (innerHeight grew past the screen).
+   With width: 0 the title flex-grows to whatever space is left and
+   the nowrap lines ellipsize inside it, as they were meant to. */
 .thread-title h2 {
   font-family: "Nunito", sans-serif;
   font-weight: 800;
@@ -629,22 +637,29 @@ body.look-night-watch, .thread.look-night-watch, .photon-card.look-night-watch {
    brand header are hidden in a thread, so nothing but the conversation
    and the composer competes for the screen: the clean, minimal layout
    of a plain chat app.
-   When the on-screen keyboard opens, the dynamic viewport shrinks
-   (Android Chrome, interactive-widget=resizes-content) or the measured
-   keyboard gap (--kb, from visualViewport) shrinks the body — either
-   way the messages area shrinks with it and the composer, in flow at
-   the bottom, stays just above the keyboard. Nothing is hidden behind
-   the keyboard, and the input is always reachable. No transition on
-   the body height: it tracks the viewport instantly, so the composer
-   follows the keyboard with no lag or clipping.
+   When the on-screen keyboard opens, the measured keyboard gap
+   (--kb, from visualViewport) shrinks the body, and the messages
+   area shrinks with it and the composer, in flow at the bottom,
+   stays just above the keyboard. Nothing is hidden behind the
+   keyboard, and the input is always reachable. The gap is subtracted
+   from 100vh, the layout viewport: layout height minus the gap is
+   exactly the visual viewport's bottom edge. It must NOT be
+   subtracted from 100dvh — the dynamic viewport already shrinks
+   with the keyboard on Android Chrome, so dvh minus the gap counted
+   the keyboard twice and collapsed the thread to a sliver with the
+   composer stranded mid-screen. The min() with 100dvh only caps the
+   height when a dynamic toolbar (the browser's URL bar) is showing,
+   so the composer still lands at the visible bottom there. No
+   transition on the body height: it tracks the viewport instantly,
+   so the composer follows the keyboard with no lag or clipping.
    While the chat input is focused (html.kb-chat), the research row
    hides — it is clutter while typing a message — and returns when the
    input blurs. Tapping the conversation dismisses the keyboard. */
 body.is-thread {
   display: flex;
   flex-direction: column;
-  height: 100vh;
-  height: calc(100dvh - var(--kb, 0px));
+  height: calc(100vh - var(--kb, 0px));
+  height: min(100dvh, calc(100vh - var(--kb, 0px)));
   min-height: 0;
   overflow: hidden;
 }
