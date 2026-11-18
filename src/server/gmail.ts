@@ -144,45 +144,155 @@ export type InboxMessage = {
   subject: string;
   date: string;
   snippet: string;
+  // True when Gmail still has the message marked unread. The summary
+  // view leads with these, so the owner sees what needs attention
+  // instead of the whole inbox.
+  unread?: boolean;
 };
 
 export async function listInbox(
   accountId: string,
   label: GmailLabel,
   maxResults = 10,
-): Promise<{ connected: boolean; email?: string; messages: InboxMessage[]; error?: string }> {
+): Promise<{
+  connected: boolean;
+  email?: string;
+  messages: InboxMessage[];
+  unreadCount?: number;
+  error?: string;
+}> {
   const acct = getGmailAccount(accountId, label);
   if (!acct) return { connected: false, messages: [] };
   const token = await freshAccessToken(accountId, label);
   if (!token) return { connected: false, email: acct.email, messages: [], error: "token_failed" };
-  const listRes = await fetch(
-    `https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=${maxResults}&q=in%3Ainbox`,
-    { headers: { Authorization: `Bearer ${token}` } },
-  );
+  // The list and the unread count are independent: ask for both at
+  // once instead of queuing them, and fetch every message's metadata
+  // in parallel too — the old serial loop made the inbox load feel
+  // claggy, one round trip per message.
+  const [listRes, labelsRes] = await Promise.all([
+    fetch(
+      `https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=${maxResults}&q=in%3Ainbox`,
+      { headers: { Authorization: `Bearer ${token}` } },
+    ),
+    fetch(`https://gmail.googleapis.com/gmail/v1/users/me/labels/INBOX`, {
+      headers: { Authorization: `Bearer ${token}` },
+    }),
+  ]);
+  let unreadCount: number | undefined;
+  if (labelsRes.ok) {
+    const lab = (await labelsRes.json().catch(() => null)) as { messagesUnread?: number } | null;
+    if (typeof lab?.messagesUnread === "number") unreadCount = lab.messagesUnread;
+  }
   if (!listRes.ok) {
     console.error("Gmail list failed:", listRes.status);
-    return { connected: true, email: acct.email, messages: [], error: "list_failed" };
+    return { connected: true, email: acct.email, messages: [], unreadCount, error: "list_failed" };
   }
   const list = (await listRes.json()) as { messages?: { id: string }[] };
-  const out: InboxMessage[] = [];
-  for (const m of list.messages || []) {
-    const r = await fetch(
-      `https://gmail.googleapis.com/gmail/v1/users/me/messages/${m.id}?format=metadata&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Date`,
-      { headers: { Authorization: `Bearer ${token}` } },
-    );
-    if (!r.ok) continue;
-    const d = (await r.json()) as any;
-    const headers: Record<string, string> = {};
-    for (const h of d.payload?.headers || []) headers[h.name] = h.value;
-    out.push({
-      id: d.id,
-      from: headers["From"] || "",
-      subject: headers["Subject"] || "(no subject)",
-      date: headers["Date"] || "",
-      snippet: d.snippet || "",
-    });
+  const out: InboxMessage[] = (
+    await Promise.all(
+      (list.messages || []).map(async (m) => {
+        const r = await fetch(
+          `https://gmail.googleapis.com/gmail/v1/users/me/messages/${m.id}?format=metadata&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Date`,
+          { headers: { Authorization: `Bearer ${token}` } },
+        );
+        if (!r.ok) return null;
+        const d = (await r.json()) as any;
+        const headers: Record<string, string> = {};
+        for (const h of d.payload?.headers || []) headers[h.name] = h.value;
+        return {
+          id: d.id,
+          from: headers["From"] || "",
+          subject: headers["Subject"] || "(no subject)",
+          date: headers["Date"] || "",
+          snippet: d.snippet || "",
+          unread: Array.isArray(d.labelIds) ? d.labelIds.includes("UNREAD") : undefined,
+        } as InboxMessage;
+      }),
+    )
+  ).filter((m): m is InboxMessage => m !== null);
+  return { connected: true, email: acct.email, messages: out, unreadCount };
+}
+
+// Read one message in full: subject, sender, date, and the plain-text
+// body. The list endpoint only carries a snippet, so the summary view
+// opens the real message through here, one tap, no whole-inbox render.
+export async function getMessage(
+  accountId: string,
+  label: GmailLabel,
+  id: string,
+): Promise<{
+  ok: boolean;
+  id?: string;
+  from?: string;
+  subject?: string;
+  date?: string;
+  body?: string;
+  error?: string;
+}> {
+  const acct = getGmailAccount(accountId, label);
+  if (!acct) return { ok: false, error: "not_connected" };
+  const token = await freshAccessToken(accountId, label);
+  if (!token) return { ok: false, error: "token_failed" };
+  const res = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${encodeURIComponent(id)}?format=full`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    console.error("Gmail message failed:", res.status);
+    return { ok: false, error: "message_failed" };
   }
-  return { connected: true, email: acct.email, messages: out };
+  const d = (await res.json()) as any;
+  const headers: Record<string, string> = {};
+  for (const h of d.payload?.headers || []) headers[h.name] = h.value;
+  const body = plainTextFromPayload(d.payload).slice(0, 60000);
+  return {
+    ok: true,
+    id: d.id,
+    from: headers["From"] || "",
+    subject: headers["Subject"] || "(no subject)",
+    date: headers["Date"] || "",
+    body,
+  };
+}
+
+// Walk a Gmail message payload for the plain-text body: prefer
+// text/plain wherever it hides (multipart/alternative nests it under
+// multipart/mixed), fall back to text/html with the tags stripped.
+// Bodies are base64url; a part with no data is skipped, not fatal.
+function plainTextFromPayload(payload: any): string {
+  if (!payload) return "";
+  const decode = (data: string): string => {
+    try {
+      const b64 = data.replace(/-/g, "+").replace(/_/g, "/");
+      return Buffer.from(b64, "base64").toString("utf8");
+    } catch {
+      return "";
+    }
+  };
+  const walk = (part: any, want: "text/plain" | "text/html"): string => {
+    if (!part) return "";
+    const mime = String(part.mimeType || "");
+    if (mime === want && part.body?.data) return decode(part.body.data);
+    for (const sub of part.parts || []) {
+      const found = walk(sub, want);
+      if (found) return found;
+    }
+    return "";
+  };
+  const plain = walk(payload, "text/plain");
+  if (plain) return plain;
+  const html = walk(payload, "text/html");
+  if (!html) return "";
+  return html
+    .replace(/<(br|p|div|li|tr|h\d)[^>]*>/gi, "\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }
 
 function toBase64Url(s: string): string {

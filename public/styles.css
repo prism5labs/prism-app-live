@@ -1392,3 +1392,92 @@ html.read-contrast .btn.store-outline:hover { background: #FADFDF; }
 @media (prefers-reduced-motion: no-preference) {
   .app-header-name { animation: neon-breathe 6s ease-in-out infinite; }
 }
+
+/* ---------- Smoothness: one coherent app, not pieces stuck together --
+   Nov 18, 2026 second pass. Every major change of scene eases instead
+   of cutting: view switches fade in over 200ms, the landing fades in
+   over 250ms, the card modal fades out as well as in (the close used
+   to hide at once — see closeCard in client/main.ts), the nav active
+   state eases, and an OAuth return skips the opening film (the splash
+   stays as a static cover until the first render, then fades in 200ms
+   — see dismissSplashFast). Same-view re-renders (data arriving, chat
+   streaming) swap instantly, so nothing flickers while it works.
+   Everything here is off under prefers-reduced-motion: static, no
+   animation. The readability controls and the Neon look are untouched. */
+.view.view-enter { animation: view-in 200ms ease both; }
+@keyframes view-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+.landing { animation: landing-in 250ms ease both; }
+@keyframes landing-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+.opening-splash.is-fading-fast { transition: opacity 0.2s ease; }
+.nav-btn { transition: color 0.2s ease, box-shadow 0.2s ease; }
+@media (prefers-reduced-motion: reduce) {
+  .view.view-enter, .landing { animation: none; }
+  .nav-btn { transition: none; }
+}
+
+/* ---------- Email summary cards ----------
+   The inbox is a tidy summary, not a dump: an unread count, then the
+   needs-attention list (unread first, then newest, capped at ten),
+   each row a button that opens the whole message one tap away. Unread
+   rows carry a cherry dot and ink-dark subject; read rows sit quieter
+   in ink-soft. The draft form below is unchanged. */
+.inbox-connected {
+  background: var(--teal-soft);
+  border: 1px solid var(--teal);
+  border-radius: var(--radius);
+  padding: 10px 14px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink);
+  margin: 0 0 12px;
+}
+.email-unread { font-weight: 700; }
+.email-row {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  border-top: 1px solid var(--line);
+  border-radius: 0;
+  padding: 10px 0;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+.email-row:hover .inbox-subject { text-decoration: underline; }
+.email-row:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+.email-row-top { display: flex; align-items: baseline; gap: 8px; }
+.email-row .inbox-subject, .email-row .inbox-meta, .email-row .inbox-snippet { display: block; }
+.email-row .inbox-subject { flex: 1 1 auto; min-width: 0; }
+.unread-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--cherry-btn);
+  align-self: center;
+}
+.email-row.read .unread-dot { visibility: hidden; }
+.email-row.read .inbox-subject { color: var(--ink-soft); font-weight: 700; }
+/* The whole message, opened from a summary row: plain text, scrollable,
+   same shape as the Drive reader. */
+.email-body {
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  font-size: 14px;
+  line-height: 1.55;
+  max-height: 55vh;
+  overflow: auto;
+  margin: 8px 0;
+}

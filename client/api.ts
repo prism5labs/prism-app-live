@@ -269,6 +269,10 @@ export const api = {
   authSession: (token: string) =>
     req("/api/auth/session", { method: "POST", body: JSON.stringify({ token }) }),
   inboxes: () => req(`/api/inboxes?accountId=${encodeURIComponent(getAccountId())}`),
+  gmailMessage: (label: string, id: string) =>
+    req(
+      `/api/gmail/message?accountId=${encodeURIComponent(getAccountId())}&label=${encodeURIComponent(label)}&id=${encodeURIComponent(id)}`,
+    ),
   saveDraft: (label: string, to: string, subject: string, body: string) =>
     req("/api/inboxes/draft", {
       method: "POST",
@@ -277,6 +281,10 @@ export const api = {
   // Outlook mail (Microsoft Graph): the same shape as Gmail, so an
   // Outlook mailbox shows as its own card and can save real drafts.
   outlookInboxes: () => req(`/api/outlook/inboxes?accountId=${encodeURIComponent(getAccountId())}`),
+  outlookMessage: (label: string, id: string) =>
+    req(
+      `/api/outlook/message?accountId=${encodeURIComponent(getAccountId())}&label=${encodeURIComponent(label)}&id=${encodeURIComponent(id)}`,
+    ),
   outlookDraft: (label: string, to: string, subject: string, body: string) =>
     req("/api/outlook/draft", {
       method: "POST",

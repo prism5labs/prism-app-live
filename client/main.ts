@@ -210,6 +210,7 @@ function toast(msg: string, kind: "ok" | "err" = "ok") {
 // product data — nothing is invented. Dismissal: the X, the Close button,
 // a tap on the backdrop, or the Escape key.
 let cardOpener: HTMLElement | null = null;
+let cardCloseTimer: number | null = null;
 
 function cardModal(): HTMLElement {
   return document.getElementById("card-modal") as HTMLElement;
@@ -218,6 +219,12 @@ function cardModal(): HTMLElement {
 function openCard(html: string, opener: HTMLElement | null) {
   const m = cardModal();
   cardOpener = opener;
+  // A close still fading out is cancelled: its timer would otherwise
+  // hide the card that just opened.
+  if (cardCloseTimer) {
+    window.clearTimeout(cardCloseTimer);
+    cardCloseTimer = null;
+  }
   m.innerHTML = html;
   m.hidden = false;
   // The card pops in; the backdrop locks the page behind it.
@@ -230,12 +237,19 @@ function openCard(html: string, opener: HTMLElement | null) {
 function closeCard() {
   const m = cardModal();
   if (m.hidden) return;
+  // Fade out first, then hide: hiding at once cuts the sheet off
+  // mid-transition and reads as a snap. The timer is guarded so a
+  // second close (or a reopen) while fading never strands the modal.
   m.classList.remove("open");
-  m.hidden = true;
-  m.innerHTML = "";
-  document.body.style.overflow = "";
-  if (cardOpener && document.contains(cardOpener)) cardOpener.focus();
-  cardOpener = null;
+  if (cardCloseTimer) window.clearTimeout(cardCloseTimer);
+  cardCloseTimer = window.setTimeout(() => {
+    m.hidden = true;
+    m.innerHTML = "";
+    document.body.style.overflow = "";
+    if (cardOpener && document.contains(cardOpener)) cardOpener.focus();
+    cardOpener = null;
+    cardCloseTimer = null;
+  }, 200);
 }
 
 function cardShell(title: string, bodyHtml: string): string {
@@ -1875,6 +1889,17 @@ async function openMessengerThread(id: string) {
 // are set up on the server, not from the app. The chooser reuses the
 // character-card modal, so it dismisses the same four ways: the X, the
 // Close button, a tap on the backdrop, or the Escape key.
+// Connect-return state, set once in init from the OAuth return params:
+// justConnected puts a plain confirmation at the top of the Email
+// section (a toast alone is too easy to miss), connectError puts the
+// failure there with a one-tap retry. Both clear when the owner leaves
+// Inboxes, or when a later load shows the account is fine.
+let justConnected: "" | "gmail" | "google" | "outlook" = "";
+let connectError = "";
+// True while an inbox load is in flight: the Email section says
+// "Checking your inbox…" instead of flashing the false "No email
+// accounts connected yet" empty state before the data lands.
+let inboxesLoading = false;
 function nextGmailLabel(): string {
   const used = new Set((state?.inboxAccounts || []).map((a: any) => String(a.label || "")));
   let n = 1;
@@ -1929,20 +1954,55 @@ function openConnectChooser(opener: HTMLElement | null, notice?: string) {
   openCard(connectChooserHtml(notice), opener);
 }
 
+// ---------- Email summary cards ----------
+// The inbox used to render every message the server returned, which
+// read as an unbelievably huge dump. Now each account is a tidy
+// summary: an unread count, then a short "needs attention" list —
+// unread first, then the newest, capped at ten — and the whole message
+// is one tap away. Older mail still lives in Gmail or Outlook (linked
+// below the list); nothing here renders the entire inbox at once.
+const EMAIL_SUMMARY_CAP = 10;
+
+function emailRowHtml(m: any, provider: "gmail" | "outlook", label: string): string {
+  const unread = m.unread === true;
+  return `<button class="inbox-msg email-row${unread ? " unread" : " read"}" data-action="email-open" data-provider="${provider}" data-label="${esc(String(label))}" data-id="${esc(String(m.id || ""))}">
+      <span class="email-row-top"><span class="unread-dot" aria-hidden="true"></span><span class="inbox-subject">${esc(m.subject || "(no subject)")}</span></span>
+      <span class="inbox-meta">${esc(m.from || "")} · ${esc(m.date || "")}</span>
+      <span class="inbox-snippet">${esc(m.snippet || "")}</span>
+    </button>`;
+}
+
 function emailCard(acct: any, provider: "gmail" | "outlook"): string {
-  const msgs = (acct.messages || [])
-    .map(
-      (m: any) => `<div class="inbox-msg">
-            <p class="inbox-subject">${esc(m.subject || "(no subject)")}</p>
-            <p class="inbox-meta">${esc(m.from || "")} · ${esc(m.date || "")}</p>
-            <p class="inbox-snippet">${esc(m.snippet || "")}</p>
-          </div>`,
-    )
-    .join("");
+  const label = String(acct.label || "");
+  const unreadCount = typeof acct.unreadCount === "number" ? acct.unreadCount : null;
+  const unreadLine =
+    unreadCount === null
+      ? ""
+      : unreadCount === 0
+        ? `<p class="fine email-unread">All caught up — nothing unread.</p>`
+        : `<p class="fine email-unread"><b>${unreadCount} unread</b></p>`;
+  // Unread first, then the newest — the server already sends newest
+  // first, and sort is stable, so unread messages rise without
+  // scrambling the recency order inside each group.
+  const msgs = [...(acct.messages || [])]
+    .sort((a: any, b: any) => Number(b.unread === true) - Number(a.unread === true))
+    .slice(0, EMAIL_SUMMARY_CAP);
+  const errorHtml =
+    acct.error === "token_failed"
+      ? `<p class="chat-error">That account's sign-in ran out, so the inbox wouldn't open. Reconnect it from the button above — nothing was lost.</p>`
+      : acct.error
+        ? `<p class="chat-error">That inbox didn't answer just now. <button class="btn small" data-action="inbox-retry">Try again</button></p>`
+        : "";
+  const webmail =
+    provider === "outlook"
+      ? `<p class="fine"><a href="https://outlook.live.com/mail/" target="_blank" rel="noopener">Open in Outlook</a> for older mail.</p>`
+      : `<p class="fine"><a href="https://mail.google.com/" target="_blank" rel="noopener">Open in Gmail</a> for older mail.</p>`;
   return `<div class="card inbox-card">
         <h3>${esc(acct.title || acct.email || "Email")}</h3>
         <p class="fine">${esc(acct.email || "")} · ${provider === "outlook" ? "Outlook" : "Gmail"}</p>
-        ${msgs || `<p class="fine">Nothing in the inbox right now.</p>`}
+        ${unreadLine}
+        ${errorHtml || (msgs.length ? msgs.map((m: any) => emailRowHtml(m, provider, label)).join("") : `<p class="fine">Nothing in the inbox right now.</p>`)}
+        ${msgs.length ? webmail : ""}
         <form class="draft-form" data-label="${esc(String(acct.label || ""))}" data-provider="${provider}">
           <h4>Save a draft</h4>
           <input name="to" type="text" placeholder="To" required>
@@ -1951,6 +2011,46 @@ function emailCard(acct: any, provider: "gmail" | "outlook"): string {
           <button class="btn primary" type="submit">Save draft</button>
         </form>
       </div>`;
+}
+
+// ---------- Reading one email in full ----------
+// A summary row opens the whole message in the character-card modal:
+// subject, sender, date, and the plain-text body. While it loads the
+// modal says so; if it fails, plain words and a one-tap retry.
+let emailOpenRetry: { provider: "gmail" | "outlook"; label: string; id: string } | null = null;
+
+async function openEmailMessage(
+  provider: "gmail" | "outlook",
+  label: string,
+  id: string,
+  opener: HTMLElement | null,
+): Promise<void> {
+  emailOpenRetry = { provider, label, id };
+  openCard(cardShell("Message", `<p class="fine">Opening that message…</p>`), opener);
+  const r: any =
+    provider === "gmail" ? await api.gmailMessage(label, id) : await api.outlookMessage(label, id);
+  if (r && r.ok) {
+    emailOpenRetry = null;
+    openCard(
+      cardShell(
+        r.subject || "Message",
+        `<h2 class="card-title">${esc(r.subject || "(no subject)")}</h2>
+        <p class="card-kind">${esc(r.from || "")} · ${esc(r.date || "")}</p>
+        <div class="email-body">${esc(r.body || "Nothing in the body.")}</div>`,
+      ),
+      opener,
+    );
+  } else {
+    openCard(
+      cardShell(
+        "Message didn't open",
+        `<h2 class="card-title">That message didn't open</h2>
+        <p class="card-tagline">The inbox didn't answer just now. Nothing was changed.</p>
+        <div class="card-actions"><button class="btn primary" data-action="email-retry-open">Try again</button></div>`,
+      ),
+      opener,
+    );
+  }
 }
 
 function renderInboxes(): string {
@@ -1963,9 +2063,22 @@ function renderInboxes(): string {
     ...outlookAccounts.map((acct: any) => emailCard(acct, "outlook")),
   ].join("");
   const emailEmpty =
-    googleConfigured || microsoftConfigured
-      ? `<p class="fine">No email accounts connected yet — tap <b>Connect an account</b> above to add one.</p>`
-      : `<p class="fine">Email sign-in isn't set up on this server yet.</p>`;
+    inboxesLoading && !accounts.length && !outlookAccounts.length
+      ? `<p class="fine">Checking your inbox…</p>`
+      : googleConfigured || microsoftConfigured
+        ? `<p class="fine">No email accounts connected yet — tap <b>Connect an account</b> above to add one.</p>`
+        : `<p class="fine">Email sign-in isn't set up on this server yet.</p>`;
+  const connectedBanner =
+    justConnected === "gmail"
+      ? `<p class="inbox-connected">Gmail connected — your inbox is below.</p>`
+      : justConnected === "outlook"
+        ? `<p class="inbox-connected">Outlook connected — your inbox is below.</p>`
+        : justConnected === "google"
+          ? `<p class="inbox-connected">Calendar and Drive connected.</p>`
+          : "";
+  const connectErrorHtml = connectError
+    ? `<p class="chat-error">${esc(connectError)} <button class="btn small" data-action="connect-open">Try again</button></p>`
+    : "";
   return `
   <section>
     <h1 class="page-title">Inboxes</h1>
@@ -1988,6 +2101,8 @@ function renderInboxes(): string {
     ${renderMessenger()}
     ${state?.inboxError ? `<p class="chat-error">${esc(state.inboxError)}</p>` : ""}
     <h2 class="section-title" id="gmail-accounts">Email</h2>
+    ${connectedBanner}
+    ${connectErrorHtml}
     <div class="inbox-grid">${cards}</div>
     ${accounts.length || outlookAccounts.length ? "" : emailEmpty}
     ${renderProfile()}
@@ -2651,9 +2766,23 @@ function syncAppBackground(): void {
   nextBackground(dir);
 }
 
+// A view change (tab, thread, customizer, call screen, briefing) fades
+// in gently over 200ms instead of cutting in: the app reads as one
+// coherent thing, not pieces stuck together. Same-view re-renders —
+// data arriving, chat streaming — swap instantly, so nothing flickers
+// while it works. The animation lives in styles.css (.view-enter) and
+// is off under prefers-reduced-motion.
+let lastViewKey = "";
+function viewKey(): string {
+  return [tab, activePhoton || "", customizePhoton || "", callPhotonName || "", dayOpen ? "day" : ""].join("|");
+}
+
 function render() {
   renderNav();
   const v = view();
+  const key = viewKey();
+  const switched = key !== lastViewKey;
+  lastViewKey = key;
   if (tab === "chat")
     v.innerHTML = callPhotonName
       ? renderCallScreen()
@@ -2667,6 +2796,13 @@ function render() {
   else if (tab === "inboxes") v.innerHTML = renderInboxes();
   else if (tab === "store") v.innerHTML = renderStore();
   else v.innerHTML = renderUpkeep();
+  if (switched) {
+    // Restart the entrance animation even when switching fast: remove,
+    // force a reflow, re-add.
+    v.classList.remove("view-enter");
+    void v.offsetWidth;
+    v.classList.add("view-enter");
+  }
   // Thread mode: a chat thread is a full-height flex column (see
   // body.is-thread in styles.css), so the keyboard never blocks the
   // conversation or the composer. Only a real thread gets it — the
@@ -2689,25 +2825,34 @@ async function refreshState() {
 }
 
 async function loadInboxes() {
-  const r = await api.inboxes();
-  if (r && r.ok) {
-    state.inboxAccounts = r.accounts;
-    state.googleConfigured = r.googleConfigured;
-  }
-  const o = await api.outlookInboxes();
-  if (o && o.ok) {
-    state.outlookAccounts = o.accounts;
-    state.microsoftConfigured = o.microsoftConfigured;
-  }
-  const c = await api.contacts();
-  if (c && c.ok) state.contacts = c.contacts || [];
-  const prof = await api.profileGet();
-  if (prof && prof.ok) {
-    profileData = prof.profile || null;
-    profileSaved = false;
-  }
-  const mem = await api.memoryList();
-  if (mem && mem.ok) memoryImportsData = mem.imports || [];
+  // The first five calls are independent: fire them together instead
+  // of queuing them one by one — the old serial chain was a big part
+  // of why opening Inboxes felt claggy. The flag keeps the Email
+  // section honest while they fly ("Checking your inbox…", not a
+  // false "nothing connected yet").
+  inboxesLoading = true;
+  try {
+    const [r, o, c, prof, mem] = await Promise.all([
+      api.inboxes(),
+      api.outlookInboxes(),
+      api.contacts(),
+      api.profileGet(),
+      api.memoryList(),
+    ]);
+    if (r && r.ok) {
+      state.inboxAccounts = r.accounts;
+      state.googleConfigured = r.googleConfigured;
+    }
+    if (o && o.ok) {
+      state.outlookAccounts = o.accounts;
+      state.microsoftConfigured = o.microsoftConfigured;
+    }
+    if (c && c.ok) state.contacts = c.contacts || [];
+    if (prof && prof.ok) {
+      profileData = prof.profile || null;
+      profileSaved = false;
+    }
+    if (mem && mem.ok) memoryImportsData = mem.imports || [];
   // Messages, Calendar, Drive: each status endpoint answers honestly
   // when its service is not connected, so a failure here just leaves
   // that section in its "not connected yet" state.
@@ -2753,6 +2898,9 @@ const ms = await api.messengerStatus();
     } else {
       messengerThreadsData = [];
     }
+  }
+  } finally {
+    inboxesLoading = false;
   }
 }
 
@@ -2801,12 +2949,37 @@ document.addEventListener("click", async (e) => {
     activePhoton = null;
     customizePhoton = null;
     dayOpen = false;
+    // A connect confirmation only lives on the Inboxes it belongs to,
+    // and so does a connect failure.
+    if (tab !== "inboxes") {
+      justConnected = "";
+      connectError = "";
+    }
     // Ending a call leaves the thread; the call screen is chat-only.
     if (callPhotonName) endCall();
     if (tab === "inboxes") loadInboxes().then(render);
     if (tab === "upkeep") loadUpkeep().then(render);
     if (tab === "store") loadStripeStatus().then(render);
     render();
+  } else if (action === "email-open") {
+    // A summary row opens the whole message, one tap.
+    openEmailMessage(
+      t.dataset.provider === "outlook" ? "outlook" : "gmail",
+      t.dataset.label || "",
+      t.dataset.id || "",
+      t,
+    );
+  } else if (action === "email-retry-open") {
+    // The message didn't open: same message, one more try.
+    if (emailOpenRetry) {
+      openEmailMessage(emailOpenRetry.provider, emailOpenRetry.label, emailOpenRetry.id, t);
+    }
+  } else if (action === "inbox-retry") {
+    // An inbox that didn't answer: say so on the button, then reload
+    // the inboxes and re-render.
+    t.setAttribute("disabled", "");
+    t.textContent = "Checking…";
+    loadInboxes().then(render);
   } else if (action === "end-call") {
     endCall();
   } else if (action === "signin") {
@@ -3615,7 +3788,7 @@ const SPLASH_SCHEME_IDS = [
   "checkered-flag",
 ] as const;
 const SPLASH_OPENS_KEY = "prism5.splashOpens";
-function playOpeningSplash(): void {
+function playOpeningSplash(returning: boolean): void {
   const splash = document.getElementById("opening-splash");
   const video = document.getElementById("opening-splash-video") as HTMLVideoElement | null;
   const greeting = document.getElementById("opening-splash-greeting");
@@ -3645,6 +3818,16 @@ function playOpeningSplash(): void {
       maybeShowLanding();
     }, 800);
   };
+  if (returning) {
+    // Coming back from Google (a sign-in or a connect): the film
+    // already played on the way out, and sitting through it again is
+    // a dead pause before the thing the owner just did. The splash
+    // stays as a static branded cover in the scheme color while the
+    // app loads underneath — no video, no 10s wait — and init
+    // dismisses it fast the moment the first render lands.
+    splash.addEventListener("click", dismiss, { once: true });
+    return;
+  }
   if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
     splash.remove();
     maybeShowLanding();
@@ -3677,6 +3860,20 @@ function playOpeningSplash(): void {
   if (video.ended) dismiss();
 }
 
+// The fast dismiss for an OAuth return: the static cover goes away in
+// 200ms once the first render has landed, instead of the film's 800ms
+// fade after a 10s play. The landing check runs after, as usual.
+function dismissSplashFast(): void {
+  const splash = document.getElementById("opening-splash");
+  if (!splash || !splash.isConnected) return;
+  splash.classList.add("is-fading-fast");
+  splash.classList.add("is-fading");
+  window.setTimeout(() => {
+    splash.remove();
+    maybeShowLanding();
+  }, 250);
+}
+
 // ---------- First-run landing ----------
 // Shown once, after the opening film, only when the account has never
 // signed in and the owner has never dismissed it. It exists so the
@@ -3686,6 +3883,11 @@ function playOpeningSplash(): void {
 // possible — nothing here forces an account.
 const LANDING_DISMISSED_KEY = "prism.landingDismissed";
 let landingShown = false;
+// Set once in init on a connect return (gmail/google/outlook
+// connected): the owner just finished a task, and the first-run pitch
+// landing over the inbox they just connected would be jarring. Only
+// this boot is suppressed — a later fresh open can still show it.
+let suppressLandingOnce = false;
 function landingDismissed(): boolean {
   try {
     return localStorage.getItem(LANDING_DISMISSED_KEY) === "1";
@@ -3695,6 +3897,7 @@ function landingDismissed(): boolean {
 }
 function maybeShowLanding(): void {
   if (landingShown) return;
+  if (suppressLandingOnce) return;
   // State is not loaded yet (the reduced-motion path dismisses the
   // film before refreshState finishes): init calls this again after
   // render, so returning here loses nothing.
@@ -3738,11 +3941,43 @@ function dismissLanding(): void {
 
 // ---------- Boot ----------
 (async function init() {
-  playOpeningSplash();
-  setupKeyboardDock();
   const params = new URLSearchParams(location.search);
+  // A return from Google (app sign-in or any connect) skips the film:
+  // it already played on the way out, and sitting through it again is
+  // a dead pause before the thing the owner just did. The splash stays
+  // as a static cover until the first render lands, then goes away
+  // fast (dismissSplashFast, below).
+  const returning =
+    params.has("signin") || params.has("gmail") || params.has("google") || params.has("outlook");
+  playOpeningSplash(returning);
+  setupKeyboardDock();
   const t = params.get("tab");
   if (t === "inboxes" || t === "store" || t === "upkeep" || t === "chat") tab = t as Tab;
+  // The connect-return flags are set here, before the first render, so
+  // the confirmation banner (or the plain-word error with its retry)
+  // is already in the Inboxes the owner lands on — not painted in
+  // after the fact.
+  const gmailParam = params.get("gmail");
+  const googleParam = params.get("google");
+  const outlookParam = params.get("outlook");
+  if (gmailParam === "connected") {
+    justConnected = "gmail";
+    suppressLandingOnce = true;
+  } else if (gmailParam === "error") {
+    connectError = "Gmail sign-in didn't finish. Try again.";
+  }
+  if (googleParam === "connected") {
+    justConnected = "google";
+    suppressLandingOnce = true;
+  } else if (googleParam === "error") {
+    connectError = "Calendar and Drive sign-in didn't finish. Try again.";
+  }
+  if (outlookParam === "connected") {
+    justConnected = "outlook";
+    suppressLandingOnce = true;
+  } else if (outlookParam === "error") {
+    connectError = "Outlook sign-in didn't finish. Try again.";
+  }
   // App sign-in return: the OAuth callback hands back a one-time
   // session token, spent here once for the account id. The token is
   // then dropped from the address bar so it cannot be reused.
@@ -3784,16 +4019,23 @@ function dismissLanding(): void {
   if (tab === "upkeep") await loadUpkeep();
   if (tab === "store") await loadStripeStatus();
   render();
+  if (returning) dismissSplashFast();
   maybeShowLanding();
-  const gmail = params.get("gmail");
+  const gmail = gmailParam;
   if (gmail === "connected") toast("Gmail account connected.");
   if (gmail === "error") toast("Gmail sign-in didn't finish. Try again.", "err");
-  const google = params.get("google");
+  const google = googleParam;
   if (google === "connected") toast("Calendar and Drive connected.");
   if (google === "error") toast("Calendar and Drive sign-in didn't finish. Try again.", "err");
-  const outlook = params.get("outlook");
+  const outlook = outlookParam;
   if (outlook === "connected") toast("Outlook account connected.");
   if (outlook === "error") toast("Outlook sign-in didn't finish. Try again.", "err");
+  // The return params have done their job: drop them from the address
+  // bar so a refresh doesn't replay the banners and toasts. The flags
+  // above already carry this boot's state.
+  if ((gmailParam || googleParam || outlookParam) && tab === "inboxes") {
+    history.replaceState(null, "", "/?tab=inboxes");
+  }
   // A failed connect drops back on Inboxes with the chooser reopened,
   // so the retry is one tap instead of a hunt for the button. The
   // failure notice rides inside the chooser: the toast sits behind the

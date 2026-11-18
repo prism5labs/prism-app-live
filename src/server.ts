@@ -50,6 +50,7 @@ import {
   authUrl,
   handleOAuthCallback,
   listInbox,
+  getMessage as gmailGetMessage,
   saveDraft,
   sendFromAny,
   connectedLabels,
@@ -63,6 +64,7 @@ import {
   authUrl as outlookAuthUrl,
   handleOAuthCallback as outlookHandleOAuthCallback,
   listInbox as outlookListInbox,
+  getMessage as outlookGetMessage,
   saveDraft as outlookSaveDraft,
   connectedLabels as outlookConnectedLabels,
   isValidOutlookLabel,
@@ -660,13 +662,14 @@ async function handleApi(req: Request, path: string): Promise<Response> {
     const connected = connectedLabels(accountId);
     const results = await Promise.all(
       connected.map(async (c) => {
-        const r = await listInbox(accountId, c.label, 8);
+        const r = await listInbox(accountId, c.label, 10);
         return {
           label: c.label,
           title: gmailLabelTitle(c.label, c.email),
           connected: r.connected,
           email: r.email || c.email,
           messages: r.messages,
+          unreadCount: typeof r.unreadCount === "number" ? r.unreadCount : null,
           error: r.error || null,
         };
       }),
@@ -875,6 +878,34 @@ async function handleApi(req: Request, path: string): Promise<Response> {
     return json({ ok: true, draftId: r.draftId });
   }
 
+  // GET /api/gmail/message?accountId&label&id — read one Gmail message
+  // in full. The summary view opens the real message through here, one
+  // tap, instead of rendering the whole inbox.
+  if (path === "/api/gmail/message" && method === "GET") {
+    const accountId = accountIdFrom(req, {});
+    if (!isValidAccountId(accountId)) return bad("accountId required", 400);
+    const label = url.searchParams.get("label") || "";
+    if (!isValidGmailLabel(label)) return bad("bad label", 400);
+    const id = url.searchParams.get("id") || "";
+    if (!id) return bad("id required", 400);
+    const r = await gmailGetMessage(accountId, label as GmailLabel, id);
+    if (!r.ok) return json({ ok: false, error: r.error || "message_failed" });
+    return json({ ok: true, id: r.id, from: r.from, subject: r.subject, date: r.date, body: r.body });
+  }
+
+  // GET /api/outlook/message?accountId&label&id — the same, for Outlook.
+  if (path === "/api/outlook/message" && method === "GET") {
+    const accountId = accountIdFrom(req, {});
+    if (!isValidAccountId(accountId)) return bad("accountId required", 400);
+    const label = url.searchParams.get("label") || "";
+    if (!isValidOutlookLabel(label)) return bad("bad label", 400);
+    const id = url.searchParams.get("id") || "";
+    if (!id) return bad("id required", 400);
+    const r = await outlookGetMessage(accountId, label as OutlookLabel, id);
+    if (!r.ok) return json({ ok: false, error: r.error || "message_failed" });
+    return json({ ok: true, id: r.id, from: r.from, subject: r.subject, date: r.date, body: r.body });
+  }
+
   // Outlook mail (Microsoft Graph): the same shape as Gmail, so an
   // Outlook mailbox shows as its own card in Inboxes and can save real
   // drafts. Without a Microsoft OAuth client the start route answers
@@ -885,13 +916,14 @@ async function handleApi(req: Request, path: string): Promise<Response> {
     const connected = outlookConnectedLabels(accountId);
     const results = await Promise.all(
       connected.map(async (c) => {
-        const r = await outlookListInbox(accountId, c.label, 8);
+        const r = await outlookListInbox(accountId, c.label, 10);
         return {
           label: c.label,
           title: outlookLabelTitle(c.label, c.email),
           connected: r.connected,
           email: r.email || c.email,
           messages: r.messages,
+          unreadCount: typeof r.unreadCount === "number" ? r.unreadCount : null,
           error: r.error || null,
         };
       }),

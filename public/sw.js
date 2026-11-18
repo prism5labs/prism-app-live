@@ -1,5 +1,12 @@
 // Prism 5 service worker. Cache-first for the app shell and static assets,
 // network-first for the API (chat, state, and inboxes must always be fresh).
+// CACHE v27: bumped Nov 18, 2026 for the smoothness + Gmail second
+// pass — gentle 200ms cross-fades on view switches, landing and modal
+// fades, the opening film skipped on OAuth returns, the inbox load
+// parallelized, and the email cards rebuilt as tidy summaries (unread
+// count + needs-attention list, full message one tap away). The cache
+// bump makes existing installs fetch the new main.js and styles.css
+// instead of serving the cached ones.
 // CACHE v26: bumped Nov 18, 2026 for the wizard-standard first slice —
 // the Reading card (text size + high contrast, saved per device) and the
 // Google sign-in/connect smoothing (no "not signed in" flash on the way
@@ -40,7 +47,7 @@
 // Start My Day Stripe links. The cache bump makes existing installs
 // fetch the new main.js and the new sputnik.jpg instead of serving the
 // cached ones.
-const CACHE = "prism5-v26";
+const CACHE = "prism5-v27";
 const SHELL = ["/", "/index.html", "/styles.css", "/main.js", "/manifest.json", "/opening-animation-v3.mp4", "/chat-bg/bg-rocket.jpg", "/chat-bg/bg-helmets.jpg", "/chat-bg/bg-starburst.jpg", "/chat-bg/bg-robot.jpg", "/chat-bg/bg-saucer.jpg", "/chat-bg/bg-raygun.jpg", "/chat-bg/bg-car.jpg", "/chat-bg/bg-pilot.jpg", "/chat-bg/bg-moonbase.jpg", "/chat-bg/bg-diner.jpg", "/chat-bg/bg-launchpad.jpg", "/chat-bg/bg-spacestation.jpg"];
 
 self.addEventListener("install", (event) => {

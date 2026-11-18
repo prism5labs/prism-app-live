@@ -145,28 +145,50 @@ export type InboxMessage = {
   subject: string;
   date: string;
   snippet: string;
+  // True when Graph still has the message marked unread. The summary
+  // view leads with these, so the owner sees what needs attention
+  // instead of the whole inbox.
+  unread?: boolean;
 };
 
 export async function listInbox(
   accountId: string,
   label: OutlookLabel,
   maxResults = 10,
-): Promise<{ connected: boolean; email?: string; messages: InboxMessage[]; error?: string }> {
+): Promise<{
+  connected: boolean;
+  email?: string;
+  messages: InboxMessage[];
+  unreadCount?: number;
+  error?: string;
+}> {
   const acct = getOutlookAccount(accountId, label);
   if (!acct) return { connected: false, messages: [] };
   const token = await freshAccessToken(accountId, label);
   if (!token) return { connected: false, email: acct.email, messages: [], error: "token_failed" };
   const q = new URLSearchParams({
     $top: String(Math.max(1, Math.min(25, Math.floor(maxResults)))),
-    $select: "id,from,subject,receivedDateTime,bodyPreview",
+    $select: "id,from,subject,receivedDateTime,bodyPreview,isRead",
     $orderby: "receivedDateTime desc",
   });
-  const listRes = await fetch(`${GRAPH_BASE}/me/messages?${q.toString()}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
+  // The list and the unread count are independent: ask for both at
+  // once instead of queuing them.
+  const [listRes, folderRes] = await Promise.all([
+    fetch(`${GRAPH_BASE}/me/messages?${q.toString()}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    }),
+    fetch(`${GRAPH_BASE}/me/mailFolders/inbox?$select=unreadItemCount`, {
+      headers: { Authorization: `Bearer ${token}` },
+    }),
+  ]);
+  let unreadCount: number | undefined;
+  if (folderRes.ok) {
+    const f = (await folderRes.json().catch(() => null)) as { unreadItemCount?: number } | null;
+    if (typeof f?.unreadItemCount === "number") unreadCount = f.unreadItemCount;
+  }
   if (!listRes.ok) {
     console.error("Outlook list failed:", listRes.status);
-    return { connected: true, email: acct.email, messages: [], error: "list_failed" };
+    return { connected: true, email: acct.email, messages: [], unreadCount, error: "list_failed" };
   }
   const list = (await listRes.json()) as { value?: any[] };
   const out: InboxMessage[] = (list.value || []).map((m: any) => ({
@@ -177,8 +199,65 @@ export async function listInbox(
     subject: m.subject || "(no subject)",
     date: m.receivedDateTime || "",
     snippet: m.bodyPreview || "",
+    unread: m.isRead === false,
   }));
-  return { connected: true, email: acct.email, messages: out };
+  return { connected: true, email: acct.email, messages: out, unreadCount };
+}
+
+// Read one Outlook message in full. Graph returns the body as text or
+// HTML; HTML is stripped to plain text so the reader shows words, not
+// markup.
+export async function getMessage(
+  accountId: string,
+  label: OutlookLabel,
+  id: string,
+): Promise<{
+  ok: boolean;
+  id?: string;
+  from?: string;
+  subject?: string;
+  date?: string;
+  body?: string;
+  error?: string;
+}> {
+  const acct = getOutlookAccount(accountId, label);
+  if (!acct) return { ok: false, error: "not_connected" };
+  const token = await freshAccessToken(accountId, label);
+  if (!token) return { ok: false, error: "token_failed" };
+  const res = await fetch(
+    `${GRAPH_BASE}/me/messages/${encodeURIComponent(id)}?$select=subject,from,receivedDateTime,body`,
+    { headers: { Authorization: `Bearer ${token}` } },
+  );
+  if (!res.ok) {
+    console.error("Outlook message failed:", res.status);
+    return { ok: false, error: "message_failed" };
+  }
+  const m = (await res.json()) as any;
+  const raw = String(m.body?.content || "");
+  const body =
+    m.body?.contentType === "text"
+      ? raw
+      : raw
+          .replace(/<(br|p|div|li|tr|h\d)[^>]*>/gi, "\n")
+          .replace(/<[^>]+>/g, "")
+          .replace(/&nbsp;/g, " ")
+          .replace(/&amp;/g, "&")
+          .replace(/&lt;/g, "<")
+          .replace(/&gt;/g, ">")
+          .replace(/&quot;/g, '"')
+          .replace(/&#39;/g, "'")
+          .replace(/\n{3,}/g, "\n\n")
+          .trim();
+  return {
+    ok: true,
+    id: String(m.id || id),
+    from: m.from?.emailAddress?.address
+      ? `${m.from.emailAddress.name ? m.from.emailAddress.name + " " : ""}<${m.from.emailAddress.address}>`
+      : "",
+    subject: m.subject || "(no subject)",
+    date: m.receivedDateTime || "",
+    body: body.slice(0, 60000),
+  };
 }
 
 // Save a real draft into an Outlook mailbox. Graph creates the draft
