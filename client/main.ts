@@ -3835,7 +3835,7 @@ function playOpeningSplash(returning: boolean): void {
   }
   splash.addEventListener("click", dismiss, { once: true });
   video.addEventListener("ended", dismiss, { once: true });
-  // If the v4 film fails to load or play, fall back to the v3 opening
+  // If the v5 film fails to load or play, fall back to the v3 opening
   // instead of a black screen. If that fails too, dismiss — the chat
   // is already rendered underneath.
   let fellBack = false;
@@ -3854,6 +3854,16 @@ function playOpeningSplash(returning: boolean): void {
   // Fallback: if the ended event never fires, do not trap the owner
   // behind the splash. The film is 10s, so the cutoff sits past it.
   window.setTimeout(dismiss, 13000);
+  // Stall watchdog: play() can resolve while no frames ever arrive
+  // (a slow connection, a stuck range request) — and a stall fires no
+  // error event, so nothing above rescues it until the 13s backstop.
+  // If the film has not advanced past the first frames a few seconds
+  // in, fall back to the v3 film instead of sitting on a black splash.
+  window.setTimeout(() => {
+    if (!splash.isConnected) return;
+    if (video.ended) return;
+    if (video.currentTime < 0.5 && video.readyState < 3) tryV3Fallback();
+  }, 5000);
   const p = video.play();
   if (p) p.catch(() => tryV3Fallback());
   // If the video already finished before this ran, dismiss now.

@@ -1,12 +1,15 @@
 // Prism 5 service worker. Cache-first for the app shell and static assets,
 // network-first for the API (chat, state, and inboxes must always be fresh).
-// CACHE v27: bumped Nov 18, 2026 for the smoothness + Gmail second
-// pass — gentle 200ms cross-fades on view switches, landing and modal
-// fades, the opening film skipped on OAuth returns, the inbox load
-// parallelized, and the email cards rebuilt as tidy summaries (unread
-// count + needs-attention list, full message one tap away). The cache
-// bump makes existing installs fetch the new main.js and styles.css
-// instead of serving the cached ones.
+// CACHE v28: bumped Nov 18, 2026 for the v5 opening film — the crystalline
+// teal prism figure in place of Prism herself, fading into the golden dust
+// and ending on the gold pyramid mark — plus the no-video hardening: Range
+// requests now bypass the worker entirely (the Cache API cannot store a
+// 206 partial response, so intercepting one only adds failure modes), the
+// splash carries a poster frame so it never sits black while the film
+// loads, and the splash code watches for a stall and falls back to the
+// v3 film. The cache bump makes existing installs fetch the new main.js,
+// the new sw.js, the v5 film and its poster instead of serving the cached
+// ones, and clears any older cache entries on activate.
 // CACHE v26: bumped Nov 18, 2026 for the wizard-standard first slice —
 // the Reading card (text size + high contrast, saved per device) and the
 // Google sign-in/connect smoothing (no "not signed in" flash on the way
@@ -47,8 +50,8 @@
 // Start My Day Stripe links. The cache bump makes existing installs
 // fetch the new main.js and the new sputnik.jpg instead of serving the
 // cached ones.
-const CACHE = "prism5-v27";
-const SHELL = ["/", "/index.html", "/styles.css", "/main.js", "/manifest.json", "/opening-animation-v3.mp4", "/chat-bg/bg-rocket.jpg", "/chat-bg/bg-helmets.jpg", "/chat-bg/bg-starburst.jpg", "/chat-bg/bg-robot.jpg", "/chat-bg/bg-saucer.jpg", "/chat-bg/bg-raygun.jpg", "/chat-bg/bg-car.jpg", "/chat-bg/bg-pilot.jpg", "/chat-bg/bg-moonbase.jpg", "/chat-bg/bg-diner.jpg", "/chat-bg/bg-launchpad.jpg", "/chat-bg/bg-spacestation.jpg"];
+const CACHE = "prism5-v28";
+const SHELL = ["/", "/index.html", "/styles.css", "/main.js", "/manifest.json", "/opening-animation-v3.mp4", "/opening-v5-poster.jpg", "/chat-bg/bg-rocket.jpg", "/chat-bg/bg-helmets.jpg", "/chat-bg/bg-starburst.jpg", "/chat-bg/bg-robot.jpg", "/chat-bg/bg-saucer.jpg", "/chat-bg/bg-raygun.jpg", "/chat-bg/bg-car.jpg", "/chat-bg/bg-pilot.jpg", "/chat-bg/bg-moonbase.jpg", "/chat-bg/bg-diner.jpg", "/chat-bg/bg-launchpad.jpg", "/chat-bg/bg-spacestation.jpg"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -72,13 +75,18 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
   if (event.request.method !== "GET") return;
   if (url.pathname.startsWith("/api/") || url.pathname === "/healthz") return;
+  // Range requests (video streaming and seeking) go straight to the
+  // origin, untouched: the Cache API cannot store a 206 partial
+  // response, so intercepting one only adds failure modes — the put
+  // would reject and the video would gain nothing from the worker.
+  if (event.request.headers.has("Range")) return;
   event.respondWith(
     caches.match(event.request).then((cached) => {
       const network = fetch(event.request)
         .then((res) => {
           if (res.ok) {
             const copy = res.clone();
-            caches.open(CACHE).then((c) => c.put(event.request, copy));
+            caches.open(CACHE).then((c) => c.put(event.request, copy)).catch(() => {});
           }
           return res;
         })
