@@ -97,6 +97,16 @@ import { handleProactiveApi, startProactiveScheduler } from "./server/proactive"
 import { handleDayApi } from "./server/startmyday";
 import { handleResearch } from "./server/research";
 import { handleStripeWebhook, handleStripeStatus } from "./server/stripe";
+// Google sign-in for the app itself: a person, not a device. Same OAuth
+// client as Gmail; the account follows the owner across devices.
+import {
+  authUrlSignin,
+  handleSigninCallback,
+  exchangeSigninSession,
+  authStatus,
+  getPerk,
+  getBackstories,
+} from "./server/auth";
 
 // Switchboard is email. Reports to Prism 5 go to the Labs test inbox.
 export const PRISM_REPORT_ADDRESS = "prism5labstest@gmail.com";
@@ -284,6 +294,12 @@ function stateFor(accountId: string) {
   const a = getOrCreateAccount(accountId);
   const owned = getOwned(accountId);
   const displayName = a.custom_name || "Prism 5";
+  // Sign-in: who this account belongs to, the welcome offer, and the
+  // Photons' backstories. All empty for an account that never signed
+  // in — the perks belong to account creation, not to a device.
+  const auth = authStatus(accountId);
+  const profile = getProfile(accountId);
+  const ownerName = profile.displayName || auth.name || "neighbor";
   return {
     accountId,
     displayName,
@@ -296,6 +312,9 @@ function stateFor(accountId: string) {
     brain: brainConnected(),
     googleConfigured: googleConfigured(),
     microsoftConfigured: microsoftConfigured(),
+    auth,
+    perk: getPerk(accountId),
+    backstories: getBackstories(accountId, ownerName, a.created_at),
     customizations: getCustomizations(accountId),
     photons: PHOTONS.map((p) => ({
       name: p.name,
@@ -665,16 +684,65 @@ async function handleApi(req: Request, path: string): Promise<Response> {
     return Response.redirect(u, 302);
   }
 
-  // GET /api/oauth/google/callback?code&state — finish a Gmail sign-in.
+  // GET /api/oauth/google/callback?code&state — finish a Gmail sign-in,
+  // or an app sign-in. App sign-in rides this same registered redirect
+  // URI (no new URI in the Google console); the state tells it apart:
+  // "<deviceAccountId>:signin" is an app sign-in, anything else is a
+  // Gmail label. A finished app sign-in mints a one-time session token
+  // and hands the browser back to Upkeep to spend it.
   if (path === "/api/oauth/google/callback" && method === "GET") {
     const code = url.searchParams.get("code") || "";
     const state = url.searchParams.get("state") || "";
-    const r = await handleOAuthCallback(code, state);
     const base = config.appUrl || "";
+    if (state.endsWith(":signin")) {
+      const r = await handleSigninCallback(code, state);
+      const dest = r.ok
+        ? `${base}/?tab=upkeep&signin=ok&session=${encodeURIComponent(r.sessionToken)}`
+        : `${base}/?tab=upkeep&signin=error`;
+      return Response.redirect(dest, 302);
+    }
+    const r = await handleOAuthCallback(code, state);
     const dest = r.ok
       ? `${base}/?tab=inboxes&gmail=connected`
       : `${base}/?tab=inboxes&gmail=error`;
     return Response.redirect(dest, 302);
+  }
+
+  // GET /api/oauth/google/start-signin?accountId — begin an app
+  // sign-in with Google. Same OAuth client as Gmail; scopes are only
+  // openid, email, profile (identity, nothing else).
+  if (path === "/api/oauth/google/start-signin" && method === "GET") {
+    const accountId = url.searchParams.get("accountId") || "";
+    if (!isValidAccountId(accountId)) return bad("accountId required", 400);
+    const u = authUrlSignin(accountId);
+    if (!u) {
+      return json({
+        ok: false,
+        error: "google_not_configured",
+        message:
+          "Google sign-in isn't set up on this server yet. It needs a Google OAuth client (client ID, secret, and redirect).",
+      });
+    }
+    return Response.redirect(u, 302);
+  }
+
+  // POST /api/auth/session — spend a one-time sign-in token for the
+  // account id. The token is spent on first use and expires after 10
+  // minutes, so a stray URL cannot sign anyone in later.
+  if (path === "/api/auth/session" && method === "POST") {
+    const body = await readBody(req);
+    const token = String(body.token || "").trim();
+    if (!token) return bad("token required", 400);
+    const exchanged = exchangeSigninSession(token);
+    if (!exchanged) return json({ ok: false, error: "bad_session" });
+    return json({ ok: true, isNew: exchanged.isNew, ...stateFor(exchanged.accountId) });
+  }
+
+  // GET /api/auth/status — is this account signed in, and as whom?
+  if (path === "/api/auth/status" && method === "GET") {
+    const accountId = accountIdFrom(req, {});
+    if (!isValidAccountId(accountId)) return bad("accountId required", 400);
+    return json({ ok: true, ...authStatus(accountId) });
   }
 
   // Steps 4 + 6 — GET /api/oauth/google/start-extra — begin a Calendar +

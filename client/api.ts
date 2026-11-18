@@ -20,6 +20,26 @@ export function getAccountId(): string {
   return id;
 }
 
+// Signing in swaps the anonymous device id for the Google-linked
+// account id, and signing out swaps back to a fresh device id. The
+// server is the source of truth either way; this only changes what the
+// browser sends.
+export function setAccountId(id: string): void {
+  try {
+    localStorage.setItem("prism5.accountId", id);
+  } catch {
+    // Private mode: the id lasts for this session only.
+  }
+}
+
+export function clearAccountId(): void {
+  try {
+    localStorage.removeItem("prism5.accountId");
+  } catch {
+    // Nothing stored, nothing to clear.
+  }
+}
+
 async function req(path: string, opts: RequestInit = {}): Promise<any> {
   const res = await fetch(path, {
     ...opts,
@@ -242,6 +262,12 @@ export const api = {
       body: JSON.stringify({ accountId: getAccountId(), query }),
     }),
   stripeStatus: () => req("/api/stripe/status"),
+  // Google sign-in for the app itself. authSession spends the one-time
+  // token the OAuth callback hands back; the account id it returns is
+  // the one the browser uses from then on.
+  authStatus: () => req(`/api/auth/status?accountId=${encodeURIComponent(getAccountId())}`),
+  authSession: (token: string) =>
+    req("/api/auth/session", { method: "POST", body: JSON.stringify({ token }) }),
   inboxes: () => req(`/api/inboxes?accountId=${encodeURIComponent(getAccountId())}`),
   saveDraft: (label: string, to: string, subject: string, body: string) =>
     req("/api/inboxes/draft", {

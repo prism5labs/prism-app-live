@@ -1,7 +1,7 @@
 // Prism 5 — standalone client. Four tabs: Chat, Inboxes, Store, Upkeep.
 // No provider or model names appear anywhere in the visible copy.
 
-import { api, getAccountId } from "./api";
+import { api, getAccountId, setAccountId, clearAccountId } from "./api";
 import { portraitHtml } from "./ui";
 import { SUPERNOVA, SATELLITE, UPKEEP, PRODUCTS, CATEGORIES } from "../src/shared/catalog";
 import { TIER_COPY, UPKEEP_COPY, FREE_CHATS_COPY } from "../src/shared/tiers";
@@ -878,6 +878,15 @@ function renderChatFront(): string {
   </section>`;
 }
 
+// A Photon's backstory, from the day the owner's account was created.
+// Display only, never saved into the thread. Empty for accounts that
+// never signed in — the stories are an account-creation perk.
+function backstoryBlock(photon: string): string {
+  const story = (state as any)?.backstories?.[photon];
+  if (!story) return "";
+  return `<div class="msg bot">${portraitHtml(portraitNameOf(PHOTONS.find((x) => x.name === photon) || { name: photon }), 28)}<div><p><b>How ${esc(photon)} began.</b></p><p>${esc(story)}</p></div></div>`;
+}
+
 // ---------- Chat thread ----------
 function renderChatThread(): string {
   const p = PHOTONS.find((x) => x.name === activePhoton);
@@ -903,8 +912,9 @@ function renderChatThread(): string {
         .join("")
     // Empty thread: the Photon introduces itself, who it is and what it
     // was built for, instead of a generic greeting. Display only, never
-    // saved into the thread.
-    : botMsg(p.intro.replaceAll("{name}", face));
+    // saved into the thread. A signed-in owner also sees how this
+    // Photon began — the backstory from the day the account was created.
+    : botMsg(p.intro.replaceAll("{name}", face)) + backstoryBlock(p.name);
   return `
   <section class="thread${look ? ` look-${look.id}` : ""}">
     <div class="thread-head">
@@ -2010,14 +2020,37 @@ function renderMemoryImport(): string {
 // can unlock the purchase on the buyer's account. Format:
 // "<accountId>:<hint>". The server only trusts an account part starting
 // with "acc_"; a bare hint unlocks nothing.
+//
+// A live welcome offer rides along too: while the account's 15%-off
+// first-order perk is active, the code is prefilled at checkout, so the
+// discount is already there when the page opens. No code to type, and
+// the offer simply stops prefilling once its 10 days are up or it is used.
 function buyUrl(url: string, hint: string): string {
   const sep = url.includes("?") ? "&" : "?";
-  return `${url}${sep}client_reference_id=${encodeURIComponent(getAccountId() + ":" + hint)}`;
+  let out = `${url}${sep}client_reference_id=${encodeURIComponent(getAccountId() + ":" + hint)}`;
+  const perk = (state as any)?.perk;
+  if (perk && perk.active && perk.code) {
+    out += `&prefilled_promo_code=${encodeURIComponent(perk.code)}`;
+  }
+  return out;
 }
 
 function buyButton(url: string, label: string, owned: boolean): string {
   if (owned) return `<span class="owned-badge">Owned — yours already</span>`;
   return `<a class="btn primary" href="${esc(url)}" target="_blank" rel="noopener">Buy — ${esc(label)}</a>`;
+}
+
+// The welcome offer, shown while it is live: 15% off the first order,
+// 10 days from account creation. The code is already filled in at
+// checkout, so there is nothing to type and nothing to remember. When
+// the offer is used or its 10 days are up, this says nothing at all.
+function perkBanner(): string {
+  const perk = (state as any)?.perk;
+  if (!perk || !perk.active) return "";
+  return `<div class="card perk-card">
+    <h2>Your welcome offer — 15% off your first order</h2>
+    <p>Your code is <b>${esc(perk.code)}</b>, good until ${esc(fmtDateOnly(perk.expiresAt))}. It is already filled in at checkout, so the discount is there when the page opens. One order only — after that, the offer is spent.</p>
+  </div>`;
 }
 
 function productCard(p: (typeof PRODUCTS)[number]): string {
@@ -2087,6 +2120,7 @@ function renderStore(): string {
   return `
   <section>
     <div class="store-head"><img src="/brand/starburst.jpg" alt=""><div><h1 class="page-title">Store</h1><p>A Launch is the helper you talk with in this app. Pick the helper that fits your day, then pick how you want to pay. The prices are further down, after a plain explanation of how it all works.</p></div></div>
+    ${perkBanner()}
     ${stripeStatusData
       ? `<p class="fine stripe-line">${stripeStatusData.configured ? "Automatic unlocks are on — a purchase unlocks as soon as Stripe confirms the payment." : "Automatic unlocks are off — the Stripe webhook isn't set up yet. Purchases still unlock by code (redeem one in Upkeep) until it is."}</p>`
       : `<p class="fine">Checking automatic unlocks…</p>`}
@@ -2338,6 +2372,41 @@ async function loadStripeStatus() {
 }
 
 // ---------- Upkeep ----------
+// Your account: sign in with Google so your Photons, chats, and
+// purchases follow you to any device. Signing in is free and creates
+// the account if there is not one yet. We see only your name and
+// email. Signing out leaves everything on the server; signing back in
+// with the same Google account brings it all back.
+function accountCard(): string {
+  const auth = (state as any)?.auth;
+  if (!auth || !auth.signedIn) {
+    return `<div class="card">
+      <h2>Your account</h2>
+      <p>You are not signed in. Your Photons, chats, and purchases live on this device only right now — sign in with Google and they follow you to any device, and they survive a new phone.</p>
+      <p class="fine">Signing in creates your account, and it comes with two things: a story for your first Photon, and 15% off your first order for 10 days.</p>
+      <div class="row"><button class="btn primary" data-action="signin">Sign in with Google</button></div>
+      <p class="fine">We see only your name and email. Nothing else from your Google account is read or kept.</p>
+    </div>`;
+  }
+  const perk = (state as any)?.perk;
+  const prismStory = (state as any)?.backstories?.Prism;
+  return `<div class="card">
+    <h2>Your account</h2>
+    <p>Signed in as <b>${esc(auth.name || auth.email || "")}</b>${auth.email && auth.name ? ` (${esc(auth.email)})` : ""}.</p>
+    <p class="fine">Account since ${esc(fmtDateOnly(auth.since || ""))}. Your Photons, chats, and purchases follow this account to any device.</p>
+    <div class="row"><button class="btn" data-action="signout">Sign out</button></div>
+  </div>
+  ${perk && perk.active ? `<div class="card perk-card">
+    <h2>Your welcome offer — 15% off your first order</h2>
+    <p>Your code is <b>${esc(perk.code)}</b>, good until ${esc(fmtDateOnly(perk.expiresAt))}. It is already filled in at checkout in the Store, so the discount is there when the page opens. One order only.</p>
+    <div class="row"><button class="btn primary" data-action="goto" data-tab="store">Go to the Store</button></div>
+  </div>` : ""}
+  ${prismStory ? `<div class="card">
+    <h2>How Prism began</h2>
+    <p>${esc(prismStory)}</p>
+  </div>` : ""}`;
+}
+
 function renderUpkeep(): string {
   const ownedPhotons: string[] = state?.ownedPhotons || [];
   const ownedProducts: string[] = state?.ownedProducts || [];
@@ -2351,6 +2420,8 @@ function renderUpkeep(): string {
   <section>
     <h1 class="page-title">Upkeep</h1>
     <p class="page-lede">${esc(UPKEEP_COPY.body)}</p>
+
+    ${accountCard()}
 
     <div class="card">
       <h2>Your chats</h2>
@@ -2658,6 +2729,18 @@ document.addEventListener("click", async (e) => {
     render();
   } else if (action === "end-call") {
     endCall();
+  } else if (action === "signin") {
+    // App sign-in with Google. The server redirects to Google and back;
+    // the return lands on Upkeep with a one-time session token.
+    location.href = `/api/oauth/google/start-signin?accountId=${encodeURIComponent(getAccountId())}`;
+  } else if (action === "signout") {
+    // Sign-out is local only: drop this device's account id and start
+    // a fresh anonymous one. Everything stays on the server, and
+    // signing back in with the same Google account brings it all back.
+    clearAccountId();
+    await refreshState();
+    render();
+    toast("Signed out. This device has a fresh, unsigned-in account now.");
   } else if (action === "call-mic") {
     toggleCallMic();
   } else if (action === "check-now") {
@@ -3493,6 +3576,32 @@ function playOpeningSplash(): void {
   const google = params.get("google");
   if (google === "connected") toast("Calendar and Drive connected.");
   if (google === "error") toast("Calendar and Drive sign-in didn't finish. Try again.", "err");
+  // App sign-in return: the OAuth callback hands back a one-time
+  // session token, spent here once for the account id. The token is
+  // then dropped from the address bar so it cannot be reused.
+  const signin = params.get("signin");
+  const session = params.get("session");
+  if (signin === "ok" && session) {
+    const r: any = await api.authSession(session);
+    if (r && r.ok) {
+      // The exchange is the handoff: the browser now uses the linked
+      // account id, so the sign-in survives a refresh and a new device
+      // is one sign-in away from the same account.
+      setAccountId(r.accountId);
+      state = r;
+      const name = r.auth?.name || r.auth?.email || "";
+      toast(
+        r.isNew
+          ? `Account created — welcome to Prism 5${name ? ", " + name : ""}. Your welcome offer and Prism's story are in Upkeep.`
+          : `Signed in — welcome back${name ? ", " + name : ""}.`,
+      );
+    } else {
+      toast("Sign-in didn't finish. Try again.", "err");
+    }
+    history.replaceState(null, "", "/?tab=upkeep");
+  } else if (signin === "error") {
+    toast("Google sign-in didn't finish. Try again.", "err");
+  }
   if (state && !state.brain) {
     // The brain is off until a key is set; the app still works.
     console.info("Brain not connected: set ANTHROPIC_API_KEY to turn chat on.");

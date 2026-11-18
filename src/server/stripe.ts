@@ -30,6 +30,7 @@
 import { timingSafeEqual } from "node:crypto";
 import { config } from "./config";
 import { db, ownPhoton, ownProduct, setUpkeep, getOrCreateAccount } from "./db";
+import { markPerkUsed } from "./auth";
 import { PHOTON_NAMES } from "../shared/photons";
 import { PRODUCTS } from "../shared/catalog";
 
@@ -358,6 +359,16 @@ export async function handleStripeWebhook(req: Request): Promise<Response> {
   const unlocked = mapping.unlocks.map((u) =>
     u.kind === "upkeep" ? "upkeep" : `${u.kind}:${u.ref}`,
   );
+  // A discounted checkout spends the account's welcome offer, when it
+  // has one. total_details.amount_discount is Stripe's own number for
+  // the discount on this session, so no promotion-code name is guessed.
+  const amountDiscount =
+    typeof session?.total_details?.amount_discount === "number"
+      ? session.total_details.amount_discount
+      : 0;
+  if (amountDiscount > 0 && markPerkUsed(mapping.accountId, sessionId)) {
+    console.log(`[stripe] checkout ${sessionId}: welcome offer used for ${mapping.accountId}`);
+  }
   console.log(`[stripe] checkout ${sessionId}: unlocked ${unlocked.join(", ")} for ${mapping.accountId}`);
   return json({
     ok: true,
