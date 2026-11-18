@@ -117,6 +117,58 @@ let memoryParseError = "";
 let stripeStatusData: any = null;
 let stripeLoading = false;
 
+// ---------- Readability: text size + high contrast ----------
+// Older eyes: text size (Normal / Large / Extra-large) and a
+// high-contrast toggle, set from the Reading card in Upkeep, saved on
+// this device only (localStorage). The classes ride on <html> so every
+// reading surface follows — chat bubbles, cards, inbox rows, forms —
+// and they are applied at module load, before the first render, so the
+// app never flashes the wrong size. The composer keeps its layout: the
+// input flexes and the send button is a fixed circle, so bigger text
+// only wraps to more lines.
+type ReadSize = "normal" | "large" | "xl";
+const READABILITY_KEY = "prism.readability.v1";
+let readSize: ReadSize = "normal";
+let readContrast = false;
+function loadReadability(): void {
+  try {
+    const raw = localStorage.getItem(READABILITY_KEY);
+    if (!raw) return;
+    const p = JSON.parse(raw);
+    if (p.size === "large" || p.size === "xl") readSize = p.size;
+    if (typeof p.contrast === "boolean") readContrast = p.contrast;
+  } catch {
+    // A bad or unreadable value keeps the defaults.
+  }
+}
+function applyReadability(): void {
+  const el = document.documentElement;
+  el.classList.toggle("read-large", readSize === "large");
+  el.classList.toggle("read-xl", readSize === "xl");
+  el.classList.toggle("read-contrast", readContrast);
+}
+function saveReadability(): void {
+  try {
+    localStorage.setItem(READABILITY_KEY, JSON.stringify({ size: readSize, contrast: readContrast }));
+  } catch {
+    // Storage unavailable: the setting still holds for this open.
+  }
+}
+function setReadSize(size: ReadSize): void {
+  readSize = size;
+  saveReadability();
+  applyReadability();
+  render();
+}
+function setReadContrast(on: boolean): void {
+  readContrast = on;
+  saveReadability();
+  applyReadability();
+  render();
+}
+loadReadability();
+applyReadability();
+
 const SEND_SVG = `<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 20V6M6 11l6-6 6 6" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 
 const NAV_ICONS: Record<Tab, string> = {
@@ -1837,7 +1889,7 @@ function nextOutlookLabel(): string {
   return `outlook-${n}`;
 }
 
-function connectChooserHtml(): string {
+function connectChooserHtml(notice?: string): string {
   const google = state?.googleConfigured;
   const microsoft = state?.microsoftConfigured;
   const choices: string[] = [];
@@ -1865,7 +1917,7 @@ function connectChooserHtml(): string {
   }
   choices.push(`<button class="btn primary" data-action="goto-messenger">Connect a Facebook Page</button>
         <p class="fine">Your business Facebook Page connects in the Messenger section below — paste a Page access token there. Personal Messenger can't be connected: Meta offers messaging for Facebook Pages only.</p>`);
-  const body = `<p class="card-tagline">Add as many accounts as you like. Each one is a separate sign-in, and each shows up here as its own inbox.</p>
+  const body = `${notice ? `<p class="chat-error">${esc(notice)}</p>` : ""}<p class="card-tagline">Add as many accounts as you like. Each one is a separate sign-in, and each shows up here as its own inbox.</p>
       <div class="connect-choices">
         ${choices.join("\n")}
       </div>
@@ -1873,8 +1925,8 @@ function connectChooserHtml(): string {
   return cardShell("Connect an account", body);
 }
 
-function openConnectChooser(opener: HTMLElement | null) {
-  openCard(connectChooserHtml(), opener);
+function openConnectChooser(opener: HTMLElement | null, notice?: string) {
+  openCard(connectChooserHtml(notice), opener);
 }
 
 function emailCard(acct: any, provider: "gmail" | "outlook"): string {
@@ -2407,6 +2459,23 @@ function accountCard(): string {
   </div>` : ""}`;
 }
 
+function readabilityCard(): string {
+  const sizeBtn = (s: ReadSize, label: string) =>
+    `<button class="btn${readSize === s ? " primary" : ""}" data-action="read-size" data-size="${s}" aria-pressed="${readSize === s}">${label}</button>`;
+  return `<div class="card">
+    <h2>Reading</h2>
+    <p class="fine">Bigger text and stronger contrast, for older eyes. Saved on this device, and it follows you across Chat, Inboxes, the Store, and Upkeep.</p>
+    <h4>Text size</h4>
+    <div class="row" role="group" aria-label="Text size">
+      ${sizeBtn("normal", "Normal")}${sizeBtn("large", "Large")}${sizeBtn("xl", "Extra-large")}
+    </div>
+    <h4>Contrast</h4>
+    <div class="row">
+      <button class="btn${readContrast ? " primary" : ""}" data-action="read-contrast" aria-pressed="${readContrast}">${readContrast ? "High contrast: on" : "High contrast: off"}</button>
+    </div>
+  </div>`;
+}
+
 function renderUpkeep(): string {
   const ownedPhotons: string[] = state?.ownedPhotons || [];
   const ownedProducts: string[] = state?.ownedProducts || [];
@@ -2422,6 +2491,8 @@ function renderUpkeep(): string {
     <p class="page-lede">${esc(UPKEEP_COPY.body)}</p>
 
     ${accountCard()}
+
+    ${readabilityCard()}
 
     <div class="card">
       <h2>Your chats</h2>
@@ -2713,6 +2784,15 @@ document.addEventListener(
 );
 
 document.addEventListener("click", async (e) => {
+  // A connect link leaves for Google or Microsoft: say so on the link
+  // first, so the tap reads as answered while the sign-in loads
+  // instead of sitting there looking dead.
+  const oauthLink = (e.target as HTMLElement).closest('a[href^="/api/oauth/"]') as HTMLAnchorElement | null;
+  if (oauthLink && !oauthLink.dataset.busy) {
+    oauthLink.dataset.busy = "1";
+    oauthLink.textContent = oauthLink.href.includes("microsoft") ? "Connecting to Microsoft…" : "Connecting to Google…";
+    oauthLink.setAttribute("aria-disabled", "true");
+  }
   const t = (e.target as HTMLElement).closest("[data-action]") as HTMLElement | null;
   if (!t) return;
   const action = t.dataset.action;
@@ -2731,8 +2811,17 @@ document.addEventListener("click", async (e) => {
     endCall();
   } else if (action === "signin") {
     // App sign-in with Google. The server redirects to Google and back;
-    // the return lands on Upkeep with a one-time session token.
+    // the return lands on Upkeep with a one-time session token. Say so
+    // on the button first: the redirect can take a moment, and a button
+    // that does nothing while Google loads reads as broken.
+    t.setAttribute("disabled", "");
+    t.textContent = "Taking you to Google…";
     location.href = `/api/oauth/google/start-signin?accountId=${encodeURIComponent(getAccountId())}`;
+  } else if (action === "read-size") {
+    const s = t.dataset.size;
+    setReadSize(s === "large" || s === "xl" ? s : "normal");
+  } else if (action === "read-contrast") {
+    setReadContrast(!readContrast);
   } else if (action === "landing-skip") {
     // First-run landing: continue into the app without an account.
     // The landing stays dismissed on this device from here on.
@@ -3654,7 +3743,43 @@ function dismissLanding(): void {
   const params = new URLSearchParams(location.search);
   const t = params.get("tab");
   if (t === "inboxes" || t === "store" || t === "upkeep" || t === "chat") tab = t as Tab;
-  await refreshState();
+  // App sign-in return: the OAuth callback hands back a one-time
+  // session token, spent here once for the account id. The token is
+  // then dropped from the address bar so it cannot be reused.
+  // The exchange runs BEFORE the first state load and first paint.
+  // Before this, boot loaded state for the old anonymous account,
+  // painted "You are not signed in", and only then exchanged the
+  // token — fixing the state in memory without repainting, so the
+  // signed-out card stayed on screen until a reload. That was the
+  // "not signed in" flash after coming back from Google: the first
+  // render now already carries the signed-in account.
+  const signin = params.get("signin");
+  const session = params.get("session");
+  let signinResult: "new" | "back" | "error" | null = null;
+  let signinName = "";
+  if (signin === "ok" && session) {
+    const r: any = await api.authSession(session);
+    if (r && r.ok) {
+      // The exchange is the handoff: the browser now uses the linked
+      // account id, so the sign-in survives a refresh and a new device
+      // is one sign-in away from the same account.
+      setAccountId(r.accountId);
+      state = r;
+      signinResult = r.isNew ? "new" : "back";
+      signinName = r.auth?.name || r.auth?.email || "";
+      // The landing must not sit over a freshly signed-in account:
+      // the film is still playing on the way back from Google, so the
+      // landing cannot have shown yet, but if it did, take it down.
+      hideLanding();
+    } else {
+      signinResult = "error";
+    }
+    history.replaceState(null, "", "/?tab=upkeep");
+  } else if (signin === "error") {
+    signinResult = "error";
+    history.replaceState(null, "", "/?tab=upkeep");
+  }
+  if (!state) await refreshState();
   if (tab === "inboxes") await loadInboxes();
   if (tab === "upkeep") await loadUpkeep();
   if (tab === "store") await loadStripeStatus();
@@ -3666,35 +3791,35 @@ function dismissLanding(): void {
   const google = params.get("google");
   if (google === "connected") toast("Calendar and Drive connected.");
   if (google === "error") toast("Calendar and Drive sign-in didn't finish. Try again.", "err");
-  // App sign-in return: the OAuth callback hands back a one-time
-  // session token, spent here once for the account id. The token is
-  // then dropped from the address bar so it cannot be reused.
-  const signin = params.get("signin");
-  const session = params.get("session");
-  if (signin === "ok" && session) {
-    const r: any = await api.authSession(session);
-    if (r && r.ok) {
-      // The exchange is the handoff: the browser now uses the linked
-      // account id, so the sign-in survives a refresh and a new device
-      // is one sign-in away from the same account.
-      setAccountId(r.accountId);
-      state = r;
-      // The landing must not sit over a freshly signed-in account:
-      // the film is still playing on the way back from Google, so the
-      // landing cannot have shown yet, but if it did, take it down.
-      hideLanding();
-      const name = r.auth?.name || r.auth?.email || "";
-      toast(
-        r.isNew
-          ? `Account created — welcome to Prism 5${name ? ", " + name : ""}. Your welcome offer and Prism's story are in Upkeep.`
-          : `Signed in — welcome back${name ? ", " + name : ""}.`,
-      );
-    } else {
-      toast("Sign-in didn't finish. Try again.", "err");
-    }
-    history.replaceState(null, "", "/?tab=upkeep");
-  } else if (signin === "error") {
-    toast("Google sign-in didn't finish. Try again.", "err");
+  const outlook = params.get("outlook");
+  if (outlook === "connected") toast("Outlook account connected.");
+  if (outlook === "error") toast("Outlook sign-in didn't finish. Try again.", "err");
+  // A failed connect drops back on Inboxes with the chooser reopened,
+  // so the retry is one tap instead of a hunt for the button. The
+  // failure notice rides inside the chooser: the toast sits behind the
+  // modal (lower z-index) and cannot be seen while it is open. The
+  // landing sits above the chooser when it shows, so it stays shut
+  // then — its own sign-in button is the way forward there, and the
+  // toast carries the message instead.
+  const connectErrorNotice =
+    gmail === "error"
+      ? "Gmail sign-in didn't finish. Try again."
+      : google === "error"
+        ? "Calendar and Drive sign-in didn't finish. Try again."
+        : outlook === "error"
+          ? "Outlook sign-in didn't finish. Try again."
+          : "";
+  if (connectErrorNotice && !document.getElementById("landing")) {
+    openConnectChooser(null, connectErrorNotice);
+  }
+  if (signinResult === "new") {
+    toast(
+      `Account created — welcome to Prism 5${signinName ? ", " + signinName : ""}. Your welcome offer and Prism's story are in Upkeep.`,
+    );
+  } else if (signinResult === "back") {
+    toast(`Signed in — welcome back${signinName ? ", " + signinName : ""}.`);
+  } else if (signinResult === "error") {
+    toast("Sign-in didn't finish. Try again.", "err");
   }
   if (state && !state.brain) {
     // The brain is off until a key is set; the app still works.

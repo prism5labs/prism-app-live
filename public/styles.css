@@ -10,15 +10,22 @@
   --teal-deep: #0A3A3E;
   --cherry: #D62828;
   --cherry-dark: #B01E1E;
+  /* Neon Counter: a brighter cherry for primary buttons, white text on
+     it is 4.63:1 (WCAG AA). The classic --cherry stays for cherry text
+     on cream, where a brighter red would drop under 4.5:1. */
+  --cherry-btn: #DE2E2E;
   --butter: #F4C95D;
   --ink: #2E2620;
   --ink-soft: #5C5142;
   --muted: #6B5D4A;
   --muted-2: #7A6A52;
   --card: #FFFDF6;
-  --line: #E9DCBC;
-  --card-line: #E4D3AC;
-  --field-line: #D9C48C;
+  /* Neon Counter: chrome/silver hairlines on every card and divider,
+     the diner counter edge. High contrast (below) keeps its stronger
+     warm lines, and the Photon look skins keep their own. */
+  --line: #CBD1D5;
+  --card-line: #B7BFC6;
+  --field-line: #C2C8CD;
   --field: #fff;
   --teal-soft: #DDEBE7;
   --meter-track: #EBDCB4;
@@ -69,13 +76,16 @@ a { color: var(--teal); }
   position: sticky;
   top: 0;
   z-index: 40;
-  background: var(--card);
+  /* Neon Counter: the header is deep teal now, the diner counter at
+     the top of the room — the butter brand name and its cherry neon
+     glow sit on it, and the chrome divider reads as counter trim. */
+  background: var(--teal-deep);
   padding-top: env(safe-area-inset-top);
   border-radius: 0 0 var(--phone-radius-sm) var(--phone-radius-sm);
 }
 .app-header {
-  background: var(--card);
-  color: var(--teal);
+  background: transparent;
+  color: var(--cream);
   display: flex;
   align-items: center;
   gap: 9px;
@@ -86,7 +96,9 @@ a { color: var(--teal); }
   font-family: "Patua One", Georgia, serif;
   font-size: 1.18rem;
   font-weight: 400;
-  color: var(--teal);
+  /* Butter on deep teal is 7.92:1; the neon glow is added below in the
+     Neon Counter block. */
+  color: var(--butter);
   line-height: 1;
 }
 .app-header-tag {
@@ -95,7 +107,8 @@ a { color: var(--teal); }
   font-weight: 800;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: #9A8A6C;
+  /* Warm cream on deep teal, 10.0:1. */
+  color: #E8DCC0;
   text-align: right;
   white-space: nowrap;
 }
@@ -149,10 +162,12 @@ a { color: var(--teal); }
 }
 .btn:hover { background: var(--teal-soft); }
 .btn:active { transform: scale(0.97); }
-.btn.primary { background: var(--teal); color: #fff; border-color: var(--teal); }
-.btn.primary:hover { background: var(--teal-deep); }
-.btn.cherry { background: var(--cherry); border-color: var(--cherry); color: #fff; }
-.btn.cherry:hover { background: var(--cherry-dark); }
+/* Neon Counter: the primary button is bright cherry, white text on it
+   4.63:1. Hover deepens to the classic cherry. */
+.btn.primary { background: var(--cherry-btn); color: #fff; border-color: var(--cherry-btn); }
+.btn.primary:hover { background: var(--cherry); }
+.btn.cherry { background: var(--cherry-btn); border-color: var(--cherry-btn); color: #fff; }
+.btn.cherry:hover { background: var(--cherry); }
 .btn.store-outline { background: transparent; color: var(--cherry); border: 1.5px solid var(--cherry); }
 .btn.store-outline:hover { background: #FDECEC; }
 .btn.small { padding: 6px 12px; font-size: 13px; }
@@ -236,6 +251,8 @@ textarea { width: 100%; resize: vertical; }
   font-weight: 700;
   line-height: 1.45;
   padding: 10px 16px;
+  /* Neon Counter: a butter frame around the strip, the counter's edge. */
+  border: 1px solid var(--butter);
   border-radius: 12px;
   margin-top: 16px;
 }
@@ -635,9 +652,12 @@ body.look-night-watch, .thread.look-night-watch, .photon-card.look-night-watch {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--teal);
+  /* Neon Counter: the send button is bright cherry (white arrow on it,
+     4.63:1), the diner's cherry on top. Hover deepens to classic cherry. */
+  background: var(--cherry-btn);
   color: #fff;
 }
+.composer .send:hover { background: var(--cherry); }
 .composer .send svg { width: 19px; height: 19px; }
 
 /* Pinned composer dock: fixed just above the tab bar, solid cream ground so
@@ -1000,7 +1020,9 @@ html.kb-chat body.is-thread .composer-dock #research-results { display: none; }
 /* Bottom nav: gallery tab bar, paper with a hairline top edge.
    Phone shape: top corners round like the phone's frame, and the
    buttons clear the curved screen edges. The bottom edge sits at
-   the screen edge, where the hardware rounds it. */
+   the screen edge, where the hardware rounds it.
+   Neon Counter: the nav is deep teal, the counter itself — cream
+   labels, the active tab in butter with a butter underline. */
 .nav {
   position: fixed;
   left: 0;
@@ -1008,8 +1030,8 @@ html.kb-chat body.is-thread .composer-dock #research-results { display: none; }
   bottom: 0;
   display: flex;
   gap: 4px;
-  background: var(--card);
-  border-top: 1px solid #E7D9B8;
+  background: var(--teal-deep);
+  border-top: 1px solid var(--butter);
   border-radius: var(--phone-radius-sm) var(--phone-radius-sm) 0 0;
   padding: 8px max(10px, env(safe-area-inset-left)) calc(10px + env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-right));
   z-index: 40;
@@ -1026,13 +1048,16 @@ html.kb-chat body.is-thread .composer-dock #research-results { display: none; }
   gap: 2px;
   font-size: 0.68rem;
   font-weight: 800;
-  color: #8A7B63;
+  /* Warm cream on deep teal, 10.0:1. */
+  color: #EFE6CE;
   padding: 6px 2px;
   border-radius: 12px;
   min-height: 44px;
 }
 .nav-btn svg { width: 21px; height: 21px; }
-.nav-btn.active { color: var(--teal); }
+/* Butter on deep teal, 7.92:1; the butter underline is in the Neon
+   Counter block below. */
+.nav-btn.active { color: var(--butter); }
 
 /* Toast. */
 .toast {
@@ -1226,4 +1251,144 @@ html.kb-chat body.is-thread .composer-dock #research-results { display: none; }
 
 @media (prefers-reduced-motion: reduce) {
   .card-modal, .card-sheet { transition: none; }
+}
+
+/* ---------- Readability: text size + high contrast ----------
+   Older eyes: three text sizes and a high-contrast toggle, set from
+   the Reading card in Upkeep and saved on this device (client/main.ts).
+   The classes ride on <html>, so they apply before the first paint.
+   rem-based sizes follow the root font-size; the px-based reading
+   surfaces are scaled explicitly below with --read-scale. The
+   composer keeps its layout: the input flexes, the send button is a
+   fixed circle, and bigger text only wraps to more lines. The diner
+   palette stays (cream #FFF3DC, teal #0F5257, cherry #D62828, butter
+   #F4C95D); high contrast only deepens the inks and lines so text
+   reads harder against the same cream ground. A chosen Photon look
+   keeps its own skin inside its thread; everywhere else, contrast
+   rules. */
+html.read-large { font-size: 18px; --read-scale: 1.16; }
+html.read-xl { font-size: 20px; --read-scale: 1.32; }
+html.read-large body, html.read-xl body { font-size: calc(16px * var(--read-scale)); }
+html.read-large h1, html.read-xl h1 { font-size: calc(30px * var(--read-scale)); }
+html.read-large h2, html.read-xl h2 { font-size: calc(22px * var(--read-scale)); }
+html.read-large h3, html.read-xl h3 { font-size: calc(18px * var(--read-scale)); }
+html.read-large h4, html.read-xl h4 { font-size: calc(15px * var(--read-scale)); }
+html.read-large .page-lede, html.read-xl .page-lede { font-size: calc(15px * var(--read-scale)); }
+html.read-large .fine, html.read-xl .fine { font-size: calc(13px * var(--read-scale)); }
+html.read-large .btn.small, html.read-xl .btn.small { font-size: calc(13px * var(--read-scale)); }
+html.read-large .photon-tag, html.read-xl .photon-tag { font-size: calc(12px * var(--read-scale)); }
+html.read-large input, html.read-large textarea, html.read-xl input, html.read-xl textarea { font-size: calc(16px * var(--read-scale)); }
+html.read-large .inbox-meta, html.read-xl .inbox-meta { font-size: calc(12px * var(--read-scale)); }
+html.read-large .inbox-snippet, html.read-xl .inbox-snippet { font-size: calc(14px * var(--read-scale)); }
+html.read-large .drive-content, html.read-xl .drive-content { font-size: calc(13px * var(--read-scale)); }
+html.read-large .call-heard, html.read-xl .call-heard { font-size: calc(14px * var(--read-scale)); }
+html.read-large .card-kind, html.read-xl .card-kind { font-size: calc(12px * var(--read-scale)); }
+html.read-large .card-tagline, html.read-xl .card-tagline { font-size: calc(15px * var(--read-scale)); }
+html.read-large .card-stats div, html.read-xl .card-stats div { font-size: calc(14px * var(--read-scale)); }
+html.read-large .landing-lede, html.read-xl .landing-lede { font-size: calc(17px * var(--read-scale)); }
+html.read-large .landing-signin, html.read-xl .landing-signin { font-size: calc(16px * var(--read-scale)); }
+html.read-large .landing-skip, html.read-xl .landing-skip { font-size: calc(14px * var(--read-scale)); }
+html.read-large .toast, html.read-xl .toast { font-size: calc(14px * var(--read-scale)); }
+html.read-large .research-item p, html.read-large .check-result li, html.read-xl .research-item p, html.read-xl .check-result li { font-size: calc(14px * var(--read-scale)); }
+html.read-large .day-when, html.read-xl .day-when { font-size: calc(15px * var(--read-scale)); }
+html.read-large .price, html.read-xl .price { font-size: calc(17px * var(--read-scale)); }
+/* Chat text gets a roomier line-height at larger sizes. */
+html.read-large .msg, html.read-xl .msg { line-height: 1.55; }
+
+html.read-contrast {
+  --ink: #171208;
+  --ink-soft: #3A3122;
+  --muted: #453A28;
+  --muted-2: #453A28;
+  --teal: #083638;
+  --teal-deep: #062A2C;
+  --cherry: #A81F1F;
+  --cherry-dark: #7E1717;
+  /* Neon Counter: the bright cherry button darkens with the rest in
+     high contrast, so white text on it stays well over 4.5:1. */
+  --cherry-btn: #A81F1F;
+  --line: #C4AF7E;
+  --card-line: #B49B62;
+  --field-line: #8A7A52;
+  --teal-soft: #C8E2DC;
+  --meter-track: #DCCFA6;
+}
+html.read-contrast .app-header-tag { color: #EADFC6; }
+html.read-contrast .nav-btn { color: #EFE6CE; }
+html.read-contrast .btn.store-outline:hover { background: #FADFDF; }
+
+/* ---------- Neon Counter: the 1950s diner turned all the way up ----------
+   Neil picked "the diner one" (Nov 18, 2026). Same diner palette —
+   cream #FFF3DC, deep teal #0F5257, cherry #D62828, butter #F4C95D —
+   with the lights on: the header and nav are deep teal, primary
+   buttons are bright cherry, cards wear thin chrome/silver hairlines
+   (the --line / --card-line / --field-line values in :root), and the
+   brand mark and large display headings carry a cherry/pink neon glow.
+   The glow is STATIC everywhere except one very slow breathe on the
+   brand mark alone, and that breathe is off under
+   prefers-reduced-motion. Glow NEVER touches body copy or small text:
+   it is only on .app-header-name, the front greeting, the view
+   titles, the landing heading, the character-sheet title, and the
+   opening greeting. Body copy stays dark ink on cream at 4.5:1 or
+   better everywhere.
+   A chosen Photon look keeps its own skin inside its thread: these
+   rules use the palette variables, so a skin's own --teal-deep,
+   --cherry and --butter ride through, and nothing here sets a
+   hard-coded color inside .thread. The readability first slice is
+   untouched — the Reading card's text-size and high-contrast controls
+   still ride on <html>, and the contrast overrides above keep their
+   stronger lines and darker cherry. */
+/* The brand mark: butter on deep teal, lit like a neon sign. */
+.app-header-name {
+  text-shadow:
+    0 0 6px rgba(255, 107, 94, 0.85),
+    0 0 18px rgba(255, 80, 70, 0.55),
+    0 0 34px rgba(214, 40, 40, 0.45);
+}
+/* Large display headings on cream: a soft halo, never a blaze. */
+.greeting,
+.page-title,
+.card-title {
+  text-shadow:
+    0 0 12px rgba(255, 107, 94, 0.28),
+    0 0 30px rgba(214, 40, 40, 0.16);
+}
+/* The landing heading is the neon sign itself: cherry on cream
+   (4.56:1 at 34px) with the halo. */
+.landing-card h1 {
+  color: var(--cherry);
+  text-shadow:
+    0 0 12px rgba(255, 107, 94, 0.4),
+    0 0 30px rgba(214, 40, 40, 0.25);
+}
+/* The opening greeting keeps its readability shadow and gains a pink
+   halo behind it. */
+.opening-splash-greeting {
+  text-shadow:
+    0 2px 18px rgba(0, 0, 0, 0.65),
+    0 0 26px rgba(255, 107, 94, 0.5),
+    0 0 60px rgba(214, 40, 40, 0.35);
+}
+/* Butter highlights: the active tab wears a butter underline, the
+   counter's edge. */
+.nav-btn.active { box-shadow: inset 0 -3px 0 var(--butter); }
+/* One slow breathe on the brand mark alone — six seconds, glow only.
+   Fully disabled under prefers-reduced-motion (no animation rule
+   exists there, so the static glow above is all that shows). */
+@keyframes neon-breathe {
+  0%, 100% {
+    text-shadow:
+      0 0 6px rgba(255, 107, 94, 0.85),
+      0 0 18px rgba(255, 80, 70, 0.55),
+      0 0 34px rgba(214, 40, 40, 0.45);
+  }
+  50% {
+    text-shadow:
+      0 0 8px rgba(255, 107, 94, 1),
+      0 0 26px rgba(255, 80, 70, 0.75),
+      0 0 48px rgba(214, 40, 40, 0.6);
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .app-header-name { animation: neon-breathe 6s ease-in-out infinite; }
 }

@@ -147,11 +147,28 @@ Confirmed against app.prism5labs.com:
   cannot show whether the code is prefilled in a real browser, and the
   15% discount showing on the page was NOT confirmed by this check.
 
+## Browser verification (Nov 17, 2026, ~21:19–21:23 CST, real browser)
+
+Google sign-in verified end to end on the live app:
+
+- Tapped "Sign in with Google" in Upkeep, chose aode1282@gmail.com,
+  continued past Google's unverified-app warning, granted consent twice
+  (sign-in, then access sharing name and email). Google redirected back
+  to `/?tab=upkeep&signin=ok`. No one-time code step was required.
+- After one reload, Upkeep showed "Signed in as neil saindon
+  (aode1282@gmail.com). Account since Nov 17, 2026." with a Sign out
+  button. The welcome offer shows in Upkeep (15% off first order, code
+  WELCOME15, good until Nov 27, 2026, already filled in at checkout,
+  one order only) and the "How Prism began" backstory shows. The Store
+  tab shows the same welcome banner at the top.
+- Quirk: right after the Google redirect the page briefly showed "You
+  are not signed in" alongside an "Account created — welcome to Prism
+  5, neil saindon" banner; one reload resolved it and the signed-in
+  state then persisted.
+- No purchase was made and no payment was entered.
+
 ## Still to verify live (needs a browser + a Google login)
 
-- Tap "Sign in with Google" in Upkeep on the live app, pick a Google
-  account, allow: lands back signed in, with the welcome offer and
-  Prism's story in Upkeep.
 - Sign in on a second browser/device with the same Google account:
   same account, same Photons and chats.
 - Sign out, sign back in: the account comes back.
