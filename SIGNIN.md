@@ -121,6 +121,32 @@ day items, Stripe payments, Google identities) because the copy clashed
 with the row itself. Those tables now move with a plain UPDATE; only
 tables whose key includes `account_id` use copy-and-delete.
 
+## Live verification (Nov 18, 2026, ~01:08 UTC, after deploy of 96f475a)
+
+Confirmed against app.prism5labs.com:
+
+- `/healthz` returns `{"ok":true,"brain":true,"provider":"anthropic"}`.
+- `/api/auth/status` with an `X-Account-Id` header returns
+  `{"ok":true,"signedIn":false}` for an unsigned account; without the
+  header it returns 400 "accountId required".
+- `/api/oauth/google/start-signin?accountId=<id>` returns 302 to
+  `accounts.google.com` with the real Gmail OAuth client id, the
+  registered callback
+  `https://prism-app-live.onrender.com/api/oauth/google/callback`,
+  scope `openid email profile`, `access_type=offline`,
+  `prompt=consent`, and state `<id>:signin`.
+- `/api/state` for an unsigned account carries `auth: {signedIn:
+  false}`, `perk: null`, `backstories: []`, and all 12 Photons.
+- Stripe (verified via the Stripe API): coupon `welcome15` live and
+  valid; promotion code `WELCOME15` live, active, first-time-transaction
+  only; all 74 Payment Links have `allow_promotion_codes: true`.
+- Checkout page check (text fetch, no purchase): a live Payment Link
+  renders "Pay Prism 5 Labs" with an "Add promotion code" field, which
+  proves promotion codes are enabled on the link. The fetch snapshot is
+  identical with and without `?prefilled_promo_code=WELCOME15`, so it
+  cannot show whether the code is prefilled in a real browser, and the
+  15% discount showing on the page was NOT confirmed by this check.
+
 ## Still to verify live (needs a browser + a Google login)
 
 - Tap "Sign in with Google" in Upkeep on the live app, pick a Google
