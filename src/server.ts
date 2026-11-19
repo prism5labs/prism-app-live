@@ -708,7 +708,7 @@ async function handleApi(req: Request, path: string): Promise<Response> {
   // URI (no new URI in the Google console); the state tells it apart:
   // "<deviceAccountId>:signin" is an app sign-in, anything else is a
   // Gmail label. A finished app sign-in mints a one-time session token
-  // and hands the browser back to Upkeep to spend it.
+  // and hands the browser back to You to spend it.
   if (path === "/api/oauth/google/callback" && method === "GET") {
     const code = url.searchParams.get("code") || "";
     const state = url.searchParams.get("state") || "";
@@ -716,14 +716,14 @@ async function handleApi(req: Request, path: string): Promise<Response> {
     if (state.endsWith(":signin")) {
       const r = await handleSigninCallback(code, state);
       const dest = r.ok
-        ? `${base}/?tab=upkeep&signin=ok&session=${encodeURIComponent(r.sessionToken)}`
-        : `${base}/?tab=upkeep&signin=error`;
+        ? `${base}/?tab=you&signin=ok&session=${encodeURIComponent(r.sessionToken)}`
+        : `${base}/?tab=you&signin=error`;
       return Response.redirect(dest, 302);
     }
     const r = await handleOAuthCallback(code, state);
     const dest = r.ok
-      ? `${base}/?tab=inboxes&gmail=connected`
-      : `${base}/?tab=inboxes&gmail=error`;
+      ? `${base}/?tab=connected&gmail=connected`
+      : `${base}/?tab=connected&gmail=error`;
     return Response.redirect(dest, 302);
   }
 
@@ -811,8 +811,8 @@ async function handleApi(req: Request, path: string): Promise<Response> {
     const r = await handleExtraOAuthCallback(code, state);
     const base = config.appUrl || "";
     const dest = r.ok
-      ? `${base}/?tab=inboxes&google=connected`
-      : `${base}/?tab=inboxes&google=error`;
+      ? `${base}/?tab=connected&google=connected`
+      : `${base}/?tab=connected&google=error`;
     return Response.redirect(dest, 302);
   }
 
@@ -986,8 +986,8 @@ async function handleApi(req: Request, path: string): Promise<Response> {
     const r = await outlookHandleOAuthCallback(code, state);
     const base = config.appUrl || "";
     const dest = r.ok
-      ? `${base}/?tab=inboxes&outlook=connected`
-      : `${base}/?tab=inboxes&outlook=error`;
+      ? `${base}/?tab=connected&outlook=connected`
+      : `${base}/?tab=connected&outlook=error`;
     return Response.redirect(dest, 302);
   }
 

@@ -84,6 +84,25 @@ function setGoogleToken(
   accessToken: string | null,
   tokenExpiry: number | null,
 ): void {
+  // The Calendar + Drive sign-in records only its own scopes.
+  recordGoogleToken(accountId, email, refreshToken, accessToken, tokenExpiry, EXTRA_SCOPES.join(" "));
+}
+
+// One Google sign-in for Gmail, Calendar, and Drive (redesign,
+// Nov 19, 2026): the Gmail sign-in now asks for the Calendar and
+// Drive scopes too, so the same consent fills both token stores —
+// the Gmail row in gmail.ts and this row here — and the owner signs
+// in once instead of twice. The scope_set recorded is the set the
+// token was actually granted, so a partial grant never claims a
+// service it cannot reach.
+export function recordGoogleToken(
+  accountId: string,
+  email: string,
+  refreshToken: string,
+  accessToken: string | null,
+  tokenExpiry: number | null,
+  scopeSet: string,
+): void {
   db.query(
     `INSERT INTO google_tokens (account_id, scope_set, email, refresh_token, access_token, token_expiry)
      VALUES (?, ?, ?, ?, ?, ?)
@@ -91,7 +110,7 @@ function setGoogleToken(
        scope_set = excluded.scope_set, email = excluded.email,
        refresh_token = excluded.refresh_token,
        access_token = excluded.access_token, token_expiry = excluded.token_expiry`,
-  ).run(accountId, EXTRA_SCOPES.join(" "), email, refreshToken, accessToken, tokenExpiry);
+  ).run(accountId, scopeSet, email, refreshToken, accessToken, tokenExpiry);
 }
 
 function updateGoogleAccessToken(accountId: string, accessToken: string, tokenExpiry: number): void {

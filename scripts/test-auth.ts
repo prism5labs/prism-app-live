@@ -96,7 +96,7 @@ try {
   check(
     "callback with a fake code redirects to the error page",
     cbRes.status === 302 &&
-      (cbRes.headers.get("location") || "").includes("tab=upkeep&signin=error"),
+      (cbRes.headers.get("location") || "").includes("tab=you&signin=error"),
     `${cbRes.status} ${(cbRes.headers.get("location") || "")}`,
   );
 
@@ -357,12 +357,12 @@ console.log("Client render");
     await new Promise((r) => setTimeout(r, 800));
     return window;
   }
-  const upWin = await bootDom("upkeep");
+  const upWin = await bootDom("you");
   const upHtml = upWin.document.getElementById("view")?.innerHTML || "";
-  check("Upkeep shows the signed-in account", upHtml.includes("Signed in as") && upHtml.includes("test@example.com"));
-  check("Upkeep shows the welcome offer with the code", upHtml.includes("WELCOME15") && upHtml.includes("15% off"));
-  check("Upkeep shows Prism's backstory", upHtml.includes("How Prism began") && upHtml.includes("Test Person"));
-  check("Upkeep offers sign-out, not sign-in", upHtml.includes("Sign out") && !upHtml.includes("Sign in with Google"));
+  check("You shows the signed-in account", upHtml.includes("Signed in as") && upHtml.includes("test@example.com"));
+  check("You shows the welcome offer with the code", upHtml.includes("WELCOME15") && upHtml.includes("15% off"));
+  check("You shows Prism's backstory", upHtml.includes("How Prism began") && upHtml.includes("Test Person"));
+  check("You offers sign-out, not sign-in", upHtml.includes("Sign out") && !upHtml.includes("Sign in with Google"));
   const stWin = await bootDom("store");
   const stHtml = stWin.document.getElementById("view")?.innerHTML || "";
   check("Store shows the welcome offer banner", stHtml.includes("WELCOME15") && stHtml.includes("15% off"));
@@ -381,7 +381,7 @@ console.log("Client render");
   // to the signed-in account. Boot must adopt the linked id in this
   // context and show signed in, without another Google round trip.
   async function bootOrphanDom() {
-    const dom = new JSDOM(html, { url: `${BASE}/?tab=upkeep`, runScripts: "outside-only", pretendToBeVisual: true });
+    const dom = new JSDOM(html, { url: `${BASE}/?tab=you`, runScripts: "outside-only", pretendToBeVisual: true });
     const { window } = dom as any;
     (window as any).matchMedia = () => ({
       matches: false,
@@ -423,7 +423,7 @@ console.log("Client render");
   // State never loads: the account card must say the server didn't
   // answer, not "not signed in", and the pill must say unreachable.
   async function bootUnreachableDom() {
-    const dom = new JSDOM(html, { url: `${BASE}/?tab=upkeep`, runScripts: "outside-only", pretendToBeVisual: true });
+    const dom = new JSDOM(html, { url: `${BASE}/?tab=you`, runScripts: "outside-only", pretendToBeVisual: true });
     const { window } = dom as any;
     (window as any).matchMedia = () => ({
       matches: false,

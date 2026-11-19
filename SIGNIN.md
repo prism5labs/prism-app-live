@@ -1,5 +1,12 @@
 # Google sign-in for the Prism app (Nov 17, 2026)
 
+> Redesign note (Nov 19, 2026, branch `prism-redesign-2026-11-19`): the
+> tabs were renamed after this record was written — Upkeep is now You,
+> Inboxes is now Connected. The sign-in button lives in You ("Your
+> account" card), the sign-in return is now `/?tab=you&signin=ok`, and
+> connect returns are now `/?tab=connected`. The history below still
+> describes what was verified on the fix branch, under the old names.
+
 Accounts used to be a device-generated id in localStorage, sent as
 `X-Account-Id`. The server created the account on first sight, and
 everything hung off that device id. Clearing browser data, losing the

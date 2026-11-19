@@ -236,29 +236,10 @@ textarea { width: 100%; resize: vertical; }
 .card-head img.mark { width: 34px; height: 38px; object-fit: cover; border-radius: 8px; flex: none; }
 .card-head h2, .card-head h3 { margin: 0; }
 
-/* ---------- Front page: sputnik banner, medallion portrait ---------- */
+/* ---------- Front page (redesign, Nov 19, 2026): no hero banner, no
+   medallion — the greeting, the day, and the Faces are the home screen. */
 .front { text-align: center; }
-.sputnik-hero { position: relative; margin: 16px 16px 0; }
-.sputnik-hero .sp-img {
-  width: 100%;
-  height: 172px;
-  object-fit: cover;
-  object-position: center 22%;
-  display: block;
-  border-radius: 18px;
-}
-.round-portrait-wrap {
-  position: absolute;
-  left: 50%;
-  bottom: -38px;
-  transform: translateX(-50%);
-}
-.round-portrait-wrap .portrait {
-  border-radius: 50%;
-  border: 3px solid var(--cream);
-  box-shadow: 0 0 0 2px var(--teal), 0 10px 22px rgba(46, 38, 32, 0.22);
-}
-.front-body { padding: 48px 24px 0; text-align: center; }
+.front-body { padding: 20px 24px 0; text-align: center; }
 .greeting { font-family: "Patua One", Georgia, serif; font-size: 1.6rem; color: var(--ink); margin: 0 0 2px; }
 .greeting-accent { color: var(--ink); }
 .tagline { margin: 0; font-size: 0.88rem; font-weight: 700; color: var(--muted-2); }
@@ -268,23 +249,8 @@ textarea { width: 100%; resize: vertical; }
 .empty-panel { text-align: left; }
 .empty-panel p { font-size: 0.83rem; color: var(--ink-soft); }
 .empty-panel .store-btn { width: 100%; font-size: 1rem; padding: 13px; margin-top: 4px; }
-.empty-panel .redeem-row { display: flex; gap: 8px; margin-top: 10px; }
-.meter { font-size: 0.78rem; font-weight: 700; color: var(--muted-2); text-align: center; margin-top: 14px; }
 .meter-bar { height: 7px; border-radius: 99px; background: var(--meter-track); overflow: hidden; margin-top: 5px; }
 .meter-fill { display: block; height: 100%; background: var(--teal); border-radius: 99px; }
-.mission-strip {
-  background: var(--teal-deep);
-  color: #FFF3DC;
-  text-align: center;
-  font-size: 0.74rem;
-  font-weight: 700;
-  line-height: 1.45;
-  padding: 10px 16px;
-  /* Neon Counter: a butter frame around the strip, the counter's edge. */
-  border: 1px solid var(--butter);
-  border-radius: 12px;
-  margin-top: 16px;
-}
 
 /* Photon grid: simple gallery cards, portraits carry the 1950s. */
 .photon-grid {
@@ -613,7 +579,7 @@ body.look-night-watch, .thread.look-night-watch, .photon-card.look-night-watch {
   pointer-events: none;
   opacity: 1;
   transform: translateX(0);
-  transition: opacity 0.45s ease, transform 0.45s ease;
+  transition: opacity 0.7s ease, transform 0.7s ease;
 }
 .app-bg.is-sliding {
   opacity: 0;
@@ -873,18 +839,13 @@ html.kb-chat body.is-thread .composer-dock #research-results { display: none; }
   .app-header-mark { animation: gem-bob 5s ease-in-out infinite, gem-glow 5s ease-in-out infinite; }
   .chrome-thin { background-size: 200% 100%; animation: chrome-shimmer 9s linear infinite; }
   .thread-head .portrait { animation: ring-breathe 4s ease-in-out infinite; }
-  .round-portrait-wrap .portrait { animation: medallion-float 6s ease-in-out infinite; }
   .switchboard-strip img { animation: poster-glow 5s ease-in-out infinite; }
-  .sputnik-hero { overflow: hidden; border-radius: 18px; }
-  .sputnik-hero .sp-img { animation: sputnik-drift 24s ease-in-out infinite alternate; }
 }
 @keyframes gem-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-2px); } }
 @keyframes gem-glow { 0%, 100% { box-shadow: 0 0 0 0 rgba(244, 201, 93, 0); } 50% { box-shadow: 0 0 12px 2px rgba(244, 201, 93, 0.55); } }
 @keyframes chrome-shimmer { 0% { background-position: 0% 0; } 100% { background-position: 200% 0; } }
 @keyframes ring-breathe { 0%, 100% { box-shadow: 0 0 0 1.5px var(--teal); } 50% { box-shadow: 0 0 0 1.5px var(--teal), 0 0 14px 2px rgba(244, 201, 93, 0.6); } }
-@keyframes medallion-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
 @keyframes poster-glow { 0%, 100% { box-shadow: none; } 50% { box-shadow: 0 0 12px rgba(244, 201, 93, 0.5); } }
-@keyframes sputnik-drift { from { transform: scale(1); } to { transform: scale(1.06) translateX(-4px); } }
 
 /* ---------- Store: posters as thumbnails, plain buying text ---------- */
 .store-head { padding: 16px 18px 2px; display: flex; align-items: center; gap: 10px; }
@@ -1266,7 +1227,7 @@ html.kb-chat body.is-thread .composer-dock #research-results { display: none; }
   background: rgba(46, 38, 32, 0.55);
   padding: 16px 16px calc(16px + env(safe-area-inset-bottom));
   opacity: 0;
-  transition: opacity 0.2s ease;
+  transition: opacity 0.35s ease;
 }
 .card-modal.open { opacity: 1; }
 .card-modal[hidden] { display: none; }
@@ -1283,7 +1244,7 @@ html.kb-chat body.is-thread .composer-dock #research-results { display: none; }
   overflow-y: auto;
   padding: 18px;
   transform: translateY(12px);
-  transition: transform 0.2s ease;
+  transition: transform 0.35s ease;
 }
 .card-modal.open .card-sheet { transform: none; }
 .card-x {
@@ -1470,30 +1431,41 @@ html.read-contrast .btn.store-outline:hover { background: #FADFDF; }
 }
 
 /* ---------- Smoothness: one coherent app, not pieces stuck together --
-   Nov 18, 2026 second pass. Every major change of scene eases instead
-   of cutting: view switches fade in over 200ms, the landing fades in
-   over 250ms, the card modal fades out as well as in (the close used
-   to hide at once — see closeCard in client/main.ts), the nav active
-   state eases, and an OAuth return skips the opening film (the splash
-   stays as a static cover until the first render, then fades in 200ms
-   — see dismissSplashFast). Same-view re-renders (data arriving, chat
+   Nov 18, 2026 second pass; slow fades Nov 19, 2026 (the fade rule:
+   every transition fades in and out slowly — no chop, nothing that
+   feels like a video popping up). View switches fade out over 350ms
+   (see fadeTo in client/main.ts, .view-leaving below) and fade in over
+   700ms, the landing fades in over 700ms, the card modal fades out as
+   well as in (the close used to hide at once — see closeCard in
+   client/main.ts), the nav active state eases, and an OAuth return
+   skips the opening film (the splash stays as a static cover until
+   the first render, then fades away over 600ms — see
+   dismissSplashFast). Same-view re-renders (data arriving, chat
    streaming) swap instantly, so nothing flickers while it works.
    Everything here is off under prefers-reduced-motion: static, no
    animation. The readability controls and the Neon look are untouched. */
-.view.view-enter { animation: view-in 200ms ease both; }
+/* No fill mode on purpose: with `both`, the animation's final keyframe
+   (opacity 1) keeps applying after it ends and overrides the
+   .view-leaving fade-out, so a tab switch never faded out at all
+   (caught by the fade probe, Nov 19, 2026). Without fill, the view
+   rests at its natural opacity once the animation ends, and the
+   fade-out transition can take over. */
+.view.view-enter { animation: view-in 700ms ease; }
 @keyframes view-in {
   from { opacity: 0; transform: translateY(4px); }
   to { opacity: 1; transform: none; }
 }
-.landing { animation: landing-in 250ms ease both; }
+.view.view-leaving { opacity: 0; transition: opacity 0.35s ease; }
+.landing { animation: landing-in 700ms ease both; }
 @keyframes landing-in {
   from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: none; }
 }
-.opening-splash.is-fading-fast { transition: opacity 0.2s ease; }
+.opening-splash.is-fading-fast { transition: opacity 0.6s ease; }
 .nav-btn { transition: color 0.2s ease, box-shadow 0.2s ease; }
 @media (prefers-reduced-motion: reduce) {
   .view.view-enter, .landing { animation: none; }
+  .view.view-leaving { transition: none; }
   .nav-btn { transition: none; }
 }
 

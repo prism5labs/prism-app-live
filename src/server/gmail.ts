@@ -1,11 +1,12 @@
-// Gmail API + Google OAuth (plain fetch, no SDK). The Inboxes tab reads the
-// three Gmail accounts side by side and can save real drafts. Connecting an
-// account needs a Google OAuth client (GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET
-// / GOOGLE_REDIRECT_URI). Without one, the Inboxes tab says so honestly.
+// Gmail API + Google OAuth (plain fetch, no SDK). The Connected tab reads
+// the three Gmail accounts side by side and can save real drafts. Connecting
+// an account needs a Google OAuth client (GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET
+// / GOOGLE_REDIRECT_URI). Without one, the Connected tab says so honestly.
 // Tokens are stored in the local SQLite database; on Render's free tier the
 // disk is ephemeral, so connections reset when the service redeploys.
 
 import { config, googleConfigured } from "./config";
+import { EXTRA_SCOPES, recordGoogleToken } from "./google";
 import {
   getGmailAccount,
   getGmailAccounts,
@@ -45,6 +46,14 @@ export const GMAIL_LABEL_TITLES: Record<string, string> = {
 const SCOPES = [
   "https://www.googleapis.com/auth/gmail.readonly",
   "https://www.googleapis.com/auth/gmail.compose",
+  // One Google sign-in for Gmail, Calendar, and Drive (redesign,
+  // Nov 19, 2026): the Gmail consent asks for the Calendar and Drive
+  // scopes too, so the owner signs in once and all three work. The
+  // app sign-in is a different flow with identity-only scopes and is
+  // untouched. Accounts connected before this change keep the old
+  // Gmail-only grant until they sign in once more; the separate
+  // Calendar + Drive flow stays as the way to add that permission.
+  ...EXTRA_SCOPES,
 ];
 
 export function authUrl(accountId: string, label: GmailLabel): string | null {
@@ -109,6 +118,24 @@ export async function handleOAuthCallback(
     const email = me.emailAddress || "";
     const expiry = Date.now() + (tokens.expires_in || 3600) * 1000;
     setGmailAccount(accountId, label as GmailLabel, email, tokens.refresh_token, tokens.access_token, expiry);
+    // The same consent granted Calendar and Drive: record the same
+    // tokens for those services, so one sign-in connects all three.
+    // Google reports the granted scopes in the token response; a
+    // partial grant (the owner unchecked a scope) records nothing
+    // here, and the Calendar + Drive flow stays available to add it.
+    // No scope field at all means a full grant of what was asked.
+    const grantedScopes = tokens.scope ? tokens.scope.split(" ").filter(Boolean) : null;
+    const hasExtra = !grantedScopes || EXTRA_SCOPES.every((s) => grantedScopes.includes(s));
+    if (hasExtra) {
+      recordGoogleToken(
+        accountId,
+        email,
+        tokens.refresh_token,
+        tokens.access_token,
+        expiry,
+        [...SCOPES].join(" "),
+      );
+    }
     return { ok: true, accountId, label, email };
   } catch (e) {
     console.error("OAuth callback failed:", e);

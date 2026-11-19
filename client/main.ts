@@ -1,4 +1,8 @@
-// Prism 5 — standalone client. Four tabs: Chat, Inboxes, Store, Upkeep.
+// Prism 5 — standalone client. Four places, each a different kind of
+// thing (redesign, Nov 19, 2026): Chat (talk to your Faces, start the
+// day), Connected (every connection, with its state, plus the inboxes
+// themselves), Store (the only place to buy or redeem), You (your
+// account and how the app behaves — nothing for sale here).
 // No provider or model names appear anywhere in the visible copy.
 
 import { api, getAccountId, setAccountId, clearAccountId } from "./api";
@@ -14,7 +18,7 @@ import { VOICES, TUNING_QUESTIONS, LOOK_SETS, voiceById, lookSetById, tuningStyl
 // runs leaves the splash over the app forever.
 (window as any).__prismMainLoaded = true;
 
-type Tab = "chat" | "inboxes" | "store" | "upkeep";
+type Tab = "chat" | "connected" | "store" | "you";
 
 // Per-Photon customization, saved on the server (state.customizations).
 // Null row means the owner has not started customizing that Photon yet.
@@ -80,7 +84,7 @@ let callStream: MediaStream | null = null;
 let callChunks: Blob[] = [];
 let callAudio: HTMLAudioElement | null = null;
 
-// Proactive checks, reminders, push (Step 3): loaded when the Upkeep
+// Proactive checks, reminders, push (Step 3): loaded when the You
 // tab opens, so the tab shows a loading line instead of stale or empty
 // cards.
 let proactiveData: any = null;
@@ -89,7 +93,7 @@ let remindersData: any[] | null = null;
 let pushData: any = null;
 let lastCheck: any = null;
 let checkRunning = false;
-let upkeepLoading = false;
+let youLoading = false;
 
 // Start My Day — the morning briefing Plug. dayOpen is a sub-view of
 // the Chat tab, like the thread and the customizer. dayData is the last
@@ -103,7 +107,7 @@ let dayBusy = false;
 let dayHandled = 0;
 let dayMoveOpen = false;
 
-// Messenger (Step 9): Page threads, loaded with the Inboxes tab.
+// Messenger (Step 9): Page threads, loaded with the Connected tab.
 let messengerStatusData: any = null;
 let messengerThreadsData: any[] | null = null;
 let messengerOpenId: string | null = null;
@@ -133,7 +137,7 @@ let stripeLoading = false;
 
 // ---------- Readability: text size + high contrast ----------
 // Older eyes: text size (Normal / Large / Extra-large) and a
-// high-contrast toggle, set from the Reading card in Upkeep, saved on
+// high-contrast toggle, set from the Reading card in You, saved on
 // this device only (localStorage). The classes ride on <html> so every
 // reading surface follows — chat bubbles, cards, inbox rows, forms —
 // and they are applied at module load, before the first render, so the
@@ -223,9 +227,9 @@ const SEND_SVG = `<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path 
 
 const NAV_ICONS: Record<Tab, string> = {
   chat: `<svg viewBox="0 0 24 24" fill="none"><path d="M21 12a8 8 0 0 1-8 8H4l2-3a8 8 0 1 1 15-5Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>`,
-  inboxes: `<svg viewBox="0 0 24 24" fill="none"><path d="M3 13h5l2 3h4l2-3h5M4 6h16a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>`,
+  connected: `<svg viewBox="0 0 24 24" fill="none"><path d="M3 13h5l2 3h4l2-3h5M4 6h16a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>`,
   store: `<svg viewBox="0 0 24 24" fill="none"><path d="M4 7h16l-1.5 12a1 1 0 0 1-1 .9h-11a1 1 0 0 1-1-.9L4 7Z M8 10V6a4 4 0 0 1 8 0v4" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>`,
-  upkeep: `<svg viewBox="0 0 24 24" fill="none"><path d="M12 3l2.2 5.3L20 9l-4 4 1 5.7L12 16l-5 2.7L8 13 4 9l5.8-.7L12 3Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>`,
+  you: `<svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4" stroke="currentColor" stroke-width="2"/><path d="M4 21a8 8 0 0 1 16 0" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`,
 };
 
 const view = () => document.getElementById("view") as HTMLElement;
@@ -299,7 +303,7 @@ function closeCard() {
     if (cardOpener && document.contains(cardOpener)) cardOpener.focus();
     cardOpener = null;
     cardCloseTimer = null;
-  }, 200);
+  }, 350);
 }
 
 function cardShell(title: string, bodyHtml: string): string {
@@ -464,7 +468,7 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") closeCard();
 });
 
-// ---------- Inboxes extras: Messages, Contacts, Calendar, Drive ----------
+// ---------- Connected extras: Messages, Contacts, Calendar, Drive ----------
 // Draft-first state: nothing sends, books, or cancels until the owner
 // taps the confirm button on a review panel. These live outside `state`
 // so a re-render never loses a draft the owner is looking at.
@@ -884,7 +888,7 @@ function renderDayBriefing(): string {
   const progress = `${dayHandled} handled · ${items.length} left`;
   const calNote =
     dayData.calendar && !dayData.calendar.connected
-      ? `<p class="fine">${esc(dayData.calendar.message || "Calendar is not connected yet.")}</p><div class="row"><button class="btn" data-action="goto" data-tab="inboxes">Go to Inboxes</button></div>`
+      ? `<p class="fine">${esc(dayData.calendar.message || "Calendar is not connected yet.")}</p><div class="row"><button class="btn" data-action="goto" data-tab="connected">Connect it in Connected</button></div>`
       : dayData.calendar && dayData.calendar.message
         ? `<p class="fine">${esc(dayData.calendar.message)}</p>`
         : "";
@@ -949,23 +953,24 @@ function renderDayBriefing(): string {
 }
 
 // ---------- Chat front page ----------
+// One home screen, one job (redesign, Nov 19, 2026): your Faces and
+// your day, and nothing else competing with them. The hero image, the
+// name form, the usage meter, the upsell line and the mission strip
+// all left this screen — the name and the meter live under You now,
+// and buying lives in the Store. The empty state has one way forward:
+// the Store tab, which is the one place to get a Face.
 function renderChatFront(): string {
   const owned = (state?.photons || []).filter((p: any) => p.owned);
-  const customName = state?.customName || "";
   const ownedHtml =
     owned.length > 0
       ? `<div class="photon-grid">${owned.map((p: any) => photonCard(p)).join("")}</div>`
       : `<div class="card empty-panel">
           <div class="card-head"><img class="mark" src="/brand/gem.jpg" alt=""><h2>Nothing to talk to yet.</h2></div>
           <p>There is no one to talk to here yet. A Launch is what gives this app a personality. Grab a Spark and run it, or pick up a Photon, and you will have someone on the line.</p>
-          <button class="btn store-outline store-btn" data-action="goto" data-tab="store">Visit the Store</button>
-          <div class="redeem-row"><button class="btn" data-action="goto" data-tab="upkeep">Redeem a code</button></div>
+          <button class="btn store-outline store-btn" data-action="goto" data-tab="store">Browse the Store</button>
         </div>`;
   return `
   <section class="front">
-    <div class="sputnik-hero">
-      <img class="sp-img" src="/brand/sputnik.jpg" alt="Sputnik emblem — gold crystal and orbit rings on deep teal, PRISM 5 LABS in gold">
-    </div>
     <div class="front-body">
       <h3 class="greeting">Howdy, <span class="greeting-accent">neighbor!</span></h3>
       <p class="tagline">Truly Atomic AI Assistants</p>
@@ -979,18 +984,6 @@ function renderChatFront(): string {
         </div>`
       : ""}
     ${ownedHtml}
-    <div class="card make-yours">
-      <h2>Make it yours</h2>
-      <p>Give your assistant a name. It replaces "Prism 5" everywhere in this app until you clear it.</p>
-      <form id="name-form" class="row">
-        <input id="name-input" type="text" maxlength="40" placeholder="e.g. Megan" value="${esc(customName)}" aria-label="Your assistant's name">
-        <button class="btn primary" type="submit">Save name</button>
-        ${customName ? `<button class="btn" type="button" data-action="clear-name">Clear</button>` : ""}
-      </form>
-    </div>
-    <div class="meter">${esc(meterLine())}${meterBar()}</div>
-    <p class="fine">Upkeep is $29 a month for unlimited chat, updates, priority support, and live voice calls.</p>
-    <div class="mission-strip">Let us handle the noise so you can focus on what you want and need to do.</div>
   </section>`;
 }
 
@@ -1293,7 +1286,7 @@ async function reportToPrism(photon: string) {
     toast("Still waiting on Prism 5 to approve the connection.");
   else if (r?.error === "contact_declined") toast("Prism 5 declined the connection.");
   else if (r?.error === "gmail_not_connected")
-    toast("Connect a Gmail account in Inboxes first, then send.", "err");
+    toast("Connect a Gmail account in Connected first, then send.", "err");
   else toast("That didn't send. Try again.", "err");
 }
 
@@ -1417,7 +1410,7 @@ function renderCallScreen(): string {
     <p id="call-status" class="call-status" role="status">${esc(callStatusText || "Checking voice…")}</p>
     <p id="call-heard" class="call-heard">${callHeard ? `You said: “${esc(callHeard)}”` : ""}</p>
     <button id="call-mic-btn" class="call-mic${callPhase === "recording" ? " recording" : ""}" data-action="call-mic" ${micDisabled ? "disabled" : ""}>${callPhase === "recording" ? "■ Stop" : "🎙️ Talk"}</button>
-    ${blocked ? `<div class="row call-blocked-actions"><button class="btn primary" data-action="goto" data-tab="upkeep">Go to Upkeep</button><button class="btn" data-action="goto" data-tab="store">Visit the Store</button></div>` : ""}
+    ${blocked ? `<div class="row call-blocked-actions"><button class="btn primary" data-action="goto" data-tab="store" data-scroll="store-upkeep">Get Upkeep in the Store</button></div>` : ""}
     <p class="fine">Voice is an Upkeep extra, and it needs the server's ElevenLabs key. If either is missing, this screen says so instead of pretending the call works.</p>
   </section>`;
 }
@@ -1643,7 +1636,7 @@ function renderSwitchboardContacts(): string {
 // Status from GET /api/texts/status drives the honest state: until the
 // server says a number is connected, the section is not shown at all —
 // a "not connected, go fix the server" card is a dead end for the person
-// using the app, and it makes the Inboxes page look unfinished. When
+// using the app, and it makes the Connected page look unfinished. When
 // Twilio is configured, the section appears with the real texts and calls.
 function renderMessagesSection(): string {
   const st = state?.textsStatus;
@@ -1729,7 +1722,7 @@ function renderCalendarSection(): string {
       <p>${esc(st.message || "Calendar isn't connected yet.")}</p>
       ${st.googleConfigured === false
         ? ""
-        : `<p class="fine">Tap <b>Connect an account</b> above, then choose Google Calendar &amp; Drive. One sign-in covers both Calendar and Drive.</p>`}
+        : `<p class="fine">Tap <b>Connect Google</b> above. One sign-in covers both Calendar and Drive.</p>`}
     </div>`;
   }
   const events = (state?.calendarEvents || []) as any[];
@@ -1792,7 +1785,7 @@ function renderDriveSection(): string {
       <p>${esc(st.message || "Drive isn't connected yet.")}</p>
       ${st.googleConfigured === false
         ? ""
-        : `<p class="fine">Tap <b>Connect an account</b> above, then choose Google Calendar &amp; Drive. One sign-in covers both.</p>`}
+        : `<p class="fine">Tap <b>Connect Google</b> above. One sign-in covers both.</p>`}
     </div>`;
   }
   const files = (state?.driveFiles || []) as any[];
@@ -1929,23 +1922,26 @@ async function openMessengerThread(id: string) {
 
 // ---------- Connect an account ----------
 // One generic button, not three named slots. Tapping it asks what to
-// connect: a Gmail account or an Outlook account (as many as you like,
-// each a separate sign-in), Google Calendar & Drive (one sign-in covers
-// both), or a Facebook Page (a Page access token, pasted in the
-// Messenger section below). Each option is shown on its own: an option
-// whose sign-in is not set up on this server says so plainly instead of
-// pretending. Yahoo, Apple Mail, and other mail providers have no
-// supported sign-in here, and texts, calls, and Facebook Page messaging
-// are set up on the server, not from the app. The chooser reuses the
-// character-card modal, so it dismisses the same four ways: the X, the
-// Close button, a tap on the backdrop, or the Escape key.
+// connect: one Google sign-in for Gmail, Calendar, and Drive (redesign,
+// Nov 19, 2026 — the old chooser offered Gmail and Calendar & Drive as
+// two separate Google sign-ins; one consent now covers all three), an
+// Outlook account (as many as you like, each a separate sign-in), or a
+// Facebook Page (a Page access token, pasted in the Messenger section
+// below). There is no separate chooser any more: each row of the
+// Connections card carries its own single control, and a failed
+// connect retries from the same sign-in it failed on (see
+// connectErrorKind). Yahoo, Apple Mail, and other mail providers have
+// no supported sign-in here, and texts, calls, and Facebook Page
+// messaging are set up on the server, not from the app.
 // Connect-return state, set once in init from the OAuth return params:
 // justConnected puts a plain confirmation at the top of the Email
 // section (a toast alone is too easy to miss), connectError puts the
 // failure there with a one-tap retry. Both clear when the owner leaves
-// Inboxes, or when a later load shows the account is fine.
+// Connected, or when a later load shows the account is fine.
 let justConnected: "" | "gmail" | "google" | "outlook" = "";
 let connectError = "";
+// Which sign-in failed, so the retry goes straight back to it.
+let connectErrorKind: "" | "gmail" | "google" | "outlook" = "";
 // True while an inbox load is in flight: the Email section says
 // "Checking your inbox…" instead of flashing the false "No email
 // accounts connected yet" empty state before the data lands.
@@ -1962,46 +1958,6 @@ function nextOutlookLabel(): string {
   let n = 1;
   while (used.has(`outlook-${n}`)) n++;
   return `outlook-${n}`;
-}
-
-function connectChooserHtml(notice?: string): string {
-  const google = state?.googleConfigured;
-  const microsoft = state?.microsoftConfigured;
-  const choices: string[] = [];
-  if (google) {
-    choices.push(`<a class="btn primary" href="/api/oauth/google/start?accountId=${encodeURIComponent(
-      getAccountId(),
-    )}&label=${nextGmailLabel()}">Add a Gmail account</a>
-        <p class="fine">Sign in with Google. That account's inbox and drafts appear below.</p>`);
-  } else {
-    choices.push(`<p>Gmail sign-in isn't set up on this server yet. It needs a Google OAuth client (client ID, secret, and redirect).</p>`);
-  }
-  if (microsoft) {
-    choices.push(`<a class="btn primary" href="/api/oauth/microsoft/start?accountId=${encodeURIComponent(
-      getAccountId(),
-    )}&label=${nextOutlookLabel()}">Add an Outlook account</a>
-        <p class="fine">Sign in with Microsoft. That account's inbox and drafts appear below, next to your Gmail accounts.</p>`);
-  } else {
-    choices.push(`<p>Outlook sign-in isn't set up on this server yet. It needs a Microsoft OAuth client (client ID, secret, and redirect).</p>`);
-  }
-  if (google) {
-    choices.push(`<a class="btn primary" href="/api/oauth/google/start-extra?accountId=${encodeURIComponent(
-      getAccountId(),
-    )}">Connect Calendar &amp; Drive</a>
-        <p class="fine">One sign-in covers both Calendar and Drive. If you already connected Gmail, you'll sign in once more to add the permission.</p>`);
-  }
-  choices.push(`<button class="btn primary" data-action="goto-messenger">Connect a Facebook Page</button>
-        <p class="fine">Your business Facebook Page connects in the Messenger section below — paste a Page access token there. Personal Messenger can't be connected: Meta offers messaging for Facebook Pages only.</p>`);
-  const body = `${notice ? `<p class="chat-error">${esc(notice)}</p>` : ""}<p class="card-tagline">Add as many accounts as you like. Each one is a separate sign-in, and each shows up here as its own inbox.</p>
-      <div class="connect-choices">
-        ${choices.join("\n")}
-      </div>
-      <p class="fine">Google and Outlook can be connected from the app. Yahoo, Apple Mail, and other mail providers are not supported yet — they need a mail connection this app does not have. Texts and calls are set up on the server, not from the app.</p>`;
-  return cardShell("Connect an account", body);
-}
-
-function openConnectChooser(opener: HTMLElement | null, notice?: string) {
-  openCard(connectChooserHtml(notice), opener);
 }
 
 // ---------- Email summary cards ----------
@@ -2103,7 +2059,101 @@ async function openEmailMessage(
   }
 }
 
-function renderInboxes(): string {
+// ---------- Connections ----------
+// The one named place for every connection (redesign, Nov 19, 2026):
+// each service shows its state in plain words — Connected (with the
+// account), Not connected, or Checking — and carries its own single
+// control. There is no separate chooser any more: the Google row's
+// button is the Google sign-in, the Outlook row's is Outlook's, and
+// the Page row jumps to the Messenger form below, where the Page
+// token goes in. One Google sign-in covers Gmail, Calendar, and
+// Drive; an account connected before that change shows Calendar and
+// Drive as not connected until it signs in once more, and the row's
+// button is the one place to do that. Gmail and Outlook have no
+// disconnect in the app — a connected account stays connected — so a
+// connected row shows a badge, not a button that pretends otherwise.
+// The Facebook Page disconnects from its chip in the Messenger
+// section, the one place that control lives.
+function renderConnections(): string {
+  const accounts = (state?.inboxAccounts || []) as any[];
+  const outlookAccounts = (state?.outlookAccounts || []) as any[];
+  const googleConfigured = state?.googleConfigured;
+  const microsoftConfigured = state?.microsoftConfigured;
+  const cal = (state as any)?.calendarStatus;
+  const drv = (state as any)?.driveStatus;
+  const pages = (messengerPagesData || []) as any[];
+
+  // Google: Gmail, Calendar, Drive — one sign-in, three services.
+  // While the first load is still flying, say Checking instead of
+  // flashing a false "not connected".
+  const googleChecking = inboxesLoading && !accounts.length && !cal && !drv;
+  const gmailOn = accounts.length > 0;
+  const calOn = cal?.connected === true;
+  const drvOn = drv?.connected === true;
+  const googleEmail = gmailOn ? String(accounts[0].email || "") : "";
+  const googleState = googleChecking
+    ? `<p class="fine">Checking your Google connection…</p>`
+    : `<p class="fine">${gmailOn ? `Gmail — connected${googleEmail ? ` as ${esc(googleEmail)}` : ""}` : "Gmail — not connected"} · Calendar — ${calOn ? "connected" : "not connected"} · Drive — ${drvOn ? "connected" : "not connected"}</p>`;
+  const googleControl = googleChecking
+    ? ""
+    : !googleConfigured
+      ? `<p class="fine">Google sign-in isn't set up on this server yet. It needs a Google OAuth client (client ID, secret, and redirect).</p>`
+      : gmailOn && calOn && drvOn
+        ? `<p><span class="owned-badge">Google connected</span></p>`
+        : gmailOn
+          ? `<div class="row"><a class="btn primary" href="/api/oauth/google/start-extra?accountId=${encodeURIComponent(getAccountId())}">Connect Calendar &amp; Drive</a></div>`
+          : `<div class="row"><a class="btn primary" href="/api/oauth/google/start?accountId=${encodeURIComponent(getAccountId())}&label=${nextGmailLabel()}">Connect Google</a></div>`;
+
+  // Outlook: one row, one button, as many accounts as the owner likes.
+  const outlookChecking = inboxesLoading && !outlookAccounts.length;
+  const outlookOn = outlookAccounts.length > 0;
+  const outlookEmail = outlookOn ? String(outlookAccounts[0].email || "") : "";
+  const outlookState = outlookChecking
+    ? `<p class="fine">Checking your Outlook connection…</p>`
+    : outlookOn
+      ? `<p class="fine">Connected${outlookEmail ? ` as ${esc(outlookEmail)}` : ""}${outlookAccounts.length > 1 ? ` · ${outlookAccounts.length} accounts` : ""}</p>`
+      : `<p class="fine">Not connected</p>`;
+  const outlookControl = outlookChecking
+    ? ""
+    : !microsoftConfigured
+      ? `<p class="fine">Outlook sign-in isn't set up on this server yet. It needs a Microsoft OAuth client (client ID, secret, and redirect).</p>`
+      : outlookOn
+        ? `<p><span class="owned-badge">Outlook connected</span></p><div class="row"><a class="btn" href="/api/oauth/microsoft/start?accountId=${encodeURIComponent(getAccountId())}&label=${nextOutlookLabel()}">Add another Outlook account</a></div>`
+        : `<div class="row"><a class="btn primary" href="/api/oauth/microsoft/start?accountId=${encodeURIComponent(getAccountId())}&label=${nextOutlookLabel()}">Connect Outlook</a></div>`;
+
+  // Facebook Page: connected from the Messenger form below, where the
+  // token goes in and the disconnect chip lives.
+  const pageChecking = inboxesLoading && messengerPagesData === null;
+  const pageOn = pages.length > 0;
+  const pageName = pageOn ? String(pages[0].pageName || pages[0].pageId || "") : "";
+  const pageState = pageChecking
+    ? `<p class="fine">Checking your Facebook Page…</p>`
+    : pageOn
+      ? `<p class="fine">Connected — ${esc(pageName)}. Manage it below, in Messenger.</p>`
+      : `<p class="fine">Not connected — your business Facebook Page connects in the Messenger section below, with a Page access token. Personal Messenger can't be connected: Meta offers messaging for Facebook Pages only.</p>`;
+  const pageControl = pageChecking
+    ? ""
+    : pageOn
+      ? `<p><span class="owned-badge">Facebook Page connected</span></p>`
+      : `<div class="row"><button class="btn primary" data-action="goto-messenger">Connect a Facebook Page</button></div>`;
+
+  return `<div class="card" id="connections">
+    <h2>Connections</h2>
+    <p class="fine">Every account Prism watches, and whether it's connected. The button on a row is the way to connect it.</p>
+    <h3>Google</h3>
+    ${googleState}
+    ${googleControl}
+    <h3>Outlook</h3>
+    ${outlookState}
+    ${outlookControl}
+    <h3>Facebook Page</h3>
+    ${pageState}
+    ${pageControl}
+    <p class="fine">Google and Outlook connect from here. Yahoo, Apple Mail, and other mail providers aren't supported yet — they need a mail connection this app does not have. Texts and calls are set up on the server, not from the app.</p>
+  </div>`;
+}
+
+function renderConnected(): string {
   const accounts = (state?.inboxAccounts || []) as any[];
   const outlookAccounts = (state?.outlookAccounts || []) as any[];
   const googleConfigured = state?.googleConfigured;
@@ -2116,7 +2166,7 @@ function renderInboxes(): string {
     inboxesLoading && !accounts.length && !outlookAccounts.length
       ? `<p class="fine">Checking your inbox…</p>`
       : googleConfigured || microsoftConfigured
-        ? `<p class="fine">No email accounts connected yet — tap <b>Connect an account</b> above to add one.</p>`
+        ? `<p class="fine">No email accounts connected yet — tap Connect Google or Connect Outlook above to add one.</p>`
         : `<p class="fine">Email sign-in isn't set up on this server yet.</p>`;
   const connectedBanner =
     justConnected === "gmail"
@@ -2126,23 +2176,32 @@ function renderInboxes(): string {
         : justConnected === "google"
           ? `<p class="inbox-connected">Calendar and Drive connected.</p>`
           : "";
+  // A failed connect retries from the same place it failed: the
+  // banner's button goes straight to that sign-in, not to a chooser.
+  const connectRetry =
+    connectErrorKind === "gmail"
+      ? `<a class="btn small" href="/api/oauth/google/start?accountId=${encodeURIComponent(getAccountId())}&label=${nextGmailLabel()}">Try again</a>`
+      : connectErrorKind === "google"
+        ? `<a class="btn small" href="/api/oauth/google/start-extra?accountId=${encodeURIComponent(getAccountId())}">Try again</a>`
+        : connectErrorKind === "outlook"
+          ? `<a class="btn small" href="/api/oauth/microsoft/start?accountId=${encodeURIComponent(getAccountId())}&label=${nextOutlookLabel()}">Try again</a>`
+          : "";
   const connectErrorHtml = connectError
-    ? `<p class="chat-error">${esc(connectError)} <button class="btn small" data-action="connect-open">Try again</button></p>`
+    ? `<p class="chat-error">${esc(connectError)} ${connectRetry}</p>`
     : "";
   return `
   <section>
-    <h1 class="page-title">Inboxes</h1>
-    <p class="page-lede">Messages, contacts, calendar, and Drive — plus your email accounts. Drafts you save here land in that account's drafts.</p>
-    <div class="connect-bar"><button class="btn primary" data-action="connect-open">Connect an account</button></div>
-    <div class="switchboard-strip"><img src="/brand/switchboard.jpg" alt=""><p><b>On Switchboard.</b> Inboxes is where Switchboard lives — every Launch in the Lab, one board.</p></div>
+    <h1 class="page-title">Connected</h1>
+    <p class="page-lede">Every account Prism watches, and whether it's connected — plus the messages, contacts, calendar, and Drive themselves. Drafts you save here land in that account's drafts.</p>
+    ${renderConnections()}
+    <div class="switchboard-strip"><img src="/brand/switchboard.jpg" alt=""><p><b>On Switchboard.</b> Connected is where Switchboard lives — every Launch in the Lab, one board.</p></div>
     <div class="inbox-jump" aria-label="Jump to a section">
       <a href="#messages">Messages</a>
       <a href="#contacts">Contacts</a>
       <a href="#calendar">Calendar</a>
       <a href="#drive">Drive</a>
+      <a href="#messenger">Messenger</a>
       <a href="#gmail-accounts">Email</a>
-      <a href="#about-you">About you</a>
-      <a href="#memory-import">Memory</a>
     </div>
     ${renderMessagesSection()}
     ${renderSwitchboardContacts()}
@@ -2155,8 +2214,6 @@ function renderInboxes(): string {
     ${connectErrorHtml}
     <div class="inbox-grid">${cards}</div>
     ${accounts.length || outlookAccounts.length ? "" : emailEmpty}
-    ${renderProfile()}
-    ${renderMemoryImport()}
   </section>`;
 }
 
@@ -2355,7 +2412,7 @@ function renderStore(): string {
     <div class="store-head"><img src="/brand/starburst.jpg" alt=""><div><h1 class="page-title">Store</h1><p>A Launch is the helper you talk with in this app. Pick the helper that fits your day, then pick how you want to pay. The prices are further down, after a plain explanation of how it all works.</p></div></div>
     ${perkBanner()}
     ${stripeStatusData
-      ? `<p class="fine stripe-line">${stripeStatusData.configured ? "Automatic unlocks are on — a purchase unlocks as soon as Stripe confirms the payment." : "Automatic unlocks are off — the Stripe webhook isn't set up yet. Purchases still unlock by code (redeem one in Upkeep) until it is."}</p>`
+      ? `<p class="fine stripe-line">${stripeStatusData.configured ? "Automatic unlocks are on — a purchase unlocks as soon as Stripe confirms the payment." : "Automatic unlocks are off — the Stripe webhook isn't set up yet. Purchases still unlock by code (redeem one below) until it is."}</p>`
       : `<p class="fine">Checking automatic unlocks…</p>`}
     <div class="chrome-thin"></div>
 
@@ -2420,6 +2477,15 @@ function renderStore(): string {
       ${kindGroups("Plug")}
       ${startMyDaySoon}
     </details>
+    <div class="card" id="store-redeem">
+      <h2>Redeem a code</h2>
+      <p>Have a friends-and-family code? Enter it here and everything unlocks. This is the only place to redeem one.</p>
+      <form id="redeem-form" class="row">
+        <input id="redeem-input" type="text" inputmode="numeric" autocomplete="off" placeholder="10-digit code" aria-label="Redeem code">
+        <button class="btn primary" type="submit">Redeem</button>
+      </form>
+      <p id="redeem-msg" class="fine"></p>
+    </div>
     <div class="store-foot">Questions about any price? Email <a href="mailto:prism5labscontact@gmail.com">prism5labscontact@gmail.com</a> or call <a href="tel:+19203937294">(920) 393-7294</a>.<br>Let us handle the noise so you can focus on what you want and need to do.<br>© 2026 Prism 5 Labs · Green Bay, Wisconsin</div>
   </section>`;
 }
@@ -2587,9 +2653,9 @@ async function togglePush() {
   }
 }
 
-async function loadUpkeep() {
-  if (upkeepLoading) return;
-  upkeepLoading = true;
+async function loadYou() {
+  if (youLoading) return;
+  youLoading = true;
   try {
     const [p, r, pu] = await Promise.all([
       api.proactiveStatus(),
@@ -2600,7 +2666,7 @@ async function loadUpkeep() {
     if (r && r.ok) remindersData = r.reminders || [];
     if (pu && pu.ok) pushData = pu;
   } finally {
-    upkeepLoading = false;
+    youLoading = false;
   }
 }
 
@@ -2662,7 +2728,6 @@ function accountCard(): string {
   ${perk && perk.active ? `<div class="card perk-card">
     <h2>Your welcome offer — 15% off your first order</h2>
     <p>Your code is <b>${esc(perk.code)}</b>, good until ${esc(fmtDateOnly(perk.expiresAt))}. It is already filled in at checkout in the Store, so the discount is there when the page opens. One order only.</p>
-    <div class="row"><button class="btn primary" data-action="goto" data-tab="store">Go to the Store</button></div>
   </div>` : ""}
   ${prismStory ? `<div class="card">
     <h2>How Prism began</h2>
@@ -2675,7 +2740,7 @@ function readabilityCard(): string {
     `<button class="btn${readSize === s ? " primary" : ""}" data-action="read-size" data-size="${s}" aria-pressed="${readSize === s}">${label}</button>`;
   return `<div class="card">
     <h2>Reading</h2>
-    <p class="fine">Bigger text and stronger contrast, for older eyes. Saved on this device, and it follows you across Chat, Inboxes, the Store, and Upkeep.</p>
+    <p class="fine">Bigger text and stronger contrast, for older eyes. Saved on this device, and it follows you across Chat, Connected, the Store, and You.</p>
     <h4>Text size</h4>
     <div class="row" role="group" aria-label="Text size">
       ${sizeBtn("normal", "Normal")}${sizeBtn("large", "Large")}${sizeBtn("xl", "Extra-large")}
@@ -2720,7 +2785,30 @@ function soundsCard(): string {
   </div>`;
 }
 
-function renderUpkeep(): string {
+// ---------- You ----------
+// Your account and how the app behaves — and nothing for sale
+// (redesign, Nov 19, 2026). Settings used to sit here as a stack of
+// cards interleaved with upsell cards on the Upkeep tab; now they
+// live here, behind the account, and the Store does the selling.
+// The name form and the chat meter moved here from the Chat home, and
+// About you and Memory import moved here from Connected: everything
+// about you, in the one place about you. Upkeep itself — the $29/mo
+// subscription — lives only in the Store now, and redeeming a code
+// lives only there too.
+function nameCard(): string {
+  const customName = state?.customName || "";
+  return `<div class="card make-yours">
+      <h2>Make it yours</h2>
+      <p>Give your assistant a name. It replaces "Prism 5" everywhere in this app until you clear it.</p>
+      <form id="name-form" class="row">
+        <input id="name-input" type="text" maxlength="40" placeholder="e.g. Megan" value="${esc(customName)}" aria-label="Your assistant's name">
+        <button class="btn primary" type="submit">Save name</button>
+        ${customName ? `<button class="btn" type="button" data-action="clear-name">Clear</button>` : ""}
+      </form>
+    </div>`;
+}
+
+function renderYou(): string {
   const ownedPhotons: string[] = state?.ownedPhotons || [];
   const ownedProducts: string[] = state?.ownedProducts || [];
   const ownedList =
@@ -2728,19 +2816,15 @@ function renderUpkeep(): string {
       ? `<ul class="owned-list">${ownedPhotons.map((n) => `<li>${esc(n)} — Photon</li>`).join("")}${ownedProducts
           .map((s) => `<li>${esc(s)}</li>`)
           .join("")}</ul>`
-      : `<p class="fine">Nothing owned yet. Buy in the Store, or redeem a code below.</p>`;
+      : `<p class="fine">Nothing owned yet.</p>`;
   return `
   <section>
-    <h1 class="page-title">Upkeep</h1>
-    <p class="page-lede">${esc(UPKEEP_COPY.body)}</p>
+    <h1 class="page-title">You</h1>
+    <p class="page-lede">Your account, and how the app behaves. Nothing for sale here — buying happens in the Store.</p>
 
     ${accountCard()}
 
-    ${readabilityCard()}
-
-    ${openingCard()}
-
-    ${soundsCard()}
+    ${nameCard()}
 
     <div class="card">
       <h2>Your chats</h2>
@@ -2750,35 +2834,21 @@ function renderUpkeep(): string {
     </div>
 
     <div class="card">
-      <h2>Redeem a code</h2>
-      <p>Have a friends-and-family code? Enter it here and everything unlocks.</p>
-      <form id="redeem-form" class="row">
-        <input id="redeem-input" type="text" inputmode="numeric" autocomplete="off" placeholder="10-digit code" aria-label="Redeem code">
-        <button class="btn primary" type="submit">Redeem</button>
-      </form>
-      <p id="redeem-msg" class="fine"></p>
-    </div>
-
-    <div class="card">
       <h2>What you own</h2>
       ${ownedList}
-      <div class="row"><button class="btn primary" data-action="goto" data-tab="store">Go to the Store</button></div>
     </div>
 
-    <div class="card upkeep-card">
-      <img src="/brand/starburst.jpg" alt="">
-      <div>
-      <h2>Upkeep — $29 a month</h2>
-      <ul class="included-list">${UPKEEP_COPY.included.map((i) => `<li>${esc(i)}</li>`).join("")}</ul>
-      ${
-        state?.upkeep
-          ? `<p><span class="owned-badge">Upkeep is on</span></p>`
-          : `<a class="btn primary" href="${esc(buyUrl(UPKEEP.url, "upkeep"))}" target="_blank" rel="noopener">Buy Upkeep — $29.87</a>`
-      }
-      <p class="fine">Upkeep is never required to use what you bought.</p>
-      <p class="fine">Questions about Upkeep or any price? Email <a href="mailto:prism5labscontact@gmail.com">prism5labscontact@gmail.com</a> or call <a href="tel:+19203937294">(920) 393-7294</a>.</p>
-      </div>
-    </div>
+    <h2 class="section-title">Settings</h2>
+
+    ${readabilityCard()}
+
+    ${openingCard()}
+
+    ${soundsCard()}
+
+    ${renderProfile()}
+
+    ${renderMemoryImport()}
 
     ${renderProactive()}
   </section>`;
@@ -2788,9 +2858,9 @@ function renderUpkeep(): string {
 function renderNav() {
   const tabs: { id: Tab; label: string }[] = [
     { id: "chat", label: "Chat" },
-    { id: "inboxes", label: "Inboxes" },
+    { id: "connected", label: "Connected" },
     { id: "store", label: "Store" },
-    { id: "upkeep", label: "Upkeep" },
+    { id: "you", label: "You" },
   ];
   nav().innerHTML = tabs
     .map(
@@ -2841,7 +2911,7 @@ const CHAT_BACKGROUNDS = [
   "/chat-bg/bg-spacestation.jpg",
 ];
 const BG_SWAP_INTERVAL_MS = 60000;
-const TAB_ORDER: Tab[] = ["chat", "inboxes", "store", "upkeep"];
+const TAB_ORDER: Tab[] = ["chat", "connected", "store", "you"];
 let bgIndex = 0;
 let lastBgKey = "";
 let lastTab: Tab = "chat";
@@ -2862,7 +2932,7 @@ function applyBackground(url: string, dir: number): void {
   bgSwapTimer = window.setTimeout(() => {
     bg.style.backgroundImage = `url("${url}")`;
     bg.classList.remove("is-sliding");
-  }, 220);
+  }, 500);
 }
 
 function nextBackground(dir: number): void {
@@ -2900,11 +2970,33 @@ function syncAppBackground(): void {
 }
 
 // A view change (tab, thread, customizer, call screen, briefing) fades
-// in gently over 200ms instead of cutting in: the app reads as one
-// coherent thing, not pieces stuck together. Same-view re-renders —
-// data arriving, chat streaming — swap instantly, so nothing flickers
-// while it works. The animation lives in styles.css (.view-enter) and
-// is off under prefers-reduced-motion.
+// in gently instead of cutting in: the app reads as one coherent thing,
+// not pieces stuck together. Same-view re-renders — data arriving, chat
+// streaming — swap instantly, so nothing flickers while it works. The
+// animation lives in styles.css (.view-enter) and is off under
+// prefers-reduced-motion. The fade is slow (700ms) by the fade rule
+// (Nov 19, 2026): nothing may feel like a video popping up.
+
+// A tab switch fades the old view out slowly first (fadeTo, below),
+// then the new view fades in — the fade rule, both directions. A
+// second tap while fading cancels the first fade, so fast tapping
+// never strands the view half-faded. Same-view renders skip this
+// entirely and stay instant.
+let navFadeTimer: number | null = null;
+function fadeTo(fn: () => void, after?: () => void): void {
+  const v = view();
+  if (navFadeTimer) {
+    window.clearTimeout(navFadeTimer);
+    navFadeTimer = null;
+  }
+  v.classList.add("view-leaving");
+  navFadeTimer = window.setTimeout(() => {
+    navFadeTimer = null;
+    v.classList.remove("view-leaving");
+    fn();
+    if (after) after();
+  }, 350);
+}
 let lastViewKey = "";
 function viewKey(): string {
   return [tab, activePhoton || "", customizePhoton || "", callPhotonName || "", dayOpen ? "day" : ""].join("|");
@@ -2926,9 +3018,9 @@ function render() {
           : activePhoton
             ? renderChatThread()
             : renderChatFront();
-  else if (tab === "inboxes") v.innerHTML = renderInboxes();
+  else if (tab === "connected") v.innerHTML = renderConnected();
   else if (tab === "store") v.innerHTML = renderStore();
-  else v.innerHTML = renderUpkeep();
+  else v.innerHTML = renderYou();
   if (switched) {
     // Restart the entrance animation even when switching fast: remove,
     // force a reflow, re-add.
@@ -2968,7 +3060,7 @@ async function refreshState(): Promise<boolean> {
 // knows right now. Four states, never a silent endless "connecting":
 // checking (state still loading), connected, not connected, and
 // unreachable (the server did not answer). The header pill and the
-// Upkeep account card both read this, so the two can never disagree.
+// You account card both read this, so the two can never disagree.
 type GoogleConnection = "checking" | "connected" | "not-connected" | "unreachable";
 function googleConnectionState(): GoogleConnection {
   if (!state) return stateFailed ? "unreachable" : "checking";
@@ -3000,10 +3092,10 @@ function syncGoogleState(): void {
   }, 300);
 }
 
-async function loadInboxes() {
+async function loadConnected() {
   // The first five calls are independent: fire them together instead
   // of queuing them one by one — the old serial chain was a big part
-  // of why opening Inboxes felt claggy. The flag keeps the Email
+  // of why opening Connected felt claggy. The flag keeps the Email
   // section honest while they fly ("Checking your inbox…", not a
   // false "nothing connected yet").
   inboxesLoading = true;
@@ -3137,7 +3229,6 @@ const SWOOSH_ACTIONS = new Set([
   "product-info",
   "tier-info",
   "card-close",
-  "connect-open",
 ]);
 const TOGGLE_DIRECTIONS: Record<string, () => boolean> = {
   // The direction is read before the handler runs, so the blip knows
@@ -3167,22 +3258,41 @@ document.addEventListener("click", async (e) => {
   else if (SWOOSH_ACTIONS.has(action)) playSwoosh();
   else if (action !== "sound-toggle") playClick();
   if (action === "goto") {
-    tab = t.dataset.tab as Tab;
-    activePhoton = null;
-    customizePhoton = null;
-    dayOpen = false;
-    // A connect confirmation only lives on the Inboxes it belongs to,
-    // and so does a connect failure.
-    if (tab !== "inboxes") {
-      justConnected = "";
-      connectError = "";
-    }
-    // Ending a call leaves the thread; the call screen is chat-only.
-    if (callPhotonName) endCall();
-    if (tab === "inboxes") loadInboxes().then(render);
-    if (tab === "upkeep") loadUpkeep().then(render);
-    if (tab === "store") loadStripeStatus().then(render);
-    render();
+    const next = t.dataset.tab as Tab;
+    const scrollTo = t.dataset.scroll || "";
+    const doSwitch = () => {
+      tab = next;
+      activePhoton = null;
+      customizePhoton = null;
+      dayOpen = false;
+      // A connect confirmation only lives on the Connected tab it
+      // belongs to, and so does a connect failure.
+      if (tab !== "connected") {
+        justConnected = "";
+        connectError = "";
+        connectErrorKind = "";
+      }
+      // Ending a call leaves the thread; the call screen is chat-only.
+      if (callPhotonName) endCall();
+      if (tab === "connected") loadConnected().then(render);
+      if (tab === "you") loadYou().then(render);
+      if (tab === "store") loadStripeStatus().then(render);
+      render();
+      // A new place starts at its top: the last tab's scroll depth
+      // must not carry over (a switch used to land mid-page).
+      window.scrollTo(0, 0);
+      // A jump inside the new view (the blocked-call button lands on
+      // the Store's Upkeep card): scroll once the view has landed.
+      if (scrollTo) {
+        const el = document.getElementById(scrollTo);
+        if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    };
+    // A real tab change fades the old view out slowly first (the fade
+    // rule), then the new view fades in — no chop between places.
+    // Staying on the same tab switches at once.
+    if (next !== tab) fadeTo(doSwitch);
+    else doSwitch();
   } else if (action === "email-open") {
     // A summary row opens the whole message, one tap.
     openEmailMessage(
@@ -3201,12 +3311,12 @@ document.addEventListener("click", async (e) => {
     // the inboxes and re-render.
     t.setAttribute("disabled", "");
     t.textContent = "Checking…";
-    loadInboxes().then(render);
+    loadConnected().then(render);
   } else if (action === "end-call") {
     endCall();
   } else if (action === "signin") {
     // App sign-in with Google. The server redirects to Google and back;
-    // the return lands on Upkeep with a one-time session token. Say so
+    // the return lands on You with a one-time session token. Say so
     // on the button first: the redirect can take a moment, and a button
     // that does nothing while Google loads reads as broken.
     t.setAttribute("disabled", "");
@@ -3243,7 +3353,7 @@ document.addEventListener("click", async (e) => {
     // splash's own tap-to-skip listener does the fade-out (this tap
     // bubbles up to it); this handler only records the choice.
     setPlayOpening(false);
-    toast("The opening won't play again. Turn it back on in Upkeep, under Opening animation.");
+    toast("The opening won't play again. Turn it back on in You, under Settings.");
   } else if (action === "landing-skip") {
     // First-run landing: continue into the app without an account.
     // The landing stays dismissed on this device from here on.
@@ -3335,18 +3445,22 @@ document.addEventListener("click", async (e) => {
     openTierCard((t.dataset.tier as "supernova" | "satellite" | "upkeep") || "supernova", t);
   } else if (action === "card-close") {
     closeCard();
-  } else if (action === "connect-open") {
-    // The one generic connect button: asks what to connect, then starts
-    // that sign-in. Any number of accounts, any supported type.
-    openConnectChooser(t);
   } else if (action === "goto-messenger") {
-    // The chooser's "Connect a Facebook Page": close the chooser and
-    // jump to the Messenger section, where the Page token goes in.
-    closeCard();
-    tab = "inboxes";
-    render();
-    const el = document.getElementById("messenger");
-    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+    // The Connections card's "Connect a Facebook Page": jump to the
+    // Messenger section, where the Page token goes in. The fade-out
+    // runs first (see fadeTo), and the scroll happens once the new
+    // view has landed, so the section is there to scroll to.
+    fadeTo(
+      () => {
+        tab = "connected";
+        loadConnected().then(render);
+        render();
+      },
+      () => {
+        const el = document.getElementById("messenger");
+        if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+      },
+    );
   } else if (action === "page-select") {
     // Which connected Page's threads to show. Empty id = the server's Page.
     const id = t.dataset.id || "";
@@ -3619,14 +3733,14 @@ document.addEventListener("click", async (e) => {
     if (r && r.ok) {
       toast(`Connection request sent to ${entry.name}.`);
       importedContacts = importedContacts.filter((_, i) => i !== idx);
-      await loadInboxes();
+      await loadConnected();
       render();
     } else if (r?.error === "already_requested") {
       toast("Request already sent — still waiting on their approval.");
       importedContacts = importedContacts.filter((_, i) => i !== idx);
       render();
     } else if (r?.error === "gmail_not_connected") {
-      toast("Connect a Gmail account in Inboxes first.", "err");
+      toast("Connect a Gmail account in Connected first.", "err");
     } else {
       toast("That request didn't send. Try again.", "err");
     }
@@ -3879,14 +3993,14 @@ document.addEventListener("submit", async (e) => {
           : "Connection request sent. They tap Approve or Decline in the email.",
       );
       form.reset();
-      await loadInboxes();
+      await loadConnected();
       render();
     } else if (r?.error === "already_requested") {
       toast("Request already sent — still waiting on their approval.");
     } else if (r?.error === "contact_declined") {
       toast("That contact was declined.", "err");
     } else if (r?.error === "gmail_not_connected") {
-      toast("Connect a Gmail account in Inboxes first.", "err");
+      toast("Connect a Gmail account in Connected first.", "err");
     } else {
       toast("That request didn't send. Try again.", "err");
     }
@@ -4171,8 +4285,9 @@ function playOpeningSplash(returning: boolean): void {
 }
 
 // The fast dismiss for an OAuth return: the static cover goes away in
-// 200ms once the first render has landed, instead of the film's 800ms
-// fade after a 10s play. The landing check runs after, as usual.
+// a slow 600ms fade once the first render has landed, instead of the
+// film's 800ms fade after a 10s play. The landing check runs after, as
+// usual.
 function dismissSplashFast(): void {
   const splash = document.getElementById("opening-splash");
   if (!splash || !splash.isConnected) return;
@@ -4181,7 +4296,7 @@ function dismissSplashFast(): void {
   window.setTimeout(() => {
     splash.remove();
     maybeShowLanding();
-  }, 250);
+  }, 650);
 }
 
 // ---------- First-run landing ----------
@@ -4264,10 +4379,14 @@ function dismissLanding(): void {
   playOpeningSplash(returning);
   setupKeyboardDock();
   const t = params.get("tab");
-  if (t === "inboxes" || t === "store" || t === "upkeep" || t === "chat") tab = t as Tab;
+  // Old tab names still land in the right place: a bookmark or an old
+  // installed copy asking for Inboxes or Upkeep gets Connected or You.
+  if (t === "inboxes") tab = "connected";
+  else if (t === "upkeep") tab = "you";
+  else if (t === "connected" || t === "store" || t === "you" || t === "chat") tab = t as Tab;
   // The connect-return flags are set here, before the first render, so
   // the confirmation banner (or the plain-word error with its retry)
-  // is already in the Inboxes the owner lands on — not painted in
+  // is already in the Connected tab the owner lands on — not painted in
   // after the fact.
   const gmailParam = params.get("gmail");
   const googleParam = params.get("google");
@@ -4277,18 +4396,21 @@ function dismissLanding(): void {
     suppressLandingOnce = true;
   } else if (gmailParam === "error") {
     connectError = "Gmail sign-in didn't finish. Try again.";
+    connectErrorKind = "gmail";
   }
   if (googleParam === "connected") {
     justConnected = "google";
     suppressLandingOnce = true;
   } else if (googleParam === "error") {
     connectError = "Calendar and Drive sign-in didn't finish. Try again.";
+    connectErrorKind = "google";
   }
   if (outlookParam === "connected") {
     justConnected = "outlook";
     suppressLandingOnce = true;
   } else if (outlookParam === "error") {
     connectError = "Outlook sign-in didn't finish. Try again.";
+    connectErrorKind = "outlook";
   }
   // App sign-in return: the OAuth callback hands back a one-time
   // session token, spent here once for the account id. The token is
@@ -4321,10 +4443,10 @@ function dismissLanding(): void {
     } else {
       signinResult = "error";
     }
-    history.replaceState(null, "", "/?tab=upkeep");
+    history.replaceState(null, "", "/?tab=you");
   } else if (signin === "error") {
     signinResult = "error";
-    history.replaceState(null, "", "/?tab=upkeep");
+    history.replaceState(null, "", "/?tab=you");
   }
   // Sign-in recovery: the token above may have been spent in a
   // different browsing context than this one — on Android the
@@ -4363,10 +4485,10 @@ function dismissLanding(): void {
   // when it arrives. Before this, a stalled load left the opening
   // cover up with nothing behind it — the "connecting forever".
   const preload =
-    tab === "inboxes"
-      ? loadInboxes()
-      : tab === "upkeep"
-        ? loadUpkeep()
+    tab === "connected"
+      ? loadConnected()
+      : tab === "you"
+        ? loadYou()
         : tab === "store"
           ? loadStripeStatus()
           : null;
@@ -4390,30 +4512,16 @@ function dismissLanding(): void {
   // The return params have done their job: drop them from the address
   // bar so a refresh doesn't replay the banners and toasts. The flags
   // above already carry this boot's state.
-  if ((gmailParam || googleParam || outlookParam) && tab === "inboxes") {
-    history.replaceState(null, "", "/?tab=inboxes");
+  if ((gmailParam || googleParam || outlookParam) && tab === "connected") {
+    history.replaceState(null, "", "/?tab=connected");
   }
-  // A failed connect drops back on Inboxes with the chooser reopened,
-  // so the retry is one tap instead of a hunt for the button. The
-  // failure notice rides inside the chooser: the toast sits behind the
-  // modal (lower z-index) and cannot be seen while it is open. The
-  // landing sits above the chooser when it shows, so it stays shut
-  // then — its own sign-in button is the way forward there, and the
-  // toast carries the message instead.
-  const connectErrorNotice =
-    gmail === "error"
-      ? "Gmail sign-in didn't finish. Try again."
-      : google === "error"
-        ? "Calendar and Drive sign-in didn't finish. Try again."
-        : outlook === "error"
-          ? "Outlook sign-in didn't finish. Try again."
-          : "";
-  if (connectErrorNotice && !document.getElementById("landing")) {
-    openConnectChooser(null, connectErrorNotice);
-  }
+  // A failed connect drops back on Connected with the failure in the
+  // Email section, where its retry goes straight back to the sign-in
+  // that failed (see connectErrorKind). No chooser reopens: the retry
+  // is one tap on the banner, not a hunt for a button.
   if (signinResult === "new") {
     toast(
-      `Account created — welcome to Prism 5${signinName ? ", " + signinName : ""}. Your welcome offer and Prism's story are in Upkeep.`,
+      `Account created — welcome to Prism 5${signinName ? ", " + signinName : ""}. Your welcome offer and Prism's story are in You.`,
     );
   } else if (signinResult === "back") {
     toast(`Signed in — welcome back${signinName ? ", " + signinName : ""}.`);
