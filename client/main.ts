@@ -174,6 +174,42 @@ function setReadContrast(on: boolean): void {
 loadReadability();
 applyReadability();
 
+// ---------- Opening animation: play it or skip it ----------
+// The opening film (v5: crystalline teal prism figure on the
+// countertop, golden-dust fade, gold pyramid mark) plays on every
+// open — unless the owner turns it off. Same pattern as Reading
+// above: saved on this device only, in localStorage, under one key,
+// read at module load before the first render so the choice holds
+// from the very first paint. Default is ON: a missing or unreadable
+// value plays the film, exactly as before. Turning it off skips the
+// film entirely on every later open until it is turned back on, in
+// Upkeep or from the control on the opening itself.
+const OPENING_KEY = "prism5.opening.v1";
+let playOpening = true;
+function loadOpeningPref(): void {
+  try {
+    const raw = localStorage.getItem(OPENING_KEY);
+    if (!raw) return;
+    const p = JSON.parse(raw);
+    if (typeof p.play === "boolean") playOpening = p.play;
+  } catch {
+    // A bad or unreadable value keeps the default: play it.
+  }
+}
+function saveOpeningPref(): void {
+  try {
+    localStorage.setItem(OPENING_KEY, JSON.stringify({ play: playOpening }));
+  } catch {
+    // Storage unavailable: the setting still holds for this open.
+  }
+}
+function setPlayOpening(on: boolean): void {
+  playOpening = on;
+  saveOpeningPref();
+  render();
+}
+loadOpeningPref();
+
 const SEND_SVG = `<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 20V6M6 11l6-6 6 6" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 
 const NAV_ICONS: Record<Tab, string> = {
@@ -2607,6 +2643,22 @@ function readabilityCard(): string {
   </div>`;
 }
 
+// The opening-animation switch: the same on-this-device setting as
+// Reading, in the same place. On means the opening film plays every
+// time the app opens; off means the app opens straight into Chat
+// (or wherever it was left) with no film at all, until it is turned
+// back on here. Reduced motion still skips the film on its own,
+// whatever this says.
+function openingCard(): string {
+  return `<div class="card">
+    <h2>Opening animation</h2>
+    <p class="fine">The short film that plays when the app opens — the prism figure on the countertop, fading into golden dust. Turn it off and the app opens straight in, every time, until you turn it back on. Saved on this device.</p>
+    <div class="row">
+      <button class="btn${playOpening ? " primary" : ""}" data-action="opening-toggle" aria-pressed="${playOpening}">${playOpening ? "Opening animation: on" : "Opening animation: off"}</button>
+    </div>
+  </div>`;
+}
+
 function renderUpkeep(): string {
   const ownedPhotons: string[] = state?.ownedPhotons || [];
   const ownedProducts: string[] = state?.ownedProducts || [];
@@ -2624,6 +2676,8 @@ function renderUpkeep(): string {
     ${accountCard()}
 
     ${readabilityCard()}
+
+    ${openingCard()}
 
     <div class="card">
       <h2>Your chats</h2>
@@ -3011,6 +3065,23 @@ document.addEventListener("click", async (e) => {
     setReadSize(s === "large" || s === "xl" ? s : "normal");
   } else if (action === "read-contrast") {
     setReadContrast(!readContrast);
+  } else if (action === "opening-toggle") {
+    // Upkeep switch: flip the opening on or off for every later
+    // open, on this device. The change takes effect from the next
+    // open — the film already playing (if any) is untouched.
+    setPlayOpening(!playOpening);
+    toast(
+      playOpening
+        ? "The opening animation will play when the app opens."
+        : "The opening animation is off — the app will open straight in.",
+    );
+  } else if (action === "opening-off") {
+    // The persistent off switch on the opening itself: turn the film
+    // off for every later open, then skip the rest of this one. The
+    // splash's own tap-to-skip listener does the fade-out (this tap
+    // bubbles up to it); this handler only records the choice.
+    setPlayOpening(false);
+    toast("The opening won't play again. Turn it back on in Upkeep, under Opening animation.");
   } else if (action === "landing-skip") {
     // First-run landing: continue into the app without an account.
     // The landing stays dismissed on this device from here on.
@@ -3809,6 +3880,14 @@ function playOpeningSplash(returning: boolean): void {
   const video = document.getElementById("opening-splash-video") as HTMLVideoElement | null;
   const greeting = document.getElementById("opening-splash-greeting");
   if (!splash || !video) return;
+  if (!playOpening) {
+    // The owner turned the opening off: no film, no 10s wait, no
+    // open counted — straight into the app. The landing check still
+    // runs (init calls it again after render, when state is loaded).
+    splash.remove();
+    maybeShowLanding();
+    return;
+  }
   // Count this open, then pick the greeting and the scheme from it.
   // If storage is unavailable (private mode), fall back to open 1.
   let opens = 0;

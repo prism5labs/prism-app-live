@@ -489,6 +489,51 @@ body.look-night-watch, .thread.look-night-watch, .photon-card.look-night-watch {
   to { opacity: 1; transform: none; }
 }
 .opening-splash.is-fading { opacity: 0; pointer-events: none; }
+/* The two ways past the opening, kept visibly apart. The one-time
+   skip is plain text ("Tap anywhere to skip") — tapping anywhere on
+   the splash dismisses this showing only, and the film plays again
+   next open. The persistent off is an outlined pill button
+   ("Don't play the opening again") — it turns the film off for every
+   later open until it is turned back on in Upkeep. The controls sit
+   at the very bottom, below the Welcome caption, clear of the home
+   indicator; the caption keeps pointer-events none so a tap on it
+   still skips. */
+.opening-splash-controls {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(18px + env(safe-area-inset-bottom));
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  animation: splash-caption-in 0.9s ease 1.1s both;
+}
+.opening-splash-skip-hint {
+  font-family: Nunito, sans-serif;
+  font-weight: 700;
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+  color: var(--splash-ink, #fff3dc);
+  opacity: 0.75;
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.6);
+}
+.opening-splash-off {
+  font-family: Nunito, sans-serif;
+  font-weight: 800;
+  font-size: 0.85rem;
+  color: var(--splash-ink, #fff3dc);
+  background: rgba(0, 0, 0, 0.25);
+  border: 1.5px solid var(--splash-accent2, #f4c95d);
+  border-radius: 999px;
+  padding: 9px 18px;
+  cursor: pointer;
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.6);
+}
+.opening-splash-off:active {
+  background: rgba(0, 0, 0, 0.45);
+}
 @media (prefers-reduced-motion: reduce) {
   .opening-splash { display: none; }
 }

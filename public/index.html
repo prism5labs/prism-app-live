@@ -26,7 +26,30 @@
       <span class="opening-splash-eyebrow">Prism 5</span>
       <span class="opening-splash-greeting" id="opening-splash-greeting">Welcome</span>
     </div>
+    <div class="opening-splash-controls">
+      <!-- One-time skip: a tap anywhere dismisses this showing only.
+           Persistent off: the button below turns the opening off for
+           every later open (localStorage, prism5.opening.v1 — see
+           client/main.ts). Plain text vs. outlined button on purpose,
+           so the two are never mistaken for each other. -->
+      <span class="opening-splash-skip-hint">Tap anywhere to skip</span>
+      <button type="button" class="opening-splash-off" data-action="opening-off">Don&rsquo;t play the opening again</button>
+    </div>
   </div>
+  <script>
+    // The opening is off on this device (turned off in Upkeep or from
+    // the opening itself): take the splash down before main.js even
+    // loads, so the owner never flashes the film on the way in.
+    // main.js re-checks the same key (prism5.opening.v1) on boot, so
+    // this is only the fast path — the setting itself lives there.
+    try {
+      var __prismOpening = JSON.parse(localStorage.getItem("prism5.opening.v1") || "null");
+      if (__prismOpening && __prismOpening.play === false) {
+        var __prismSplash = document.getElementById("opening-splash");
+        if (__prismSplash) __prismSplash.remove();
+      }
+    } catch (e) {}
+  </script>
   <script>
     // If main.js never runs (a bad bundle, a stuck worker), the splash
     // would sit over the app forever — it is only ever removed by JS.
