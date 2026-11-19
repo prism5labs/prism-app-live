@@ -2459,14 +2459,25 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array<ArrayBuffer> {
 async function togglePush() {
   if (!pushData) return;
   if (pushData.subscribed) {
-    // No server unsubscribe route: drop the local subscription here; the
-    // server drops dead ones on its own when a send bounces.
+    // Off means off on the server too: drop the local subscription, then
+    // delete the stored server row(s) for this account before re-reading
+    // status — otherwise status still reports subscribed and the toggle
+    // flips straight back on. No endpoint (reinstall) deletes them all.
+    let endpoint: string | undefined;
     try {
       const reg = await navigator.serviceWorker.ready;
       const sub = await reg.pushManager.getSubscription();
-      if (sub) await sub.unsubscribe();
+      if (sub) {
+        endpoint = sub.endpoint;
+        await sub.unsubscribe();
+      }
     } catch {
       // Already gone.
+    }
+    try {
+      await api.pushUnsubscribe(endpoint);
+    } catch {
+      // The local drop above still stands; status re-read shows the truth.
     }
     const r = await api.pushStatus();
     if (r && r.ok) pushData = r;

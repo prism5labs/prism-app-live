@@ -244,6 +244,14 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ accountId: getAccountId(), subscription }),
     }),
+  pushUnsubscribe: (endpoint?: string) =>
+    req("/api/push/unsubscribe", {
+      method: "POST",
+      body: JSON.stringify({
+        accountId: getAccountId(),
+        ...(endpoint ? { endpoint } : {}),
+      }),
+    }),
   // Messenger, Facebook Pages only (Step 9). Personal Messenger has no
   // supported API, so there is no route for it. A Page can be connected
   // from the app with a Page access token (connect), and the threads,

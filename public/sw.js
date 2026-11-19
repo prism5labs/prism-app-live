@@ -1,5 +1,13 @@
 // Prism 5 service worker. Cache-first for the app shell and static assets,
 // network-first for the API (chat, state, and inboxes must always be fresh).
+// CACHE v30: bumped Nov 18, 2026 for the phone-taps fix — the toggle
+// could not turn off, because the off path only dropped the local
+// subscription while the server kept the stored row and status kept
+// reporting subscribed, and there was no server unsubscribe route at
+// all. POST /api/push/unsubscribe now deletes the stored row(s), and
+// the off path calls it before re-reading status. The cache bump makes
+// existing installs fetch the new main.js and sw.js instead of serving
+// the cached ones, and clears any older cache entries on activate.
 // CACHE v29: bumped Nov 18, 2026 for the freeze diagnosis — the opening
 // film stalled and the sign-in page read as frozen on Neil's phone. The
 // v5 film is now precached at install (best effort, so a slow video
@@ -59,7 +67,7 @@
 // Start My Day Stripe links. The cache bump makes existing installs
 // fetch the new main.js and the new sputnik.jpg instead of serving the
 // cached ones.
-const CACHE = "prism5-v29";
+const CACHE = "prism5-v30";
 const SHELL = ["/", "/index.html", "/styles.css", "/main.js", "/manifest.json", "/opening-animation-v3.mp4", "/opening-v5-poster.jpg", "/chat-bg/bg-rocket.jpg", "/chat-bg/bg-helmets.jpg", "/chat-bg/bg-starburst.jpg", "/chat-bg/bg-robot.jpg", "/chat-bg/bg-saucer.jpg", "/chat-bg/bg-raygun.jpg", "/chat-bg/bg-car.jpg", "/chat-bg/bg-pilot.jpg", "/chat-bg/bg-moonbase.jpg", "/chat-bg/bg-diner.jpg", "/chat-bg/bg-launchpad.jpg", "/chat-bg/bg-spacestation.jpg"];
 
 self.addEventListener("install", (event) => {

@@ -215,6 +215,13 @@ function deletePushSubscription(accountId: string, endpoint: string): void {
   );
 }
 
+// Turning phone taps off means off: after a reinstall the browser has no
+// local subscription to name, so the only way to clear the orphaned server
+// row is to delete every stored subscription for the account.
+export function deleteAllPushSubscriptions(accountId: string): void {
+  db.query(`DELETE FROM push_subscriptions WHERE account_id = ?`).run(accountId);
+}
+
 // --- Web Push crypto (WebCrypto only, zero dependencies) ---
 // Implements RFC 8291 (aes128gcm) + RFC 8292 (VAPID, ES256 JWT).
 
@@ -760,6 +767,23 @@ export async function handleProactiveApi(req: Request, path: string): Promise<Re
     if (!p256dh || !auth) return bad("subscription keys required", 400);
     storePushSubscription(accountId, { endpoint, keys: { p256dh, auth } });
     return json({ ok: true, subscribed: true, pushConfigured: pushConfigured() });
+  }
+
+  // POST /api/push/unsubscribe — delete the stored push subscription(s).
+  // With an endpoint, only that device's row goes; with no endpoint, every
+  // stored subscription for the account goes — that is what "turn phone
+  // taps off" means after a reinstall, when the browser has no local
+  // subscription left to name. Same auth as /api/push/subscribe.
+  if (path === "/api/push/unsubscribe" && method === "POST") {
+    const body = await readBody(req);
+    const accountId = accountIdFrom(req, body);
+    if (!isValidAccountId(accountId)) return bad("accountId required", 400);
+    const sub = body.subscription || body;
+    const endpoint = typeof sub?.endpoint === "string" ? sub.endpoint.trim() : "";
+    if (endpoint) deletePushSubscription(accountId, endpoint);
+    else deleteAllPushSubscriptions(accountId);
+    const remaining = listPushSubscriptions(accountId);
+    return json({ ok: true, subscribed: remaining.length > 0, subscriptions: remaining.length });
   }
 
   // GET /api/push/status — is push configured, and is this device subscribed?
