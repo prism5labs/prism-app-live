@@ -259,6 +259,28 @@ textarea { width: 100%; resize: vertical; }
   gap: 12px;
   margin: 0 0 16px;
 }
+
+/* Character carousels: one hero at a time (Nov 19, 2026). The viewport
+   stacks the slides — only the hero is in flow, the rest sit absolute
+   and invisible — so the height follows the hero. The move is a simple
+   300ms fade; under reduced motion there is no transition at all, and
+   there is no auto-advance anywhere, so nothing moves unless the
+   visitor taps a control. Dots and arrows are real buttons with the
+   same visible focus ring as the portrait buttons. */
+.carousel { margin: 0 0 16px; }
+.carousel-viewport { position: relative; }
+.carousel-slide { transition: opacity 300ms ease; }
+.carousel-slide:not(.active) { opacity: 0; visibility: hidden; position: absolute; inset: 0; pointer-events: none; }
+.carousel-slide .photon-card { width: 100%; }
+.carousel-controls { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 12px; }
+.carousel-dots { display: flex; gap: 7px; flex-wrap: wrap; justify-content: center; flex: 1; }
+.carousel-dot { width: 12px; height: 12px; border-radius: 50%; border: 1px solid var(--muted); background: transparent; padding: 0; cursor: pointer; }
+.carousel-dot.active { background: var(--cherry); border-color: var(--cherry); }
+.carousel-btn { flex: none; }
+.carousel-btn:focus-visible, .carousel-dot:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) {
+  .carousel-slide { transition: none; }
+}
 .photon-card {
   background: var(--card);
   color: var(--ink);
@@ -533,13 +555,13 @@ body.look-night-watch, .thread.look-night-watch, .photon-card.look-night-watch {
   .opening-splash { display: none; }
 }
 
-/* ---------- First-run landing ---------- */
-/* A full-screen card shown once, after the opening film, only to an
-   account that has never signed in and never dismissed it. Same
-   palette and type as the rest of the app; the benefits read as a
-   short list, the Google sign-in is the one big button, and the
-   skip link sits quietly underneath — nothing here forces an account. */
-.landing {
+/* ---------- First-open chooser ---------- */
+/* A full-screen card shown after the opening film, until the owner
+   picks a door: Business or Personal. Same palette and type as the
+   rest of the app; the two doors are the big buttons, the Google
+   sign-in sits under them, and the skip link sits quietly
+   underneath — nothing here forces an account. */
+.chooser {
   position: fixed;
   inset: 0;
   z-index: 60;
@@ -550,15 +572,13 @@ body.look-night-watch, .thread.look-night-watch, .photon-card.look-night-watch {
   padding: 24px;
   overflow-y: auto;
 }
-.landing-card { max-width: 420px; width: 100%; text-align: center; }
-.landing-mark { width: 56px; height: 64px; object-fit: cover; border-radius: 12px; margin-bottom: 8px; }
-.landing-card h1 { font-size: 34px; margin-bottom: 4px; }
-.landing-lede { color: var(--ink-soft); font-size: 17px; margin-bottom: 16px; }
-.landing-benefits { text-align: left; margin: 0 auto 20px; padding: 0; list-style: none; max-width: 360px; }
-.landing-benefits li { padding: 6px 0 6px 26px; position: relative; }
-.landing-benefits li::before { content: "◆"; position: absolute; left: 2px; top: 7px; color: var(--cherry); font-size: 12px; }
-.landing-signin { width: 100%; padding: 12px; font-size: 16px; margin-bottom: 10px; }
-.landing-skip { background: none; border: 0; color: var(--muted); font: inherit; font-size: 14px; text-decoration: underline; cursor: pointer; padding: 8px; }
+.chooser-card { max-width: 420px; width: 100%; text-align: center; }
+.chooser-mark { width: 56px; height: 64px; object-fit: cover; border-radius: 12px; margin-bottom: 8px; }
+.chooser-card h1 { font-size: 34px; margin-bottom: 4px; }
+.chooser-lede { color: var(--ink-soft); font-size: 17px; margin-bottom: 16px; }
+.chooser-signin { width: 100%; padding: 12px; font-size: 16px; margin-bottom: 10px; }
+.chooser-door { width: 100%; padding: 12px; font-size: 16px; margin-bottom: 4px; }
+.chooser-skip { background: none; border: 0; color: var(--muted); font: inherit; font-size: 14px; text-decoration: underline; cursor: pointer; padding: 8px; }
 
 /* ---------- Chat backgrounds: the room you talk in ---------- */
 /* A fixed poster-art layer behind the whole app, specific to the Photon
@@ -1322,9 +1342,9 @@ html.read-large .call-heard, html.read-xl .call-heard { font-size: calc(14px * v
 html.read-large .card-kind, html.read-xl .card-kind { font-size: calc(12px * var(--read-scale)); }
 html.read-large .card-tagline, html.read-xl .card-tagline { font-size: calc(15px * var(--read-scale)); }
 html.read-large .card-stats div, html.read-xl .card-stats div { font-size: calc(14px * var(--read-scale)); }
-html.read-large .landing-lede, html.read-xl .landing-lede { font-size: calc(17px * var(--read-scale)); }
-html.read-large .landing-signin, html.read-xl .landing-signin { font-size: calc(16px * var(--read-scale)); }
-html.read-large .landing-skip, html.read-xl .landing-skip { font-size: calc(14px * var(--read-scale)); }
+html.read-large .landing-lede, html.read-xl .chooser-lede { font-size: calc(17px * var(--read-scale)); }
+html.read-large .landing-signin, html.read-xl .chooser-signin { font-size: calc(16px * var(--read-scale)); }
+html.read-large .landing-skip, html.read-xl .chooser-skip { font-size: calc(14px * var(--read-scale)); }
 html.read-large .toast, html.read-xl .toast { font-size: calc(14px * var(--read-scale)); }
 html.read-large .research-item p, html.read-large .check-result li, html.read-xl .research-item p, html.read-xl .check-result li { font-size: calc(14px * var(--read-scale)); }
 html.read-large .day-when, html.read-xl .day-when { font-size: calc(15px * var(--read-scale)); }
@@ -1392,7 +1412,7 @@ html.read-contrast .btn.store-outline:hover { background: #FADFDF; }
 }
 /* The landing heading is the neon sign itself: cherry on cream
    (4.56:1 at 34px) with the halo. */
-.landing-card h1 {
+.chooser-card h1 {
   color: var(--cherry);
   text-shadow:
     0 0 12px rgba(255, 107, 94, 0.4),
@@ -1456,7 +1476,7 @@ html.read-contrast .btn.store-outline:hover { background: #FADFDF; }
   to { opacity: 1; transform: none; }
 }
 .view.view-leaving { opacity: 0; transition: opacity 0.35s ease; }
-.landing { animation: landing-in 700ms ease both; }
+.chooser { animation: landing-in 700ms ease both; }
 @keyframes landing-in {
   from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: none; }
@@ -1464,7 +1484,7 @@ html.read-contrast .btn.store-outline:hover { background: #FADFDF; }
 .opening-splash.is-fading-fast { transition: opacity 0.6s ease; }
 .nav-btn { transition: color 0.2s ease, box-shadow 0.2s ease; }
 @media (prefers-reduced-motion: reduce) {
-  .view.view-enter, .landing { animation: none; }
+  .view.view-enter, .chooser { animation: none; }
   .view.view-leaving { transition: none; }
   .nav-btn { transition: none; }
 }

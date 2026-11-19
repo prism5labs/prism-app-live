@@ -42,6 +42,27 @@ export const UPKEEP = {
   url: "https://buy.stripe.com/6oU3cueJieuQ6MS7AafQI0d",
 };
 
+// Nova (personal), created Nov 19, 2026: one product with two ways to
+// pay — once, or month by month. Personal Upkeep is the care plan for a
+// personal helper, separate from Upkeep ($29/month, the business care
+// plan). The URLs carry their default client_reference_id, exactly as
+// the links were created; the client buy flow replaces it with
+// "<accountId>:<hint>" at click time.
+export const NOVA = {
+  name: "Nova",
+  price: "$79.00",
+  total: "$81.37",
+  url: "https://buy.stripe.com/6oUeVc7gQ2M8b38dYyfQI1g?client_reference_id=nova-personal",
+  monthly: { price: "$10.00/month", total: "$10.30/month", url: "https://buy.stripe.com/aFa28qbx686s3AG6w6fQI1h?client_reference_id=nova-monthly" },
+};
+
+export const PERSONAL_UPKEEP = {
+  name: "Personal Upkeep",
+  price: "$9.00/month",
+  total: "$9.27/month",
+  url: "https://buy.stripe.com/bJeaEW8kU9aw8V04nYfQI1f?client_reference_id=personal-upkeep",
+};
+
 // Each Photon is bought individually on the Supernova link, with the Photon
 // named in client_reference_id so fulfillment can tell which one it is.
 export function photonBuyUrl(name: string): string {
@@ -471,5 +492,8 @@ export const ALL_CHECKOUT_URLS: string[] = [
   SATELLITE.twoYear.url,
   SATELLITE.annual.url,
   UPKEEP.url,
+  NOVA.url,
+  NOVA.monthly.url,
+  PERSONAL_UPKEEP.url,
   ...PRODUCTS.flatMap((p) => [p.personal.url, p.business.url]),
 ];

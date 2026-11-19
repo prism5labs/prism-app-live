@@ -47,8 +47,9 @@
 
 import { db, getOrCreateAccount, setUpkeep } from "./db";
 import { config, googleConfigured, isOwnerEmail } from "./config";
-import { BACKSTORIES, renderBackstory } from "../shared/backstories";
+import { BACKSTORIES, ATOM_BACKSTORIES, renderBackstory } from "../shared/backstories";
 import { PHOTON_NAMES } from "../shared/photons";
+import { ATOM_NAMES } from "../shared/atoms";
 
 // --- Tables (created here, in this module, at import) ---
 db.exec(`
@@ -94,6 +95,18 @@ CREATE TABLE IF NOT EXISTS photon_backstories (
   template TEXT NOT NULL,
   created_at TEXT NOT NULL,
   PRIMARY KEY (account_id, photon)
+);
+-- An Atom's backstory, the same welcome material as a Photon's (Nov 19,
+-- 2026): one row per Atom, created when the account is first linked.
+-- A separate table, not the photon one: the column is named "photon"
+-- there, and an Atom's name in it would be a lie the next reader has
+-- to untangle. Same shape, same rules.
+CREATE TABLE IF NOT EXISTS atom_backstories (
+  account_id TEXT NOT NULL,
+  atom TEXT NOT NULL,
+  template TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (account_id, atom)
 );
 `);
 
@@ -171,6 +184,22 @@ function createBackstories(accountId: string): void {
   }
 }
 
+// An Atom's backstories, created alongside the Photons' at account
+// linking — the same welcome material, one row per Atom. INSERT OR
+// IGNORE, so calling it twice (linking, then a backfill) never
+// duplicates a row.
+function createAtomBackstories(accountId: string): void {
+  const now = new Date().toISOString();
+  for (const atom of ATOM_NAMES) {
+    const template = ATOM_BACKSTORIES[atom];
+    if (!template) continue;
+    db.query(
+      `INSERT OR IGNORE INTO atom_backstories (account_id, atom, template, created_at)
+       VALUES (?, ?, ?, ?)`,
+    ).run(accountId, atom, template, now);
+  }
+}
+
 export type Perk = {
   code: string;
   percent: number;
@@ -240,17 +269,33 @@ export function authStatus(accountId: string): AuthStatus {
 
 // Backstories for this account, rendered with the owner's name and the
 // day the account was created. Empty when the account never signed in:
-// the stories are an account-creation perk, not a device perk.
+// the stories are an account-creation perk, not a device perk. Photons
+// and Atoms both: the two rosters share one map (the names are distinct),
+// so no surface carries one roster's welcome without the other's.
+// Backfill: an account linked before the Atoms existed has Photon rows
+// and no Atom rows — the Atom rows are created on first read, so the
+// welcome is whole without a migration run.
 export function getBackstories(
   accountId: string,
   ownerName: string,
   sinceIso: string,
 ): Record<string, string> {
+  const atomCount = (
+    db.query(`SELECT COUNT(*) AS n FROM atom_backstories WHERE account_id = ?`).get(accountId) as { n: number }
+  ).n;
+  const photonCount = (
+    db.query(`SELECT COUNT(*) AS n FROM photon_backstories WHERE account_id = ?`).get(accountId) as { n: number }
+  ).n;
+  if (photonCount > 0 && atomCount === 0) createAtomBackstories(accountId);
   const rows = db
     .query(`SELECT photon, template FROM photon_backstories WHERE account_id = ?`)
     .all(accountId) as { photon: string; template: string }[];
   const out: Record<string, string> = {};
   for (const row of rows) out[row.photon] = renderBackstory(row.template, ownerName, sinceIso);
+  const atomRows = db
+    .query(`SELECT atom, template FROM atom_backstories WHERE account_id = ?`)
+    .all(accountId) as { atom: string; template: string }[];
+  for (const row of atomRows) out[row.atom] = renderBackstory(row.template, ownerName, sinceIso);
   return out;
 }
 
@@ -287,6 +332,7 @@ const MIGRATABLE_TABLES = [
   "google_identities",
   "account_perks",
   "photon_backstories",
+  "atom_backstories",
 ];
 
 function moveTable(table: string, fromId: string, toId: string): number {
@@ -457,6 +503,7 @@ export function linkGoogleIdentity(
   );
   createPerk(deviceAccountId);
   createBackstories(deviceAccountId);
+  createAtomBackstories(deviceAccountId);
   // Owner grant: see the existing-identity branch above.
   if (isOwnerEmail(identity.email)) setUpkeep(deviceAccountId, true);
   recordSigninLink(deviceAccountId, deviceAccountId);

@@ -6,11 +6,13 @@
 // No provider or model names appear anywhere in the visible copy.
 
 import { api, getAccountId, setAccountId, clearAccountId } from "./api";
-import { portraitHtml } from "./ui";
+import { portraitHtml, atomPortraitHtml } from "./ui";
 import { soundsEnabled, setSoundsEnabled, playClick, playToggle, playSwoosh } from "./sounds";
-import { SUPERNOVA, SATELLITE, UPKEEP, PRODUCTS, CATEGORIES } from "../src/shared/catalog";
+import { SUPERNOVA, SATELLITE, UPKEEP, NOVA, PERSONAL_UPKEEP, PRODUCTS, CATEGORIES } from "../src/shared/catalog";
 import { TIER_COPY, UPKEEP_COPY, FREE_CHATS_COPY } from "../src/shared/tiers";
+import { PERSONAL_FEATURES, BUSINESS_FEATURES } from "../src/shared/features";
 import { PHOTONS } from "../src/shared/photons";
+import { ATOMS } from "../src/shared/atoms";
 import { VOICES, TUNING_QUESTIONS, LOOK_SETS, voiceById, lookSetById, tuningStyle } from "../src/shared/voices";
 
 // Set the moment this bundle runs, so the inline splash backstop in
@@ -60,10 +62,47 @@ let stateFailed = false;
 let authRecovered = false;
 let tab: Tab = "chat";
 let activePhoton: string | null = null;
-let storeVariant: "personal" | "business" = "personal";
+// Which door the owner came through: Business or Personal (the
+// first-open chooser, Nov 19, 2026). Saved on this device, in
+// localStorage, under one key — the same pattern as the reading and
+// opening settings. "" means never chosen: the app shows the business
+// side until a door is picked, because the app was business-first,
+// and the chooser still shows on the next open until a door is picked.
+type Side = "business" | "personal";
+const SIDE_KEY = "prism.side.v1";
+function loadSide(): Side | "" {
+  try {
+    const v = localStorage.getItem(SIDE_KEY) || "";
+    return v === "personal" || v === "business" ? v : "";
+  } catch {
+    return "";
+  }
+}
+let side: Side | "" = loadSide();
+function sideOrDefault(): Side {
+  return side || "business";
+}
+function setSide(s: Side): void {
+  side = s;
+  try {
+    localStorage.setItem(SIDE_KEY, s);
+  } catch {
+    // Private mode: the choice lasts for this session only.
+  }
+  // The Store follows the side: its Personal/Business prices open on
+  // the side the owner picked.
+  storeVariant = s;
+  // And the account follows too: the side lives on the account profile
+  // (POST /api/profile), so the website reads it from GET /api/state
+  // and a signed-in owner lands on their chosen door everywhere. The
+  // save runs in the background — a failure leaves the local choice
+  // standing, and the next state load pushes it again.
+  api.profileSave({ side: s }).catch(() => {});
+}
+let storeVariant: "personal" | "business" = sideOrDefault();
 // Which Store sections are open. Remembered across re-renders, so the
 // Personal/Business toggle doesn't collapse what the user opened.
-let storeOpen: Record<string, boolean> = { photons: true, sparks: false, plugs: false };
+let storeOpen: Record<string, boolean> = { photons: true, atoms: true, sparks: false, plugs: false };
 let threadMessages: any[] = [];
 let threadLoading = false;
 let toastTimer: number | null = null;
@@ -443,6 +482,43 @@ function personalityCardHtml(): string {
 function openPhotonCard(name: string, opener: HTMLElement | null) {
   const p = PHOTONS.find((x) => x.name === name);
   if (p) openCard(photonCardHtml(p), opener);
+}
+
+// An Atom's character card, mirroring a Photon's: portrait, tagline,
+// focus, introduction, and the plain price. No "Start chatting" button:
+// Atoms do not chat yet — the thread is Photon-only until the Atom
+// chat leg lands — so the card never promises a conversation it cannot
+// open.
+function atomCardHtml(a: (typeof ATOMS)[number]): string {
+  const owned = state?.freeCode === true || (state?.ownedAtoms || []).includes(a.name);
+  // An Atom's backstory, from the day the owner's account was created —
+  // the same welcome material as a Photon's. Empty for accounts that
+  // never signed in. Atoms do not chat yet, so the story is read here,
+  // on the card, instead of in a thread intro.
+  const story = (state as any)?.backstories?.[a.name] || "";
+  const body = `
+    <div class="card-hero">${atomPortraitHtml(a.name, 140)}</div>
+    <h2 class="card-title">${esc(a.name)}</h2>
+    <p class="card-kind">Atom · Nova · ${esc(a.pronoun)}</p>
+    <p class="card-tagline">${esc(a.tagline)}</p>
+    <p><b>What ${esc(a.name)} does out of the box:</b> ${esc(a.focus)}</p>
+    <p class="card-intro">“${esc(a.intro.replaceAll("{name}", a.name))}”</p>
+    ${story ? `<p><b>How ${esc(a.name)} began:</b> ${esc(story)}</p>` : ""}
+    ${cardStats([
+      ["Price", "$79.00 ($81.37 at checkout)"],
+      ["Or monthly", "$10/mo ($10.30 at checkout)"],
+      ["Chats", "300 chats a month, free forever — no subscription needed"],
+    ])}
+    <p class="fine">A Nova is for your own day, not a business: one inbox triaged, your calendar and reminders, a morning briefing and an end-of-day wrap, and gentle check-ins.</p>
+    <div class="card-actions">
+      ${owned ? `<span class="owned-badge">Owned — yours already</span>` : buyButton(buyUrl(NOVA.url, "Atom-" + a.name), "$81.37", false)}
+    </div>`;
+  return cardShell(a.name, body);
+}
+
+function openAtomCard(name: string, opener: HTMLElement | null) {
+  const a = ATOMS.find((x) => x.name === name);
+  if (a) openCard(atomCardHtml(a), opener);
 }
 
 function openProductCard(slug: string, opener: HTMLElement | null) {
@@ -959,11 +1035,75 @@ function renderDayBriefing(): string {
 // all left this screen — the name and the meter live under You now,
 // and buying lives in the Store. The empty state has one way forward:
 // the Store tab, which is the one place to get a Face.
+// ---------- Character carousels ----------
+// The rosters — twelve Photons, twelve Atoms — show one hero at a time
+// instead of twelve cards at once (Nov 19, 2026): twelve plus twelve
+// cards take a lot of space, and one hero at a time is the diner
+// poster on the wall. Every slide stays in the DOM (a screen reader
+// and the tests still see all twelve); only the hero is visible,
+// focusable, and announced. Prev/next arrows and a dot per hero move
+// between them; the move is a simple fade, and an instant swap under
+// reduced motion. There is NO auto-advance: the carousel moves only
+// when the visitor taps a control, so there is nothing to pause and
+// nothing that moves under prefers-reduced-motion. The current slide
+// is remembered per carousel across re-renders, the same way storeOpen
+// is.
+const carouselIndex: Record<string, number> = {};
+function carouselHtml(id: string, label: string, slides: string[], names: string[]): string {
+  const idx = Math.min(carouselIndex[id] || 0, slides.length - 1);
+  const slideHtml = slides
+    .map(
+      (s, i) =>
+        `<div class="carousel-slide${i === idx ? " active" : ""}" data-slide="${i}"${i === idx ? "" : ' inert aria-hidden="true"'}>${s}</div>`,
+    )
+    .join("");
+  const dots = names
+    .map(
+      (n, i) =>
+        `<button class="carousel-dot${i === idx ? " active" : ""}" data-action="carousel-dot" data-carousel="${id}" data-index="${i}" aria-label="Show ${esc(n)}"${i === idx ? ' aria-current="true"' : ""}></button>`,
+    )
+    .join("");
+  return `<div class="carousel" data-carousel="${id}" role="region" aria-roledescription="carousel" aria-label="${esc(label)}">
+    <div class="carousel-viewport">${slideHtml}</div>
+    <div class="carousel-controls">
+      <button class="btn carousel-btn" data-action="carousel-prev" data-carousel="${id}" aria-label="Previous in ${esc(label)}">← Prev</button>
+      <div class="carousel-dots">${dots}</div>
+      <button class="btn carousel-btn" data-action="carousel-next" data-carousel="${id}" aria-label="Next in ${esc(label)}">Next →</button>
+    </div>
+  </div>`;
+}
+// Move a carousel without a full re-render: the slides swap in place,
+// so the page does not jump and the Store's open sections stay open.
+function carouselGo(id: string, next: number): void {
+  const root = document.querySelector(`.carousel[data-carousel="${id}"]`);
+  if (!root) return;
+  const slides = [...root.querySelectorAll(".carousel-slide")] as HTMLElement[];
+  if (!slides.length) return;
+  const idx = ((next % slides.length) + slides.length) % slides.length;
+  carouselIndex[id] = idx;
+  slides.forEach((s, i) => {
+    const on = i === idx;
+    s.classList.toggle("active", on);
+    if (on) {
+      s.removeAttribute("inert");
+      s.removeAttribute("aria-hidden");
+    } else {
+      s.setAttribute("inert", "");
+      s.setAttribute("aria-hidden", "true");
+    }
+  });
+  root.querySelectorAll(".carousel-dot").forEach((d, i) => {
+    d.classList.toggle("active", i === idx);
+    if (i === idx) d.setAttribute("aria-current", "true");
+    else d.removeAttribute("aria-current");
+  });
+}
+
 function renderChatFront(): string {
   const owned = (state?.photons || []).filter((p: any) => p.owned);
   const ownedHtml =
     owned.length > 0
-      ? `<div class="photon-grid">${owned.map((p: any) => photonCard(p)).join("")}</div>`
+      ? carouselHtml("chat-photons", "Your Photons", owned.map((p: any) => photonCard(p)), owned.map((p: any) => p.name))
       : `<div class="card empty-panel">
           <div class="card-head"><img class="mark" src="/brand/gem.jpg" alt=""><h2>Nothing to talk to yet.</h2></div>
           <p>There is no one to talk to here yet. A Launch is what gives this app a personality. Grab a Spark and run it, or pick up a Photon, and you will have someone on the line.</p>
@@ -2315,9 +2455,22 @@ function renderMemoryImport(): string {
 // first-order perk is active, the code is prefilled at checkout, so the
 // discount is already there when the page opens. No code to type, and
 // the offer simply stops prefilling once its 10 days are up or it is used.
+// The Nova links were created with a default client_reference_id
+// (nova-personal, nova-monthly, personal-upkeep) baked into the link
+// itself. A link that arrives with one already set gets its value
+// replaced with "<accountId>:<hint>" — the webhook can only unlock a
+// purchase when the account id rides along, and a second
+// client_reference_id on the same URL would leave Stripe guessing
+// which one counts. Links without one get it appended, as before.
 function buyUrl(url: string, hint: string): string {
-  const sep = url.includes("?") ? "&" : "?";
-  let out = `${url}${sep}client_reference_id=${encodeURIComponent(getAccountId() + ":" + hint)}`;
+  const ref = encodeURIComponent(getAccountId() + ":" + hint);
+  let out: string;
+  if (/[?&]client_reference_id=/.test(url)) {
+    out = url.replace(/([?&]client_reference_id=)[^&]*/, "$1" + ref);
+  } else {
+    const sep = url.includes("?") ? "&" : "?";
+    out = `${url}${sep}client_reference_id=${ref}`;
+  }
   const perk = (state as any)?.perk;
   if (perk && perk.active && perk.code) {
     out += `&prefilled_promo_code=${encodeURIComponent(perk.code)}`;
@@ -2373,6 +2526,7 @@ function kindGroups(kind: "Spark" | "Plug"): string {
 function renderStore(): string {
   const ownedProducts: string[] = state?.ownedProducts || [];
   const ownedPhotons: string[] = state?.ownedPhotons || [];
+  const ownedAtoms: string[] = state?.ownedAtoms || [];
   const allOwned = state?.freeCode === true;
   const variant = storeVariant;
   const photonCards = PHOTONS.map((p) => {
@@ -2385,7 +2539,7 @@ function renderStore(): string {
       <p class="price">$499.00 <span class="fine">($514.00 at checkout)</span></p>
       ${buyButton(buyUrl(SUPERNOVA.url, "Photon-" + p.name), "$514.00", owned)}
     </div>`;
-  }).join("");
+  });
 
   const sparkCount = PRODUCTS.filter((p) => p.kind === "Spark").length;
   const plugCount = PRODUCTS.filter((p) => p.kind === "Plug").length;
@@ -2407,9 +2561,50 @@ function renderStore(): string {
         <p class="fine">Checkout links are being set up — the plug itself is ready. There is no Buy button until its two Stripe links exist.</p>
       </div></div>`;
 
+  // The Store shows one side at a time. The side comes from the
+  // first-open chooser (switch it in You) — the Sparks & Plugs
+  // Personal/Business toggle below only changes those prices, it
+  // never changes which sections show.
+  const isPersonal = sideOrDefault() === "personal";
+  const atomCards = ATOMS.map((a) => {
+    const owned = allOwned || ownedAtoms.includes(a.name);
+    return `<div class="card product-card photon-store">
+      <button class="portrait-btn" data-action="atom-info" data-atom="${esc(a.name)}" aria-label="More about ${esc(a.name)}">${atomPortraitHtml(a.name, 220)}</button>
+      <h3 class="photon-name">${esc(a.name)}</h3>
+      <p>${esc(a.tagline)}</p>
+      <p class="fine">${esc(a.focus)} And so much more.</p>
+      <p class="price">$79.00 <span class="fine">($81.37 at checkout)</span></p>
+      ${buyButton(buyUrl(NOVA.url, "Atom-" + a.name), "$81.37", owned)}
+    </div>`;
+  });
+  const supernovaRow = `    <div class="poster-row" id="store-supernova"><button class="poster-btn" data-action="tier-info" data-tier="supernova" aria-label="More about Supernova"><img src="/brand/poster-supernova.jpg" alt="Supernova poster, the whole front office"></button><div class="pr-txt"><b>Supernova</b><span class="desc">${esc(TIER_COPY.supernova.body)}</span><span class="desc">${esc(TIER_COPY.supernova.hours)}</span><span class="price">$499.00</span><span class="at">$514.00 at checkout</span>${buyButton(buyUrl(SUPERNOVA.url, "supernova"), "$514.00", allOwned || ownedProducts.includes("supernova"))}<p class="fine">Or pay monthly:</p><div class="row monthly-row">
+        <a class="btn small" href="${esc(buyUrl(SUPERNOVA.monthly.url, "supernova-monthly"))}" target="_blank" rel="noopener">$49/mo</a>
+        <a class="btn small" href="${esc(buyUrl(SUPERNOVA.twoYear.url, "supernova-two-year"))}" target="_blank" rel="noopener">$39/mo · 2-year</a>
+        <a class="btn small" href="${esc(buyUrl(SUPERNOVA.annual.url, "supernova-annual"))}" target="_blank" rel="noopener">$539/yr</a>
+      </div></div></div>`;
+  const satelliteRow = `    <div class="poster-row" id="store-satellite"><button class="poster-btn" data-action="tier-info" data-tier="satellite" aria-label="More about Satellite"><img src="/brand/poster-satellite.jpg" alt="Satellite poster, one Brain, one Face, one job duty"></button><div class="pr-txt"><b>Satellite</b><span class="desc">${esc(TIER_COPY.satellite.body)}</span><span class="desc">${esc(TIER_COPY.satellite.hours)}</span><span class="price">$99.00</span><span class="at">$101.97 at checkout</span>${buyButton(buyUrl(SATELLITE.url, "satellite"), "$101.97", allOwned || ownedProducts.includes("satellite"))}<p class="fine">Or pay monthly:</p><div class="row monthly-row">
+        <a class="btn small" href="${esc(buyUrl(SATELLITE.monthly.url, "satellite-monthly"))}" target="_blank" rel="noopener">$33/mo</a>
+        <a class="btn small" href="${esc(buyUrl(SATELLITE.twoYear.url, "satellite-two-year"))}" target="_blank" rel="noopener">$26/mo · 2-year</a>
+        <a class="btn small" href="${esc(buyUrl(SATELLITE.annual.url, "satellite-annual"))}" target="_blank" rel="noopener">$363/yr</a>
+      </div></div></div>`;
+  const novaRow = `    <div class="poster-row" id="store-nova"><img src="/brand/starburst.jpg" alt="Nova, the helper for your own day"><div class="pr-txt"><b>Nova</b><span class="desc">Nova is the helper for your own day, not a business. One inbox, triaged, with replies drafted in your words. Your calendar and reminders, a morning briefing and an end-of-day wrap, and gentle check-ins that nudge you to get started — never a nag.</span><span class="desc">What Nova opens:</span><ul class="included-list">${PERSONAL_FEATURES.map((f) => `<li>${esc(f.label)}</li>`).join("")}</ul><span class="price">$79.00</span><span class="at">$81.37 at checkout</span>${buyButton(buyUrl(NOVA.url, "nova-personal"), "$81.37", allOwned || ownedProducts.includes("nova"))}<p class="fine">Or pay monthly:</p><div class="row monthly-row">
+        <a class="btn small" href="${esc(buyUrl(NOVA.monthly.url, "nova-monthly"))}" target="_blank" rel="noopener">$10/mo</a><span class="fine">$10.00/month ($10.30 at checkout)</span>
+      </div><p class="fine">The business set stays locked on Nova alone — front-desk answering, quotes and invoices, client handling, more than one account, team features. Those open with a business Launch — Supernova or Satellite — on the Business side.</p></div></div>`;
+  const personalUpkeepCard = `    <div class="card upkeep-card" id="store-personal-upkeep"><img src="/brand/starburst.jpg" alt=""><div><h2>Personal Upkeep</h2><p>The care that keeps your personal helper working well: updates as they come out, and help first when you need it. It sits beside Nova. Your first three months come with Nova; after that it is $9 a month, only if you want it. Upkeep itself is the care plan for a business Launch.</p><p class="price">$9.00/month <span class="fine">($9.27 at checkout)</span></p><div class="row">${buyButton(buyUrl(PERSONAL_UPKEEP.url, "personal-upkeep"), "$9.27", allOwned || ownedProducts.includes("personal-upkeep"))}</div></div></div>`;
+  const photonsGroup = `    <details class="store-group" id="store-photons" ${storeOpen.photons ? "open" : ""}>
+      <summary><span class="summary-title">Meet the Photons</span><span class="fine">12 Supernovas · tap to hide</span></summary>
+      <p class="page-lede">Each Photon is a Supernova on its own. Buy one and it drops into your app, ready to talk. One hero at a time below — the arrows and dots move between them.</p>
+      ${carouselHtml("store-photons", "Meet the Photons", photonCards, PHOTONS.map((p) => p.name))}
+    </details>`;
+  const atomsGroup = `<details class="store-group" id="store-atoms" ${storeOpen.atoms ? "open" : ""}>
+      <summary><span class="summary-title">Meet the Atoms</span><span class="fine">12 Novas · tap to hide</span></summary>
+      <p class="page-lede">Each Atom is a Nova on its own. Buy one and it drops into your app, ready to help with your own day. One hero at a time below — the arrows and dots move between them.</p>
+      ${carouselHtml("store-atoms", "Meet the Atoms", atomCards, ATOMS.map((a) => a.name))}
+    </details>`;
+  const upkeepCard = `    <div class="card upkeep-card" id="store-upkeep"><button class="poster-btn upkeep-poster-btn" data-action="tier-info" data-tier="upkeep" aria-label="More about Upkeep"><img src="/brand/starburst.jpg" alt=""></button><div><h2>Upkeep</h2><p>${esc(UPKEEP_COPY.body)}</p><p class="price">$29.00/month <span class="fine">($29.87 at checkout)</span></p><div class="row">${buyButton(buyUrl(UPKEEP.url, "upkeep"), "$29.87", state?.upkeep === true)}<button class="btn small more-info" data-action="tier-info" data-tier="upkeep">More info</button></div></div></div>`;
   return `
   <section>
-    <div class="store-head"><img src="/brand/starburst.jpg" alt=""><div><h1 class="page-title">Store</h1><p>A Launch is the helper you talk with in this app. Pick the helper that fits your day, then pick how you want to pay. The prices are further down, after a plain explanation of how it all works.</p></div></div>
+    <div class="store-head"><img src="/brand/starburst.jpg" alt=""><div><h1 class="page-title">Store</h1><p>${isPersonal ? "A Nova is the helper for your own day." : "A Launch is the helper you talk with in this app."} Pick the helper that fits your day, then pick how you want to pay. The prices are further down, after a plain explanation of how it all works.</p></div></div>
     ${perkBanner()}
     ${stripeStatusData
       ? `<p class="fine stripe-line">${stripeStatusData.configured ? "Automatic unlocks are on — a purchase unlocks as soon as Stripe confirms the payment." : "Automatic unlocks are off — the Stripe webhook isn't set up yet. Purchases still unlock by code (redeem one below) until it is."}</p>`
@@ -2421,7 +2616,7 @@ function renderStore(): string {
       <div class="pricing-body">
         <p><b>First, what are these things?</b> A Launch is what gives this app someone to talk to. With no Launch, there is no one to talk to. Each Launch is called a Photon, and each Photon has its own way of helping, like keeping on top of your messages, sorting your calendar, or drafting notes in your words.</p>
         <p><b>A Spark</b> is one button for one job. You press it, it does that one job, and you can press it again as often as you like. It never runs out and it never dies. <b>A Plug</b> is the same idea, except you do not press anything. It runs on its own, in the background, and does its job without being asked.</p>
-        <p><b>A Supernova</b> is the full helper. It is the whole front office in one: messages, calendar, paperwork, and anything else that comes up, and it learns how you like things done. <b>A Satellite</b> is a smaller version of the same thing, for one job at a time, with one way of talking and one way of looking.</p>
+        <p><b>A Supernova</b> is the full helper. It is the whole front office in one: messages, calendar, paperwork, and anything else that comes up, and it learns how you like things done. <b>A Satellite</b> is a smaller version of the same thing, for one job at a time, with one way of talking and one way of looking. <b>Nova</b> is the helper for your own day, not a business: one inbox triaged, your calendar and reminders, a morning briefing and an end-of-day wrap, and gentle check-ins. The business set — front-desk answering, quotes and invoices, client handling, more than one account, team features — stays locked on Nova alone, and opens with a Supernova or a Satellite.</p>
         <p><b>Upkeep</b> is the care that keeps your helper working well: unlimited chats, updates as they come out, help first when you need it, and talking out loud instead of typing. Upkeep is never required. Every purchase already includes 300 chats a month, free forever, with no monthly payment needed.</p>
         <p><b>How paying works.</b> Some things you pay for once, and then they are yours forever. That is how Sparks, Plugs, Supernova, and Satellite work when you buy them outright. Or you can pay month by month instead. Paying monthly costs less at the start, and if you stop paying, the live help pauses until you start again. What you already bought stays on your phone, nothing is deleted and nothing is chased. Paying for two years at a time costs less each month, because you are committing for longer. Paying for a whole year at once costs the same as 11 months, so the 12th month is free.</p>
         <p><b>Why does it cost what it does?</b> Each helper is written out, line by line, for the way you actually work, then tested until it works properly, and then kept working with updates. A Supernova is about 300 hours of that careful building and testing. A Satellite is about 150 hours, a Plug about 50 hours, and a Spark about 25 hours. You are paying for that time, and for a helper that is built around your day, not a generic one.</p>
@@ -2431,33 +2626,20 @@ function renderStore(): string {
     </details>
 
     <div class="store-jump" aria-label="Jump to a section">
-      <a href="#store-supernova">Supernova</a>
+      ${isPersonal ? `<a href="#store-nova">Nova</a>
+      <a href="#store-atoms">Atoms</a>
+      <a href="#store-personal-upkeep">Personal Upkeep</a>` : `<a href="#store-supernova">Supernova</a>
       <a href="#store-satellite">Satellite</a>
       <a href="#store-photons">Photons</a>
-      <a href="#store-upkeep">Upkeep</a>
+      <a href="#store-upkeep">Upkeep</a>`}
       <a href="#store-sparks-plugs">Sparks &amp; Plugs</a>
     </div>
 
-    <h2 class="section-title">Launches</h2>
-    <div class="poster-row" id="store-supernova"><button class="poster-btn" data-action="tier-info" data-tier="supernova" aria-label="More about Supernova"><img src="/brand/poster-supernova.jpg" alt="Supernova poster, the whole front office"></button><div class="pr-txt"><b>Supernova</b><span class="desc">${esc(TIER_COPY.supernova.body)}</span><span class="desc">${esc(TIER_COPY.supernova.hours)}</span><span class="price">$499.00</span><span class="at">$514.00 at checkout</span>${buyButton(buyUrl(SUPERNOVA.url, "supernova"), "$514.00", allOwned || ownedProducts.includes("supernova"))}<p class="fine">Or pay monthly:</p><div class="row monthly-row">
-        <a class="btn small" href="${esc(buyUrl(SUPERNOVA.monthly.url, "supernova-monthly"))}" target="_blank" rel="noopener">$49/mo</a>
-        <a class="btn small" href="${esc(buyUrl(SUPERNOVA.twoYear.url, "supernova-two-year"))}" target="_blank" rel="noopener">$39/mo · 2-year</a>
-        <a class="btn small" href="${esc(buyUrl(SUPERNOVA.annual.url, "supernova-annual"))}" target="_blank" rel="noopener">$539/yr</a>
-      </div></div></div>
-
-    <div class="poster-row" id="store-satellite"><button class="poster-btn" data-action="tier-info" data-tier="satellite" aria-label="More about Satellite"><img src="/brand/poster-satellite.jpg" alt="Satellite poster, one Brain, one Face, one job duty"></button><div class="pr-txt"><b>Satellite</b><span class="desc">${esc(TIER_COPY.satellite.body)}</span><span class="desc">${esc(TIER_COPY.satellite.hours)}</span><span class="price">$99.00</span><span class="at">$101.97 at checkout</span>${buyButton(buyUrl(SATELLITE.url, "satellite"), "$101.97", allOwned || ownedProducts.includes("satellite"))}<p class="fine">Or pay monthly:</p><div class="row monthly-row">
-        <a class="btn small" href="${esc(buyUrl(SATELLITE.monthly.url, "satellite-monthly"))}" target="_blank" rel="noopener">$33/mo</a>
-        <a class="btn small" href="${esc(buyUrl(SATELLITE.twoYear.url, "satellite-two-year"))}" target="_blank" rel="noopener">$26/mo · 2-year</a>
-        <a class="btn small" href="${esc(buyUrl(SATELLITE.annual.url, "satellite-annual"))}" target="_blank" rel="noopener">$363/yr</a>
-      </div></div></div>
-
-    <details class="store-group" id="store-photons" ${storeOpen.photons ? "open" : ""}>
-      <summary><span class="summary-title">Meet the Photons</span><span class="fine">12 Supernovas · tap to hide</span></summary>
-      <p class="page-lede">Each Photon is a Supernova on its own. Buy one and it drops into your app, ready to talk.</p>
-      <div class="product-grid">${photonCards}</div>
-    </details>
-
-    <div class="card upkeep-card" id="store-upkeep"><button class="poster-btn upkeep-poster-btn" data-action="tier-info" data-tier="upkeep" aria-label="More about Upkeep"><img src="/brand/starburst.jpg" alt=""></button><div><h2>Upkeep</h2><p>${esc(UPKEEP_COPY.body)}</p><p class="price">$29.00/month <span class="fine">($29.87 at checkout)</span></p><div class="row">${buyButton(buyUrl(UPKEEP.url, "upkeep"), "$29.87", state?.upkeep === true)}<button class="btn small more-info" data-action="tier-info" data-tier="upkeep">More info</button></div></div></div>
+    <h2 class="section-title">${isPersonal ? "Nova" : "Launches"}</h2>
+    ${isPersonal ? novaRow : supernovaRow + satelliteRow}
+    ${isPersonal ? personalUpkeepCard : ""}
+    ${isPersonal ? atomsGroup : photonsGroup}
+    ${isPersonal ? "" : upkeepCard}
 
     <h2 class="section-title" id="store-sparks-plugs">Sparks &amp; Plugs</h2>
     <p class="page-lede">One job each. A Spark is a single button for one job, push it and it does the thing. A Plug is a Spark that runs on its own.</p>
@@ -2808,13 +2990,96 @@ function nameCard(): string {
     </div>`;
 }
 
+// What a product slug reads as in "What you own" — plain words, not slugs.
+function productDisplayName(slug: string): string {
+  if (slug === "nova") return "Nova — personal";
+  if (slug === "supernova") return "Supernova";
+  if (slug === "satellite") return "Satellite";
+  if (slug === "personal-upkeep") return "Personal Upkeep";
+  return slug
+    .split("-")
+    .map((w) => (w ? w[0].toUpperCase() + w.slice(1) : w))
+    .join(" ");
+}
+
+// Nova, on its own card in You — distinct from the business Launches
+// below it. The two gentler defaults ride here: check-ins and
+// getting-started nudges, on from the moment Nova is owned, each with
+// its own switch. Personal Upkeep state sits alongside it.
+function novaCard(): string {
+  const ownedProducts: string[] = state?.ownedProducts || [];
+  const allOwned = state?.freeCode === true;
+  if (!allOwned && !ownedProducts.includes("nova")) return "";
+  const ns = state?.novaSettings || { checkIns: true, gettingStartedNudges: true };
+  const hasPersonalUpkeep = allOwned || ownedProducts.includes("personal-upkeep");
+  return `<div class="card">
+    <h2>Nova — for your own day</h2>
+    <p><span class="owned-badge">Yours</span></p>
+    <p class="fine">Your personal helper. It opens the personal set:</p>
+    <ul class="included-list">${PERSONAL_FEATURES.map((f) => `<li>${esc(f.label)}</li>`).join("")}</ul>
+    <h3>Gentle, by default</h3>
+    <p class="fine">Check-ins and getting-started nudges are on for Nova owners, from the start. Turn either off here and it stays off.</p>
+    <div class="row">
+      <button class="btn${ns.checkIns ? " primary" : ""}" data-action="nova-checkins" aria-pressed="${ns.checkIns ? "true" : "false"}">${ns.checkIns ? "Check-ins: on" : "Check-ins: off"}</button>
+      <button class="btn${ns.gettingStartedNudges ? " primary" : ""}" data-action="nova-nudges" aria-pressed="${ns.gettingStartedNudges ? "true" : "false"}">${ns.gettingStartedNudges ? "Getting-started nudges: on" : "Getting-started nudges: off"}</button>
+    </div>
+    <p class="fine">Personal Upkeep: ${hasPersonalUpkeep ? "on — $9 a month, keeping your personal helper cared for." : "not on yet. Your first three months come with Nova; after that it is $9 a month in the Store, beside Nova."}</p>
+  </div>`;
+}
+
+// The business set, shown locked for a Nova-only owner — never hidden,
+// never half-open: the list says what it is and what opens it. The
+// server's feature gate (state.features) decides; ownership is only
+// the fallback for a state that predates it.
+function businessLockedCard(): string {
+  const ownedProducts: string[] = state?.ownedProducts || [];
+  const allOwned = state?.freeCode === true;
+  const features = state?.features as { personal: boolean; business: boolean } | undefined;
+  const hasBusiness = features
+    ? features.business
+    : allOwned || ownedProducts.includes("supernova") || ownedProducts.includes("satellite");
+  const hasPersonal = features
+    ? features.personal
+    : allOwned ||
+      ownedProducts.includes("nova") ||
+      ownedProducts.includes("supernova") ||
+      ownedProducts.includes("satellite");
+  if (!hasPersonal || hasBusiness) return "";
+  return `<div class="card">
+    <h2>The business set — locked</h2>
+    <p class="fine">Nova is for your own day. These stay locked unless you own a business Launch — Supernova or Satellite:</p>
+    <ul class="included-list">${BUSINESS_FEATURES.map((f) => `<li>${esc(f.label)}</li>`).join("")}</ul>
+    <div class="row"><button class="btn primary" data-action="goto" data-tab="store">See business Launches in the Store</button></div>
+  </div>`;
+}
+
+// The side switcher lives here, in You, under Settings — the same place
+// the other app-wide choices live. Two doors, one app: Business shows
+// the business Launches and prices, Personal shows Nova, the Atoms, and
+// personal prices. Switching never touches what you own.
+function sideCard(): string {
+  const current = sideOrDefault();
+  return `<div class="card">
+    <h2>Business or Personal</h2>
+    <p class="fine">Two doors, one app. Business shows the business Launches and prices; Personal shows Nova, the Atoms, and personal prices. Switch any time — nothing you own changes.</p>
+    <div class="row" role="group" aria-label="Business or Personal">
+      <button class="btn${current === "business" ? " primary" : ""}" data-action="side-pick" data-side="business" aria-pressed="${current === "business" ? "true" : "false"}">For my business</button>
+      <button class="btn${current === "personal" ? " primary" : ""}" data-action="side-pick" data-side="personal" aria-pressed="${current === "personal" ? "true" : "false"}">For me, personally</button>
+    </div>
+  </div>`;
+}
+
 function renderYou(): string {
   const ownedPhotons: string[] = state?.ownedPhotons || [];
+  const ownedAtoms: string[] = state?.ownedAtoms || [];
   const ownedProducts: string[] = state?.ownedProducts || [];
+  // Nova and Personal Upkeep have their own card above; the list below
+  // is the business Launches and the Sparks and Plugs.
+  const listedProducts = ownedProducts.filter((s) => s !== "nova" && s !== "personal-upkeep");
   const ownedList =
-    ownedPhotons.length || ownedProducts.length
-      ? `<ul class="owned-list">${ownedPhotons.map((n) => `<li>${esc(n)} — Photon</li>`).join("")}${ownedProducts
-          .map((s) => `<li>${esc(s)}</li>`)
+    ownedPhotons.length || ownedAtoms.length || listedProducts.length
+      ? `<ul class="owned-list">${ownedPhotons.map((n) => `<li>${esc(n)} — Photon</li>`).join("")}${ownedAtoms.map((n) => `<li>${esc(n)} — Atom</li>`).join("")}${listedProducts
+          .map((s) => `<li>${esc(productDisplayName(s))}</li>`)
           .join("")}</ul>`
       : `<p class="fine">Nothing owned yet.</p>`;
   return `
@@ -2838,7 +3103,13 @@ function renderYou(): string {
       ${ownedList}
     </div>
 
+    ${novaCard()}
+
+    ${businessLockedCard()}
+
     <h2 class="section-title">Settings</h2>
+
+    ${sideCard()}
 
     ${readabilityCard()}
 
@@ -3050,6 +3321,25 @@ async function refreshState(): Promise<boolean> {
   if (r && r.ok) {
     state = r;
     stateFailed = false;
+    // The side lives on the account: the account wins over the device
+    // cache. When the account has no side yet but this device picked
+    // one (while signed out, or on a device that never synced), push
+    // the device choice up, so the account — and the website — follows
+    // it from here on.
+    const accountSide = (r as any)?.side === "personal" || (r as any)?.side === "business" ? (r as any).side : "";
+    if (accountSide) {
+      if (side !== accountSide) {
+        side = accountSide;
+        try {
+          localStorage.setItem(SIDE_KEY, accountSide);
+        } catch {
+          // Private mode: the choice lasts for this session only.
+        }
+        storeVariant = accountSide;
+      }
+    } else if (side) {
+      api.profileSave({ side }).catch(() => {});
+    }
     return true;
   }
   stateFailed = true;
@@ -3215,7 +3505,7 @@ const SWOOSH_ACTIONS = new Set([
   "back-to-front",
   "open-photon",
   "card-chat",
-  "landing-skip",
+  "chooser-skip",
   "day-start",
   "day-back",
   "custom-back",
@@ -3226,6 +3516,7 @@ const SWOOSH_ACTIONS = new Set([
   "drive-close",
   "research-close",
   "photon-info",
+  "atom-info",
   "product-info",
   "tier-info",
   "card-close",
@@ -3237,6 +3528,8 @@ const TOGGLE_DIRECTIONS: Record<string, () => boolean> = {
   "opening-off": () => false,
   "push-toggle": () => !(pushData && pushData.subscribed),
   "read-contrast": () => !readContrast,
+  "nova-checkins": () => !(state?.novaSettings?.checkIns ?? true),
+  "nova-nudges": () => !(state?.novaSettings?.gettingStartedNudges ?? true),
   "day-move-show": () => !dayMoveOpen,
   "call-mic": () => callPhase !== "recording",
 };
@@ -3347,6 +3640,24 @@ document.addEventListener("click", async (e) => {
     playToggle(on, true);
     render();
     toast(on ? "Interface sounds are on." : "Interface sounds are off.");
+  } else if (action === "nova-checkins" || action === "nova-nudges") {
+    // Nova's gentler default, switched by the owner: check-ins or
+    // getting-started nudges, on until turned off. Saved on the server
+    // for this account, so it follows the owner across devices — and
+    // the state re-read is the save, so a failed save never shows as
+    // flipped.
+    const key = action === "nova-checkins" ? "checkIns" : "gettingStartedNudges";
+    const label = action === "nova-checkins" ? "Check-ins" : "Getting-started nudges";
+    const next = !(state?.novaSettings?.[key] ?? true);
+    t.setAttribute("disabled", "");
+    const r = await api.novaSettings({ [key]: next });
+    if (r && r.ok && r.novaSettings) {
+      state.novaSettings = r.novaSettings;
+      toast(`${label} ${next ? "on" : "off"}.`);
+    } else {
+      toast("That switch didn't save. Try again.", "err");
+    }
+    render();
   } else if (action === "opening-off") {
     // The persistent off switch on the opening itself: turn the film
     // off for every later open, then skip the rest of this one. The
@@ -3354,10 +3665,24 @@ document.addEventListener("click", async (e) => {
     // bubbles up to it); this handler only records the choice.
     setPlayOpening(false);
     toast("The opening won't play again. Turn it back on in You, under Settings.");
-  } else if (action === "landing-skip") {
-    // First-run landing: continue into the app without an account.
-    // The landing stays dismissed on this device from here on.
-    dismissLanding();
+  } else if (action === "side-pick") {
+    // A door, picked in the first-open chooser or in the You tab: the
+    // choice persists on this device, the chooser goes away, and the
+    // Store follows the side at once.
+    const picked = t.dataset.side === "personal" ? "personal" : "business";
+    setSide(picked);
+    hideChooser();
+    render();
+    toast(
+      picked === "personal"
+        ? "Personal side — Nova, the Atoms, and personal prices."
+        : "Business side — Supernova, Satellite, the Photons, and business prices.",
+    );
+  } else if (action === "chooser-skip") {
+    // Continue into the app without signing in — and without picking a
+    // door. Nothing is stored, so the chooser shows again on the next
+    // open until a door is picked.
+    hideChooser();
   } else if (action === "signout") {
     // Sign-out is local only: drop this device's account id and start
     // a fresh anonymous one. Everything stays on the server, and
@@ -3439,6 +3764,18 @@ document.addEventListener("click", async (e) => {
     // A Photon portrait in the Store: the character card, not the chat.
     // The Chat front keeps its own tap-to-open-thread behavior.
     openPhotonCard(t.dataset.photon || "", t);
+  } else if (action === "atom-info") {
+    // An Atom portrait in the Store: the character card, same as a
+    // Photon's. Atoms do not chat yet, so the card has no chat button.
+    openAtomCard(t.dataset.atom || "", t);
+  } else if (action === "carousel-prev") {
+    // A roster carousel moves in place — no full re-render, so the
+    // page does not jump and open Store sections stay open.
+    carouselGo(t.dataset.carousel || "", (carouselIndex[t.dataset.carousel || ""] || 0) - 1);
+  } else if (action === "carousel-next") {
+    carouselGo(t.dataset.carousel || "", (carouselIndex[t.dataset.carousel || ""] || 0) + 1);
+  } else if (action === "carousel-dot") {
+    carouselGo(t.dataset.carousel || "", Number(t.dataset.index || 0));
   } else if (action === "product-info") {
     openProductCard(t.dataset.slug || "", t);
   } else if (action === "tier-info") {
@@ -4173,10 +4510,10 @@ function playOpeningSplash(returning: boolean): void {
   if (!splash || !video) return;
   if (!playOpening) {
     // The owner turned the opening off: no film, no 10s wait, no
-    // open counted — straight into the app. The landing check still
+    // open counted — straight into the app. The chooser check still
     // runs (init calls it again after render, when state is loaded).
     splash.remove();
-    maybeShowLanding();
+    maybeShowChooser();
     return;
   }
   // Count this open, then pick the greeting and the scheme from it.
@@ -4201,7 +4538,7 @@ function playOpeningSplash(returning: boolean): void {
     splash.classList.add("is-fading");
     window.setTimeout(() => {
       splash.remove();
-      maybeShowLanding();
+      maybeShowChooser();
     }, 800);
   };
   // A tap on the film skips it with a swoosh — except a tap on the
@@ -4234,7 +4571,7 @@ function playOpeningSplash(returning: boolean): void {
   }
   if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
     splash.remove();
-    maybeShowLanding();
+    maybeShowChooser();
     return;
   }
   splash.addEventListener("click", dismissByTap, { once: true });
@@ -4286,7 +4623,7 @@ function playOpeningSplash(returning: boolean): void {
 
 // The fast dismiss for an OAuth return: the static cover goes away in
 // a slow 600ms fade once the first render has landed, instead of the
-// film's 800ms fade after a 10s play. The landing check runs after, as
+// film's 800ms fade after a 10s play. The chooser check runs after, as
 // usual.
 function dismissSplashFast(): void {
   const splash = document.getElementById("opening-splash");
@@ -4295,73 +4632,71 @@ function dismissSplashFast(): void {
   splash.classList.add("is-fading");
   window.setTimeout(() => {
     splash.remove();
-    maybeShowLanding();
+    maybeShowChooser();
   }, 650);
 }
 
-// ---------- First-run landing ----------
+// ---------- First-open chooser ----------
 // Shown once, after the opening film, only when the account has never
 // signed in and the owner has never dismissed it. It exists so the
 // account benefits are offered up front instead of hiding at the
 // bottom of Upkeep: the sign-in is the same Google flow as the
 // Upkeep card (same endpoint, same return), and skipping is always
 // possible — nothing here forces an account.
-const LANDING_DISMISSED_KEY = "prism.landingDismissed";
-let landingShown = false;
+// ---------- First-open chooser ----------
+// Two doors, one app (Nov 19, 2026): "For my business" / "For me,
+// personally" — the website's two doors, as the front door of the app,
+// before Chat / Connected / Store / You. The choice persists on this
+// device (see SIDE_KEY, next to storeVariant); until a door is picked
+// the chooser shows on every open, and the app shows the business side.
+// This replaces the old first-run landing: the pitch and the Google
+// sign-in live on the chooser card itself now, so there is one front
+// door instead of two gates in a row.
+let chooserShown = false;
 // Set once in init on a connect return (gmail/google/outlook
-// connected): the owner just finished a task, and the first-run pitch
-// landing over the inbox they just connected would be jarring. Only
-// this boot is suppressed — a later fresh open can still show it.
-let suppressLandingOnce = false;
-function landingDismissed(): boolean {
-  try {
-    return localStorage.getItem(LANDING_DISMISSED_KEY) === "1";
-  } catch {
-    return false;
-  }
-}
-function maybeShowLanding(): void {
-  if (landingShown) return;
-  if (suppressLandingOnce) return;
+// connected): the owner just finished a task, and the chooser over the
+// inbox they just connected would be jarring. Only this boot is
+// suppressed — a later fresh open can still show it.
+let suppressChooserOnce = false;
+function maybeShowChooser(): void {
+  if (chooserShown) return;
+  if (suppressChooserOnce) return;
+  // A door already picked on this device: never show it again here.
+  if (loadSide() !== "") return;
   // State is not loaded yet (the reduced-motion path dismisses the
   // film before refreshState finishes): init calls this again after
   // render, so returning here loses nothing.
-  if (!state || (state as any)?.auth?.signedIn) return;
-  if (landingDismissed()) return;
+  if (!state) return;
+  // A door already picked on the account — on another device, or on
+  // the website: the account is the truth, so no asking again here.
+  // (refreshState already adopted the account side into the device
+  // cache above; this is the belt to its braces for a state that
+  // arrived another way.)
+  if ((state as any)?.side === "business" || (state as any)?.side === "personal") return;
   // The film is still playing: its dismiss calls this again when it
-  // goes away, so the landing never covers the film.
+  // goes away, so the chooser never covers the film.
   if (document.getElementById("opening-splash")?.isConnected) return;
-  landingShown = true;
+  chooserShown = true;
   const el = document.createElement("div");
-  el.id = "landing";
-  el.className = "landing";
-  el.innerHTML = `<div class="landing-card">
-    <img class="landing-mark" src="/brand/gem.jpg" alt="">
+  el.id = "side-chooser";
+  el.className = "chooser";
+  el.innerHTML = `<div class="chooser-card">
+    <img class="chooser-mark" src="/brand/gem.jpg" alt="">
     <h1>Prism 5</h1>
-    <p class="landing-lede">One assistant that does it all, and becomes a second you.</p>
-    <ul class="landing-benefits">
-      <li>A backstory for every Photon, written with your name.</li>
-      <li>15% off your first order, revealed once you sign up.</li>
-      <li>Signing up also signs you up for the newsletter, with exclusive rotating offers of merch and more.</li>
-      <li>Your Photons, chats, and purchases follow you to any device.</li>
-      <li>Restore purchases anywhere, just by signing back in.</li>
-    </ul>
-    <button class="btn primary landing-signin" data-action="signin">Sign in or create account with Google</button>
-    <p class="fine">Signing in with Google creates your account. No password, no form — we see only your name and email.</p>
-    <button class="landing-skip" data-action="landing-skip">Continue without signing in</button>
+    <p class="chooser-lede">One assistant that does it all, and becomes a second you.</p>
+    <p class="fine">Two doors — pick the one that fits your day. You can switch sides any time, in You.</p>
+    <button class="btn primary chooser-door" data-action="side-pick" data-side="business">For my business</button>
+    <p class="fine">The front desk, the shop, the clients — Prism at work.</p>
+    <button class="btn primary chooser-door" data-action="side-pick" data-side="personal">For me, personally</button>
+    <p class="fine">Your inbox, your calendar, your day — Prism for you.</p>
+    <button class="btn primary chooser-signin" data-action="signin">Sign in or create account with Google</button>
+    <p class="fine">Signing in with Google creates your account. No password, no form — we see only your name and email. Your Photons, Atoms, chats, and purchases follow you to any device.</p>
+    <button class="chooser-skip" data-action="chooser-skip">Continue without signing in</button>
   </div>`;
   document.body.appendChild(el);
 }
-function hideLanding(): void {
-  document.getElementById("landing")?.remove();
-}
-function dismissLanding(): void {
-  try {
-    localStorage.setItem(LANDING_DISMISSED_KEY, "1");
-  } catch {
-    // Storage unavailable: the landing still goes away for this open.
-  }
-  hideLanding();
+function hideChooser(): void {
+  document.getElementById("side-chooser")?.remove();
 }
 
 // ---------- Boot ----------
@@ -4393,21 +4728,21 @@ function dismissLanding(): void {
   const outlookParam = params.get("outlook");
   if (gmailParam === "connected") {
     justConnected = "gmail";
-    suppressLandingOnce = true;
+    suppressChooserOnce = true;
   } else if (gmailParam === "error") {
     connectError = "Gmail sign-in didn't finish. Try again.";
     connectErrorKind = "gmail";
   }
   if (googleParam === "connected") {
     justConnected = "google";
-    suppressLandingOnce = true;
+    suppressChooserOnce = true;
   } else if (googleParam === "error") {
     connectError = "Calendar and Drive sign-in didn't finish. Try again.";
     connectErrorKind = "google";
   }
   if (outlookParam === "connected") {
     justConnected = "outlook";
-    suppressLandingOnce = true;
+    suppressChooserOnce = true;
   } else if (outlookParam === "error") {
     connectError = "Outlook sign-in didn't finish. Try again.";
     connectErrorKind = "outlook";
@@ -4436,10 +4771,10 @@ function dismissLanding(): void {
       state = r;
       signinResult = r.isNew ? "new" : "back";
       signinName = r.auth?.name || r.auth?.email || "";
-      // The landing must not sit over a freshly signed-in account:
+      // The chooser must not sit over a freshly signed-in account:
       // the film is still playing on the way back from Google, so the
-      // landing cannot have shown yet, but if it did, take it down.
-      hideLanding();
+      // chooser cannot have shown yet, but if it did, take it down.
+      hideChooser();
     } else {
       signinResult = "error";
     }
@@ -4475,7 +4810,7 @@ function dismissLanding(): void {
     window.setTimeout(async () => {
       await refreshState();
       render();
-      maybeShowLanding();
+      maybeShowChooser();
     }, 5000);
   }
   // The tab's data loads before the first render, but it must never
@@ -4499,7 +4834,7 @@ function dismissLanding(): void {
   }
   render();
   if (returning) dismissSplashFast();
-  maybeShowLanding();
+  maybeShowChooser();
   const gmail = gmailParam;
   if (gmail === "connected") toast("Gmail account connected.");
   if (gmail === "error") toast("Gmail sign-in didn't finish. Try again.", "err");

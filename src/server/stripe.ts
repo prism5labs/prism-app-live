@@ -29,9 +29,10 @@
 
 import { timingSafeEqual } from "node:crypto";
 import { config } from "./config";
-import { db, ownPhoton, ownProduct, setUpkeep, getOrCreateAccount } from "./db";
+import { db, ownPhoton, ownAtom, ownProduct, setUpkeep, getOrCreateAccount } from "./db";
 import { markPerkUsed } from "./auth";
 import { PHOTON_NAMES } from "../shared/photons";
+import { ATOM_NAMES } from "../shared/atoms";
 import { PRODUCTS } from "../shared/catalog";
 
 db.exec(`
@@ -124,6 +125,7 @@ export function verifyStripeSignature(
 
 export type UnlockAction =
   | { kind: "photon"; ref: string }
+  | { kind: "atom"; ref: string }
   | { kind: "product"; ref: string }
   | { kind: "upkeep" };
 
@@ -161,10 +163,16 @@ const PRODUCT_SLUGS = new Set(PRODUCTS.map((p) => p.slug));
  * nothing this server recognises — the caller logs it and does NOT guess.
  * Hint vocabulary (set by the client buy flow, see WIRING.md):
  *   "Photon-<Name>"            -> that Photon
+ *   "Atom-<Name>"              -> that Atom (bought on a Nova link, the
+ *                                 same way a Photon is bought on the
+ *                                 Supernova link)
  *   "<catalog slug>"           -> that Spark/Plug (personal/business suffix
  *                                 stripped: "<slug>-personal" / "-business")
  *   "supernova" (+ -monthly, -two-year, -annual) -> product "supernova"
  *   "satellite" (+ -monthly, -two-year, -annual) -> product "satellite"
+ *   "nova" (+ -monthly)        -> product "nova" (one-time or monthly:
+ *                                 both unlock the same personal set)
+ *   "personal-upkeep"          -> product "personal-upkeep"
  *   "upkeep"                   -> Upkeep on
  */
 export function unlocksForHint(hint: string | null): UnlockAction[] | null {
@@ -173,6 +181,10 @@ export function unlocksForHint(hint: string | null): UnlockAction[] | null {
   if (photonMatch && PHOTON_NAMES.includes(photonMatch[1])) {
     return [{ kind: "photon", ref: photonMatch[1] }];
   }
+  const atomMatch = hint.match(/^Atom-(.+)$/);
+  if (atomMatch && ATOM_NAMES.includes(atomMatch[1])) {
+    return [{ kind: "atom", ref: atomMatch[1] }];
+  }
   const slug = hint.replace(/-(personal|business)$/, "");
   if (PRODUCT_SLUGS.has(slug)) return [{ kind: "product", ref: slug }];
   if (slug === "supernova" || slug.startsWith("supernova-")) {
@@ -180,6 +192,12 @@ export function unlocksForHint(hint: string | null): UnlockAction[] | null {
   }
   if (slug === "satellite" || slug.startsWith("satellite-")) {
     return [{ kind: "product", ref: "satellite" }];
+  }
+  if (slug === "nova" || slug.startsWith("nova-")) {
+    return [{ kind: "product", ref: "nova" }];
+  }
+  if (slug === "personal-upkeep") {
+    return [{ kind: "product", ref: "personal-upkeep" }];
   }
   if (slug === "upkeep") return [{ kind: "upkeep" }];
   return null;
@@ -191,10 +209,14 @@ export function unlocksForHint(hint: string | null): UnlockAction[] | null {
  * left unknown rather than guessed:
  *   $514.00 Supernova one-time, $101.97 Satellite one-time,
  *   $29.87 Upkeep, $50.47 Supernova monthly, $555.17 Supernova annual,
- *   $33.99 Satellite monthly, $26.78 Satellite 2-year, $373.89 Satellite annual.
+ *   $33.99 Satellite monthly, $26.78 Satellite 2-year, $373.89 Satellite annual,
+ *   $10.30 Nova monthly, $9.27 Personal Upkeep.
  * NOT mapped: $40.17 (Supernova 2-year AND Plug personal), $19.57 / $25.75
  * (every Spark), $60.77 (every Plug business) — the slug is unknowable
- * from the amount alone.
+ * from the amount alone. And $101.97 is deliberately NOT mapped to Nova
+ * one-time: it is the same total as Satellite one-time, so the amount
+ * alone cannot tell them apart — Nova one-time unlocks only through its
+ * hint (nova-personal), never through the amount.
  */
 const AMOUNT_TO_UNLOCKS: Record<number, UnlockAction[]> = {
   51400: [{ kind: "product", ref: "supernova" }],
@@ -205,6 +227,8 @@ const AMOUNT_TO_UNLOCKS: Record<number, UnlockAction[]> = {
   3399: [{ kind: "product", ref: "satellite" }],
   2678: [{ kind: "product", ref: "satellite" }],
   37389: [{ kind: "product", ref: "satellite" }],
+  1030: [{ kind: "product", ref: "nova" }],
+  927: [{ kind: "product", ref: "personal-upkeep" }],
 };
 
 export type SessionMapping = {
@@ -245,6 +269,7 @@ export function applyUnlocks(accountId: string, unlocks: UnlockAction[]): void {
   getOrCreateAccount(accountId);
   for (const u of unlocks) {
     if (u.kind === "photon") ownPhoton(accountId, u.ref);
+    else if (u.kind === "atom") ownAtom(accountId, u.ref);
     else if (u.kind === "product") ownProduct(accountId, u.ref);
     else setUpkeep(accountId, true);
   }

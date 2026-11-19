@@ -104,6 +104,13 @@ export const api = {
     req("/api/redeem", { method: "POST", body: JSON.stringify({ accountId: getAccountId(), code }) }),
   setCustomName: (name: string) =>
     req("/api/custom-name", { method: "POST", body: JSON.stringify({ accountId: getAccountId(), name }) }),
+  // Nova settings (Nov 19, 2026): the gentler default — check-ins and
+  // getting-started nudges, on for Nova owners until they switch one off.
+  novaSettings: (patch: { checkIns?: boolean; gettingStartedNudges?: boolean }) =>
+    req("/api/nova-settings", {
+      method: "POST",
+      body: JSON.stringify({ accountId: getAccountId(), ...patch }),
+    }),
   thread: (photon: string) =>
     req(`/api/threads/${encodeURIComponent(photon)}?accountId=${encodeURIComponent(getAccountId())}`),
   chat: (photon: string, message: string) =>

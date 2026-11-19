@@ -56,6 +56,14 @@ export function portraitHtml(name: string, size: number): string {
   )}.png" alt="${name} portrait" width="${size}" height="${size}" onerror="this.outerHTML=window.__photonTile('${name}')"></span>`;
 }
 
+// Atoms live at public/atoms/<Name>.png (the twelve 1950s pulp-poster
+// portraits, Nov 19, 2026). Same tile fallback as the Photons.
+export function atomPortraitHtml(name: string, size: number): string {
+  return `<span class="portrait" style="width:${size}px;height:${size}px"><img src="/atoms/${encodeURIComponent(
+    name,
+  )}.png" alt="${name} portrait" width="${size}" height="${size}" onerror="this.outerHTML=window.__photonTile('${name}')"></span>`;
+}
+
 declare global {
   interface Window {
     __photonTile: (name: string) => string;

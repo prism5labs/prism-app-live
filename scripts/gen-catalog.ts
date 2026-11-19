@@ -172,6 +172,38 @@ const snAnnual = find(subs, "Supernova (annual prepay)");
 const satMonthly = find(subs, "Satellite");
 const satTwoYear = find(subs, "Satellite (2-year)");
 const satAnnual = find(subs, "Satellite (annual prepay)");
+// --- Novas (personal), created Nov 19, 2026 ---
+// The Novas table lives in its own section of the links record (it is not
+// part of the one-time/subscription tables above). The one-time Nova price
+// is $79.00 (total $81.37) — the old $99.00 one-time link was deactivated
+// Nov 19, 2026 and must never be wired anywhere; the guard below fails
+// the generation unless the one-time row is exactly the $79 / $81.37
+// one, so a stale $99 row can never slip back into the catalog. The
+// monthly Nova price is $10.00 (total $10.30) — the earlier $12.00/month
+// link was deactivated Nov 19, 2026 and replaced by the $10 link; the
+// second guard below fails the generation unless the monthly row is
+// exactly the $10 / $10.30 one, so a stale $12 row can never slip back
+// either. The
+// links carry their default client_reference_id (nova-personal /
+// nova-monthly / personal-upkeep) in the emitted URL, exactly as
+// created — the client buy flow replaces that value with
+// "<accountId>:<hint>" at click time, the same way Photon links get
+// their Photon-<Name> reference, so the webhook can unlock the purchase
+// on the buyer's account.
+const novas = parseTable(sectionBetween(md, "## Novas (personal)"));
+const novaOneTime = novas.find((r) => r.product === "Nova" && r.total === "$81.37");
+if (!novaOneTime || novaOneTime.price !== "$79.00") {
+  throw new Error("link row not found: Nova one-time $79.00 / $81.37");
+}
+const novaMonthly = novas.find(
+  (r) => r.product === "Nova" && r.price.includes("/month"),
+);
+if (!novaMonthly) throw new Error("link row not found: Nova monthly");
+if (novaMonthly.price !== "$10.00/month" || novaMonthly.total !== "$10.30/month") {
+  throw new Error("link row not found: Nova monthly $10.00 / $10.30");
+}
+const personalUpkeep = find(novas, "Personal Upkeep");
+
 const upkeep = find(subs, "Upkeep");
 
 const esc = (s: string) => JSON.stringify(s);
@@ -220,6 +252,27 @@ export const UPKEEP = {
   url: ${esc(upkeep.url)},
 };
 
+// Nova (personal), created Nov 19, 2026: one product with two ways to
+// pay — once, or month by month. Personal Upkeep is the care plan for a
+// personal helper, separate from Upkeep ($29/month, the business care
+// plan). The URLs carry their default client_reference_id, exactly as
+// the links were created; the client buy flow replaces it with
+// "<accountId>:<hint>" at click time.
+export const NOVA = {
+  name: "Nova",
+  price: ${esc(novaOneTime.price)},
+  total: ${esc(novaOneTime.total)},
+  url: ${esc(novaOneTime.url + "?client_reference_id=nova-personal")},
+  monthly: { price: ${esc(novaMonthly.price)}, total: ${esc(novaMonthly.total)}, url: ${esc(novaMonthly.url + "?client_reference_id=nova-monthly")} },
+};
+
+export const PERSONAL_UPKEEP = {
+  name: "Personal Upkeep",
+  price: ${esc(personalUpkeep.price)},
+  total: ${esc(personalUpkeep.total)},
+  url: ${esc(personalUpkeep.url + "?client_reference_id=personal-upkeep")},
+};
+
 // Each Photon is bought individually on the Supernova link, with the Photon
 // named in client_reference_id so fulfillment can tell which one it is.
 export function photonBuyUrl(name: string): string {
@@ -240,13 +293,19 @@ export const ALL_CHECKOUT_URLS: string[] = [
   SATELLITE.twoYear.url,
   SATELLITE.annual.url,
   UPKEEP.url,
+  NOVA.url,
+  NOVA.monthly.url,
+  PERSONAL_UPKEEP.url,
   ...PRODUCTS.flatMap((p) => [p.personal.url, p.business.url]),
 ];
 `;
 
 writeFileSync(OUT, out);
 console.log(`wrote ${OUT}`);
-console.log(`products: ${products.length}, named links: ${named.length}, total checkout URLs: ${9 + 48}`);
+console.log(`products: ${products.length}, named links: ${named.length}, total checkout URLs: ${12 + 48}`);
 console.log(`supernova ${supernova.url} total ${supernova.total}`);
 console.log(`satellite ${satellite.url} total ${satellite.total}`);
 console.log(`upkeep ${upkeep.url} total ${upkeep.total}`);
+console.log(`nova ${novaOneTime.url} total ${novaOneTime.total}`);
+console.log(`nova monthly ${novaMonthly.url} total ${novaMonthly.total}`);
+console.log(`personal upkeep ${personalUpkeep.url} total ${personalUpkeep.total}`);

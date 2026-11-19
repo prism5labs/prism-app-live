@@ -8,6 +8,7 @@ import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { config } from "./config";
 import { PHOTON_NAMES } from "../shared/photons";
+import { ATOM_NAMES } from "../shared/atoms";
 import { VOICES, LOOK_SETS } from "../shared/voices";
 
 const VOICE_IDS = new Set(VOICES.map((v) => v.id));
@@ -102,6 +103,7 @@ CREATE TABLE IF NOT EXISTS profile (
   notes TEXT,
   title TEXT,
   pronouns TEXT,
+  side TEXT,
   updated_at TEXT NOT NULL
 );
 -- Memory imported from other AIs, so the owner keeps continuity and does
@@ -198,9 +200,18 @@ try {
   const _pnames = new Set(_pcols.map((c) => c.name));
   if (!_pnames.has("title")) db.exec(`ALTER TABLE profile ADD COLUMN title TEXT`);
   if (!_pnames.has("pronouns")) db.exec(`ALTER TABLE profile ADD COLUMN pronouns TEXT`);
+  if (!_pnames.has("side")) db.exec(`ALTER TABLE profile ADD COLUMN side TEXT`);
 } catch (err) {
   console.error("profile migration failed:", err);
 }
+
+// --- Side column added Nov 19, 2026 (Business or Personal) ---
+// The first-open chooser's choice lives on the ACCOUNT, in the profile
+// row, so the app and the website follow it together for a signed-in
+// owner. Only "business" or "personal" is ever stored; anything else
+// reads back as null, which is "never chosen" — the chooser shows until
+// a door is picked. The device-local copy (prism.side.v1) is a cache,
+// not the truth.
 
 export const MONTH_LIMIT = 300;
 
@@ -275,13 +286,14 @@ export function incrementMeter(accountId: string): void {
   db.query(`UPDATE accounts SET meter_used = meter_used + 1 WHERE id = ?`).run(accountId);
 }
 
-export function getOwned(accountId: string): { photons: string[]; products: string[] } {
+export function getOwned(accountId: string): { photons: string[]; products: string[]; atoms: string[] } {
   const rows = db
     .query(`SELECT kind, ref FROM owned WHERE account_id = ?`)
     .all(accountId) as { kind: string; ref: string }[];
   const photons = rows.filter((r) => r.kind === "photon").map((r) => r.ref);
   const products = rows.filter((r) => r.kind === "product").map((r) => r.ref);
-  return { photons, products };
+  const atoms = rows.filter((r) => r.kind === "atom").map((r) => r.ref);
+  return { photons, products, atoms };
 }
 
 export function ownsPhoton(accountId: string, photon: string): boolean {
@@ -300,6 +312,24 @@ export function ownPhoton(accountId: string, photon: string): void {
   ).run(accountId, photon, now);
 }
 
+// Atoms are owned the same way as Photons: one row per Atom, kind
+// 'atom', ref the Atom's name (see src/shared/atoms.ts).
+export function ownAtom(accountId: string, atom: string): void {
+  const now = new Date().toISOString();
+  db.query(
+    `INSERT OR IGNORE INTO owned (account_id, kind, ref, created_at) VALUES (?, 'atom', ?, ?)`,
+  ).run(accountId, atom, now);
+}
+
+export function ownsAtom(accountId: string, atom: string): boolean {
+  const a = getOrCreateAccount(accountId);
+  if (a.free_code) return true;
+  const row = db
+    .query(`SELECT 1 AS x FROM owned WHERE account_id = ? AND kind = 'atom' AND ref = ?`)
+    .get(accountId, atom) as any;
+  return !!row;
+}
+
 export function ownProduct(accountId: string, ref: string): void {
   const now = new Date().toISOString();
   db.query(
@@ -316,11 +346,85 @@ export function redeemFreeCode(accountId: string): void {
   getOrCreateAccount(accountId);
   db.query(`UPDATE accounts SET free_code = 1 WHERE id = ?`).run(accountId);
   for (const name of PHOTON_NAMES) ownPhoton(accountId, name);
+  for (const name of ATOM_NAMES) ownAtom(accountId, name);
   // The free code unlocks everything: all Photons and all catalog products.
   db.query(
     `INSERT OR IGNORE INTO owned (account_id, kind, ref, created_at)
-     SELECT ?, 'product', slug, ? FROM (SELECT 'supernova' AS slug UNION ALL SELECT 'satellite')`,
+     SELECT ?, 'product', slug, ? FROM (SELECT 'supernova' AS slug UNION ALL SELECT 'satellite' UNION ALL SELECT 'nova' UNION ALL SELECT 'personal-upkeep')`,
   ).run(accountId, now);
+}
+
+// --- Nova settings (Nov 19, 2026) ---
+// One row per account, only when the owner has saved a choice. No row
+// means "the default": check-ins and getting-started nudges ON for Nova
+// owners, OFF for everyone else (see getNovaSettings and
+// NOVA_DEFAULTS in src/shared/features.ts). The check-in/nudge sender
+// itself is not built yet; when it is, it reads these same values from
+// /api/state, so the owner's choice here is the one that counts.
+db.exec(`
+CREATE TABLE IF NOT EXISTS nova_settings (
+  account_id TEXT PRIMARY KEY,
+  check_ins INTEGER NOT NULL DEFAULT 1,
+  getting_started_nudges INTEGER NOT NULL DEFAULT 1,
+  updated_at TEXT NOT NULL
+);
+`);
+
+export type NovaSettings = {
+  checkIns: boolean;
+  gettingStartedNudges: boolean;
+  saved: boolean;
+};
+
+export function getNovaSettings(accountId: string): NovaSettings {
+  const row = db
+    .query(`SELECT check_ins, getting_started_nudges FROM nova_settings WHERE account_id = ?`)
+    .get(accountId) as { check_ins: number; getting_started_nudges: number } | null;
+  if (row) {
+    return {
+      checkIns: row.check_ins === 1,
+      gettingStartedNudges: row.getting_started_nudges === 1,
+      saved: true,
+    };
+  }
+  // No saved choice: the default follows ownership. A Nova owner (or an
+  // Atom owner, or a business Launch owner, who holds the personal set
+  // too, or the free code) gets the gentler default — both on. Anyone
+  // else gets both off, so nothing nudges an owner who never bought Nova.
+  const owned = getOwned(accountId);
+  const a = getOrCreateAccount(accountId);
+  const on =
+    a.free_code ||
+    owned.atoms.length > 0 ||
+    owned.products.includes("nova") ||
+    owned.products.includes("supernova") ||
+    owned.products.includes("satellite");
+  return { checkIns: on, gettingStartedNudges: on, saved: false };
+}
+
+export function saveNovaSettings(
+  accountId: string,
+  patch: { checkIns?: boolean; gettingStartedNudges?: boolean },
+): NovaSettings {
+  const current = getNovaSettings(accountId);
+  const next: NovaSettings = {
+    checkIns: patch.checkIns !== undefined ? patch.checkIns : current.checkIns,
+    gettingStartedNudges:
+      patch.gettingStartedNudges !== undefined
+        ? patch.gettingStartedNudges
+        : current.gettingStartedNudges,
+    saved: true,
+  };
+  const now = new Date().toISOString();
+  db.query(
+    `INSERT INTO nova_settings (account_id, check_ins, getting_started_nudges, updated_at)
+     VALUES (?, ?, ?, ?)
+     ON CONFLICT(account_id) DO UPDATE SET
+       check_ins = excluded.check_ins,
+       getting_started_nudges = excluded.getting_started_nudges,
+       updated_at = excluded.updated_at`,
+  ).run(accountId, next.checkIns ? 1 : 0, next.gettingStartedNudges ? 1 : 0, now);
+  return next;
 }
 
 export type Customization = {
@@ -641,6 +745,10 @@ export function normalizePronouns(value: unknown): string | null {
 }
 
 // --- About you (the owner's profile) ---
+export type Side = "business" | "personal";
+export function normalizeSide(value: unknown): Side | null {
+  return value === "business" || value === "personal" ? value : null;
+}
 export type Profile = {
   displayName: string | null;
   about: string | null;
@@ -648,15 +756,16 @@ export type Profile = {
   notes: string | null;
   title: AddressTitle | null;
   pronouns: string | null;
+  side: Side | null;
   updatedAt: string | null;
 };
 
 export function getProfile(accountId: string): Profile {
   const row = db
-    .query(`SELECT display_name, about, preferences, notes, title, pronouns, updated_at FROM profile WHERE account_id = ?`)
+    .query(`SELECT display_name, about, preferences, notes, title, pronouns, side, updated_at FROM profile WHERE account_id = ?`)
     .get(accountId) as any;
   if (!row) {
-    return { displayName: null, about: null, preferences: null, notes: null, title: null, pronouns: null, updatedAt: null };
+    return { displayName: null, about: null, preferences: null, notes: null, title: null, pronouns: null, side: null, updatedAt: null };
   }
   return {
     displayName: row.display_name || null,
@@ -665,13 +774,14 @@ export function getProfile(accountId: string): Profile {
     notes: row.notes || null,
     title: normalizeTitle(row.title),
     pronouns: normalizePronouns(row.pronouns),
+    side: normalizeSide(row.side),
     updatedAt: row.updated_at || null,
   };
 }
 
 export function saveProfile(
   accountId: string,
-  patch: { displayName?: string | null; about?: string | null; preferences?: string | null; notes?: string | null; title?: string | null; pronouns?: string | null },
+  patch: { displayName?: string | null; about?: string | null; preferences?: string | null; notes?: string | null; title?: string | null; pronouns?: string | null; side?: string | null },
 ): Profile {
   const now = new Date().toISOString();
   const current = getProfile(accountId);
@@ -704,15 +814,19 @@ export function saveProfile(
   // Pronouns are one capped line. Undefined means "leave it as it is".
   const title = patch.title === undefined ? current.title : normalizeTitle(patch.title);
   const pronouns = patch.pronouns === undefined ? current.pronouns : normalizePronouns(patch.pronouns);
+  // A side is only ever "business" or "personal"; anything else arrives
+  // as null, which is "never chosen". Undefined means "leave it as it is".
+  const side = patch.side === undefined ? current.side : normalizeSide(patch.side);
   db.query(
-    `INSERT INTO profile (account_id, display_name, about, preferences, notes, title, pronouns, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `INSERT INTO profile (account_id, display_name, about, preferences, notes, title, pronouns, side, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(account_id) DO UPDATE SET
        display_name = excluded.display_name, about = excluded.about,
        preferences = excluded.preferences, notes = excluded.notes,
        title = excluded.title, pronouns = excluded.pronouns,
+       side = excluded.side,
        updated_at = excluded.updated_at`,
-  ).run(accountId, displayName, about, preferences, notes, title, pronouns, now);
+  ).run(accountId, displayName, about, preferences, notes, title, pronouns, side, now);
   return getProfile(accountId);
 }
 

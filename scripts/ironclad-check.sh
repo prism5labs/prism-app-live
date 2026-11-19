@@ -30,7 +30,7 @@ else
 fi
 
 # 2. Canon prices in the catalog (price + 3% total, what the buyer pays).
-for pair in '"$499.00"' '"$514.00"' '"$49.00/month"' '"$50.47/month"' '"$39.00/month"' '"$40.17/month"' '"$539.00/year"' '"$555.17/year"' '"$99.00"' '"$101.97"' '"$33.00/month"' '"$33.99/month"' '"$26.00/month"' '"$26.78/month"' '"$363.00/year"' '"$373.89/year"' '"$29.00/month"' '"$29.87/month"' '"$19.00"' '"$19.57"' '"$25.00"' '"$25.75"' '"$59.00"' '"$60.77"'; do
+for pair in '"$499.00"' '"$514.00"' '"$49.00/month"' '"$50.47/month"' '"$39.00/month"' '"$40.17/month"' '"$539.00/year"' '"$555.17/year"' '"$99.00"' '"$101.97"' '"$33.00/month"' '"$33.99/month"' '"$26.00/month"' '"$26.78/month"' '"$363.00/year"' '"$373.89/year"' '"$29.00/month"' '"$29.87/month"' '"$79.00"' '"$81.37"' '"$10.00/month"' '"$10.30/month"' '"$9.00/month"' '"$9.27/month"' '"$19.00"' '"$19.57"' '"$25.00"' '"$25.75"' '"$59.00"' '"$60.77"'; do
   grep -qF "$pair" src/shared/catalog.ts || fail "canon price $pair missing from src/shared/catalog.ts"
 done
 if grep -qF '"$0.00"' src/shared/catalog.ts; then

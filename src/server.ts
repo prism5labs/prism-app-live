@@ -28,6 +28,8 @@ import {
   markRequestSent,
   getProfile,
   saveProfile,
+  getNovaSettings,
+  saveNovaSettings,
   listImportedMemory,
   addImportedMemory,
   deleteImportedMemory,
@@ -45,7 +47,9 @@ import {
   photonByName,
   PHOTON_NAMES,
 } from "./shared/photons";
-import { SUPERNOVA, SATELLITE, UPKEEP, PRODUCTS, CATEGORIES } from "./shared/catalog";
+import { SUPERNOVA, SATELLITE, UPKEEP, NOVA, PERSONAL_UPKEEP, PRODUCTS, CATEGORIES } from "./shared/catalog";
+import { featureAccess, hasPersonalAccess } from "./shared/features";
+import { ATOMS } from "./shared/atoms";
 import {
   authUrl,
   handleOAuthCallback,
@@ -321,6 +325,24 @@ function stateFor(accountId: string) {
     customName: a.custom_name,
     ownedPhotons: owned.photons,
     ownedProducts: owned.products,
+    ownedAtoms: owned.atoms,
+    // Nova feature sets (Nov 19, 2026): personal open with a Nova (or a
+    // business Launch, or the free code); business open only with a
+    // business Launch (or the free code). The client shows locked sets
+    // as locked from this, and never invents its own gate.
+    features: featureAccess(owned.products, a.free_code, owned.atoms),
+    // Nova's gentler default: check-ins and getting-started nudges on
+    // for Nova owners until the owner saves a choice in the You tab.
+    novaSettings: getNovaSettings(accountId),
+    // The Business-or-Personal side, from the account profile (Nov 19,
+    // 2026) — the chooser's choice, remembered on the account, not the
+    // device. Null when never chosen: the chooser shows until a door is
+    // picked. THE WEBSITE LEG READS THIS: GET /api/state returns
+    // `side` ("business" | "personal" | null) for the account, so a
+    // signed-in visitor lands on their chosen door; the side is saved
+    // with POST /api/profile { side }. The device copy (prism.side.v1)
+    // is a cache — this field is the truth.
+    side: profile.side,
     meter: meterState(a),
     upkeep: a.upkeep,
     freeCode: a.free_code,
@@ -383,6 +405,14 @@ async function handleApi(req: Request, path: string): Promise<Response> {
       supernova: SUPERNOVA,
       satellite: SATELLITE,
       upkeep: UPKEEP,
+      nova: NOVA,
+      personalUpkeep: PERSONAL_UPKEEP,
+      atoms: ATOMS.map((a) => ({
+        name: a.name,
+        pronoun: a.pronoun,
+        tagline: a.tagline,
+        focus: a.focus,
+      })),
       categories: CATEGORIES,
       products: PRODUCTS,
       photonNames: PHOTON_NAMES,
@@ -1028,8 +1058,32 @@ async function handleApi(req: Request, path: string): Promise<Response> {
       notes: typeof body.notes === "string" || body.notes === null ? body.notes : undefined,
       title: typeof body.title === "string" || body.title === null ? body.title : undefined,
       pronouns: typeof body.pronouns === "string" || body.pronouns === null ? body.pronouns : undefined,
+      side: typeof body.side === "string" || body.side === null ? body.side : undefined,
     });
     return json({ ok: true, profile });
+  }
+
+  // Nova settings (Nov 19, 2026): the gentler default — check-ins and
+  // getting-started nudges, on for Nova owners until they say otherwise.
+  // POST saves one or both switches. The gate is the same ownership
+  // check the rest of the app uses: personal access (a Nova, a business
+  // Launch, or the free code) or the save is refused, so an account that
+  // never bought Nova cannot switch on nudges it does not own.
+  if (path === "/api/nova-settings" && method === "POST") {
+    const body = await readBody(req);
+    const accountId = accountIdFrom(req, body);
+    if (!isValidAccountId(accountId)) return bad("accountId required", 400);
+    const owned = getOwned(accountId);
+    const a = getOrCreateAccount(accountId);
+    if (!hasPersonalAccess(owned.products, a.free_code, owned.atoms)) {
+      return json({ ok: false, error: "not_owned" }, 403);
+    }
+    const settings = saveNovaSettings(accountId, {
+      checkIns: typeof body.checkIns === "boolean" ? body.checkIns : undefined,
+      gettingStartedNudges:
+        typeof body.gettingStartedNudges === "boolean" ? body.gettingStartedNudges : undefined,
+    });
+    return json({ ok: true, novaSettings: settings });
   }
 
   // Memory imported from another AI. GET lists what is stored (title,

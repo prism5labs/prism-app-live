@@ -132,7 +132,7 @@ try {
   check("welcome perk starts active", perk1?.active === true);
   check("non-owner sign-in does not grant Upkeep", getOrCreateAccount(deviceA).upkeep === false);
   const stories = getBackstories(deviceA, "Test Person", getOrCreateAccount(deviceA).created_at);
-  check("backstories exist for all 12 Photons", Object.keys(stories).length === 12, `got ${Object.keys(stories).length}`);
+  check("backstories exist for all 12 Photons and all 12 Atoms", Object.keys(stories).length === 24, `got ${Object.keys(stories).length}`);
   check(
     "Prism backstory is personalised with the owner's name",
     (stories.Prism || "").includes("Test Person") && !(stories.Prism || "").includes("{owner}"),
@@ -140,6 +140,10 @@ try {
   check(
     "backstory carries the meeting date, no placeholder left",
     !(stories.Prism || "").includes("{date}") && /\w+ \d{1,2}, \d{4}/.test(stories.Prism || ""),
+  );
+  check(
+    "an Atom backstory is personalised too, with its own beginning",
+    (stories.Mabel || "").includes("Test Person") && (stories.Mabel || "").includes("letters desk"),
   );
 
   // --- Functions: migration (second device, same Google account) ---
@@ -299,7 +303,7 @@ try {
   const stA: any = await (await fetch(`${BASE}/api/state?accountId=${deviceA}`)).json();
   check("state says signed in", stA.auth?.signedIn === true && stA.auth?.email === "test@example.com");
   check("state carries the used perk", stA.perk?.code === "WELCOME15" && stA.perk?.active === false);
-  check("state carries 12 backstories", Object.keys(stA.backstories || {}).length === 12);
+  check("state carries 24 backstories (12 Photons, 12 Atoms)", Object.keys(stA.backstories || {}).length === 24);
 } finally {
   server.kill();
 }
@@ -460,7 +464,12 @@ console.log("Client render");
   const unPill = unWin.document.getElementById("google-state")?.textContent || "";
   check("header pill says Google unreachable when the server doesn't answer", unPill === "Google unreachable", unPill);
 
-  // --- Client render (jsdom): first-run landing ---
+  // --- Client render (jsdom): first-open chooser ---
+  // The chooser replaced the first-run landing (Nov 19, 2026): two
+  // doors — Business or Personal — as the front door before Chat /
+  // Connected / Store / You, for every account until a door is picked.
+  // The choice persists in localStorage (prism.side.v1); skipping
+  // stores nothing, so the chooser shows again on the next open.
   const unsignedState = {
     ...signedInState,
     auth: { signedIn: false },
@@ -469,7 +478,7 @@ console.log("Client render");
     upkeep: false,
     freeCode: false,
   };
-  async function bootLandingDom(dismissed: boolean) {
+  async function bootChooserDom(pickedSide: "" | "business" | "personal", stateSide?: "business" | "personal") {
     const dom = new JSDOM(html, { url: `${BASE}/?tab=chat`, runScripts: "outside-only", pretendToBeVisual: true });
     const { window } = dom as any;
     (window as any).matchMedia = () => ({
@@ -479,11 +488,12 @@ console.log("Client render");
     });
     (window as any).fetch = async (input: any) => {
       const url = String(input);
-      if (url.includes("/api/state")) return new Response(JSON.stringify(unsignedState), { headers: { "content-type": "application/json" } });
+      if (url.includes("/api/state"))
+        return new Response(JSON.stringify({ ...unsignedState, side: stateSide ?? null }), { headers: { "content-type": "application/json" } });
       return new Response(JSON.stringify({ ok: true }), { headers: { "content-type": "application/json" } });
     };
     (window as any).localStorage.setItem("prism5.accountId", "acc_deviceA0123456789ab");
-    if (dismissed) (window as any).localStorage.setItem("prism.landingDismissed", "1");
+    if (pickedSide) (window as any).localStorage.setItem("prism.side.v1", pickedSide);
     (window as any).eval(js);
     await new Promise((r) => setTimeout(r, 800));
     // The film dismisses itself in jsdom (the video cannot play, so
@@ -493,40 +503,63 @@ console.log("Client render");
     await new Promise((r) => setTimeout(r, 1100));
     return window;
   }
-  const landWin = await bootLandingDom(false);
-  const landing = landWin.document.getElementById("landing");
-  check("landing shows for a never-signed-in account", !!landing);
+  const chooserWin = await bootChooserDom("");
+  const chooser = chooserWin.document.getElementById("side-chooser");
+  check("chooser shows for a never-signed-in account with no side stored", !!chooser);
+  check("old landing element no longer exists", !chooserWin.document.getElementById("landing"));
   check(
-    "landing names the account benefits, without giving the code away",
-    !(landing?.textContent || "").includes("WELCOME15") &&
-      (landing?.textContent || "").includes("15% off your first order") &&
-      (landing?.textContent || "").includes("newsletter") &&
-      (landing?.textContent || "").includes("follow you to any device"),
+    "chooser has the two doors, in the website's words",
+    !!chooser?.querySelector('[data-action="side-pick"][data-side="business"]') &&
+      (chooser?.querySelector('[data-action="side-pick"][data-side="business"]')?.textContent || "").includes("For my business") &&
+      !!chooser?.querySelector('[data-action="side-pick"][data-side="personal"]') &&
+      (chooser?.querySelector('[data-action="side-pick"][data-side="personal"]')?.textContent || "").includes("For me, personally"),
   );
   check(
-    "landing sign-in button reuses the Google flow",
-    !!landing?.querySelector('[data-action="signin"]') &&
-      (landing?.querySelector('[data-action="signin"]')?.textContent || "").includes(
+    "chooser keeps the lede and the sign-in promise, without giving the code away",
+    !(chooser?.textContent || "").includes("WELCOME15") &&
+      (chooser?.textContent || "").includes("One assistant that does it all, and becomes a second you.") &&
+      (chooser?.textContent || "").includes("follow you to any device"),
+  );
+  check(
+    "chooser sign-in button reuses the Google flow",
+    !!chooser?.querySelector('[data-action="signin"]') &&
+      (chooser?.querySelector('[data-action="signin"]')?.textContent || "").includes(
         "Sign in or create account with Google",
       ),
   );
-  check("landing offers a quiet skip", !!landing?.querySelector('[data-action="landing-skip"]'));
-  // Skip: the landing goes away and stays dismissed on this device.
-  (landing?.querySelector('[data-action="landing-skip"]') as any)?.click();
+  check("chooser offers a quiet skip", !!chooser?.querySelector('[data-action="chooser-skip"]'));
+  // Picking a door: the chooser goes away and the side is stored.
+  (chooser?.querySelector('[data-action="side-pick"][data-side="personal"]') as any)?.click();
   await new Promise((r) => setTimeout(r, 100));
-  check("skipping removes the landing", !landWin.document.getElementById("landing"));
+  check("picking a door removes the chooser", !chooserWin.document.getElementById("side-chooser"));
+  check("picking a door stores the side", chooserWin.localStorage.getItem("prism.side.v1") === "personal");
+  // A fresh open with a side stored: no chooser.
+  const pickedWin = await bootChooserDom("personal");
+  check("a stored side means no chooser on the next open", !pickedWin.document.getElementById("side-chooser"));
+  // Skip: the chooser goes away, and nothing is stored — it shows
+  // again on the next open.
+  const skipWin = await bootChooserDom("");
+  const skipChooser = skipWin.document.getElementById("side-chooser");
+  (skipChooser?.querySelector('[data-action="chooser-skip"]') as any)?.click();
+  await new Promise((r) => setTimeout(r, 100));
+  check("skipping removes the chooser", !skipWin.document.getElementById("side-chooser"));
+  check("skipping stores no side", skipWin.localStorage.getItem("prism.side.v1") === null);
+  // A side already on the ACCOUNT (picked on another device, or on the
+  // website): no chooser even with an empty device cache — the account
+  // is the truth, and the device adopts it.
+  const accountSideWin = await bootChooserDom("", "personal");
+  check("a side on the account means no chooser", !accountSideWin.document.getElementById("side-chooser"));
   check(
-    "skipping sets the dismiss flag",
-    landWin.localStorage.getItem("prism.landingDismissed") === "1",
+    "the device adopts the account side",
+    accountSideWin.localStorage.getItem("prism.side.v1") === "personal",
   );
-  const dismissedWin = await bootLandingDom(true);
-  check("dismissed landing does not show again", !dismissedWin.document.getElementById("landing"));
-  // Signed-in account: no landing even after the film goes away.
+  // Signed-in account with no side stored: the chooser still shows —
+  // it is the front door for everyone, not a sign-in gate.
   const signedWin = await bootDom("chat");
   const signedSplash = signedWin.document.getElementById("opening-splash");
   if (signedSplash && signedSplash.isConnected) (signedSplash as any).click();
   await new Promise((r) => setTimeout(r, 1100));
-  check("signed-in account never sees the landing", !signedWin.document.getElementById("landing"));
+  check("signed-in account with no side stored sees the chooser", !!signedWin.document.getElementById("side-chooser"));
 }
 
 console.log(`\n${passed} passed, ${failed} failed`);
