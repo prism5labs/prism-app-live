@@ -408,7 +408,9 @@ body.look-night-watch, .thread.look-night-watch, .photon-card.look-night-watch {
   position: fixed;
   inset: 0;
   z-index: 100;
-  background: var(--splash-bg, #000);
+  /* Never plain black before JS runs: the first scheme's diner teal,
+     so a slow bundle shows a branded cover, not a black screen. */
+  background: var(--splash-bg, #0f5257);
   display: flex;
   align-items: center;
   justify-content: center;

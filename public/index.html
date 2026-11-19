@@ -27,6 +27,17 @@
       <span class="opening-splash-greeting" id="opening-splash-greeting">Welcome</span>
     </div>
   </div>
+  <script>
+    // If main.js never runs (a bad bundle, a stuck worker), the splash
+    // would sit over the app forever — it is only ever removed by JS.
+    // This backstop takes it down after 15s unless main.js has run.
+    window.__prismSplashFallback = window.setTimeout(function () {
+      if (!window.__prismMainLoaded) {
+        var s = document.getElementById("opening-splash");
+        if (s) s.remove();
+      }
+    }, 15000);
+  </script>
   <div class="app-top">
     <header class="app-header">
       <img class="app-header-mark" src="/brand/gem.jpg" alt="" width="30" height="34">

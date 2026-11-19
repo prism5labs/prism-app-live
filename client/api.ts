@@ -57,8 +57,35 @@ async function req(path: string, opts: RequestInit = {}): Promise<any> {
   }
 }
 
+// Boot-critical calls (state, session exchange) must never hang the
+// app: a stalled /api/state used to leave the app an unrendered shell
+// with no sign-in button anywhere — it read as a frozen sign-in page.
+// They answer { ok: false, error: "timeout" } after 10s instead of
+// hanging, so boot always reaches render.
+async function reqTimeout(path: string, opts: RequestInit = {}, ms = 10000): Promise<any> {
+  try {
+    const res = await fetch(path, {
+      ...opts,
+      signal: AbortSignal.timeout(ms),
+      headers: {
+        "content-type": "application/json",
+        "x-account-id": getAccountId(),
+        ...(opts.headers || {}),
+      },
+    });
+    const text = await res.text();
+    try {
+      return JSON.parse(text);
+    } catch {
+      return { ok: false, error: "bad_response", raw: text.slice(0, 200) };
+    }
+  } catch (e: any) {
+    return { ok: false, error: e?.name === "TimeoutError" ? "timeout" : "network" };
+  }
+}
+
 export const api = {
-  state: () => req(`/api/state?accountId=${encodeURIComponent(getAccountId())}`),
+  state: () => reqTimeout(`/api/state?accountId=${encodeURIComponent(getAccountId())}`),
   store: () => req("/api/store"),
   seed: () => req("/api/seed"),
   redeem: (code: string) =>
@@ -267,7 +294,7 @@ export const api = {
   // the one the browser uses from then on.
   authStatus: () => req(`/api/auth/status?accountId=${encodeURIComponent(getAccountId())}`),
   authSession: (token: string) =>
-    req("/api/auth/session", { method: "POST", body: JSON.stringify({ token }) }),
+    reqTimeout("/api/auth/session", { method: "POST", body: JSON.stringify({ token }) }),
   inboxes: () => req(`/api/inboxes?accountId=${encodeURIComponent(getAccountId())}`),
   gmailMessage: (label: string, id: string) =>
     req(

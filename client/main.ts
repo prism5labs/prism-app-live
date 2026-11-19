@@ -8,6 +8,11 @@ import { TIER_COPY, UPKEEP_COPY, FREE_CHATS_COPY } from "../src/shared/tiers";
 import { PHOTONS } from "../src/shared/photons";
 import { VOICES, TUNING_QUESTIONS, LOOK_SETS, voiceById, lookSetById, tuningStyle } from "../src/shared/voices";
 
+// Set the moment this bundle runs, so the inline splash backstop in
+// index.html knows main.js loaded. Without it, a bundle that never
+// runs leaves the splash over the app forever.
+(window as any).__prismMainLoaded = true;
+
 type Tab = "chat" | "inboxes" | "store" | "upkeep";
 
 // Per-Photon customization, saved on the server (state.customizations).
@@ -3862,8 +3867,18 @@ function playOpeningSplash(returning: boolean): void {
   window.setTimeout(() => {
     if (!splash.isConnected) return;
     if (video.ended) return;
-    if (video.currentTime < 0.5 && video.readyState < 3) tryV3Fallback();
+    // If the film has not advanced past the first frames in 5s, fall
+    // back — no readyState qualifier: a film can sit buffered at
+    // currentTime 0 with readyState 3 and still never show a frame.
+    if (video.currentTime < 0.5) tryV3Fallback();
   }, 5000);
+  // Second watch: if the v3 fallback stalls too, take the splash down
+  // at 9s instead of sitting on it until the 13s backstop.
+  window.setTimeout(() => {
+    if (!splash.isConnected) return;
+    if (video.ended) return;
+    if (video.currentTime < 0.5) dismiss();
+  }, 9000);
   const p = video.play();
   if (p) p.catch(() => tryV3Fallback());
   // If the video already finished before this ran, dismiss now.
@@ -3959,6 +3974,8 @@ function dismissLanding(): void {
   // fast (dismissSplashFast, below).
   const returning =
     params.has("signin") || params.has("gmail") || params.has("google") || params.has("outlook");
+  // main.js ran: the inline splash backstop in index.html stands down.
+  window.clearTimeout((window as any).__prismSplashFallback);
   playOpeningSplash(returning);
   setupKeyboardDock();
   const t = params.get("tab");
@@ -4025,6 +4042,18 @@ function dismissLanding(): void {
     history.replaceState(null, "", "/?tab=upkeep");
   }
   if (!state) await refreshState();
+  if (!state) {
+    // Boot reached render with no state (the server did not answer in
+    // 10s — a restart, a dead connection). Say so, and retry once a
+    // few seconds later so a transient restart heals itself instead
+    // of leaving an empty shell with no sign-in button.
+    toast("Couldn't reach the server just now — checking again in a moment.", "err");
+    window.setTimeout(async () => {
+      await refreshState();
+      render();
+      maybeShowLanding();
+    }, 5000);
+  }
   if (tab === "inboxes") await loadInboxes();
   if (tab === "upkeep") await loadUpkeep();
   if (tab === "store") await loadStripeStatus();

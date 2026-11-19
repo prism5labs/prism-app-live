@@ -1,5 +1,14 @@
 // Prism 5 service worker. Cache-first for the app shell and static assets,
 // network-first for the API (chat, state, and inboxes must always be fresh).
+// CACHE v29: bumped Nov 18, 2026 for the freeze diagnosis — the opening
+// film stalled and the sign-in page read as frozen on Neil's phone. The
+// v5 film is now precached at install (best effort, so a slow video
+// fetch cannot fail the whole install) and video Range requests are
+// served as 206 slices out of the cache when the whole file is cached,
+// so the film plays from the installed copy on reopen even on a slow
+// connection instead of stalling on the network. The cache bump makes
+// existing installs fetch the new sw.js and main.js instead of serving
+// the cached ones, and clears any older cache entries on activate.
 // CACHE v28: bumped Nov 18, 2026 for the v5 opening film — the crystalline
 // teal prism figure in place of Prism herself, fading into the golden dust
 // and ending on the gold pyramid mark — plus the no-video hardening: Range
@@ -50,14 +59,21 @@
 // Start My Day Stripe links. The cache bump makes existing installs
 // fetch the new main.js and the new sputnik.jpg instead of serving the
 // cached ones.
-const CACHE = "prism5-v28";
+const CACHE = "prism5-v29";
 const SHELL = ["/", "/index.html", "/styles.css", "/main.js", "/manifest.json", "/opening-animation-v3.mp4", "/opening-v5-poster.jpg", "/chat-bg/bg-rocket.jpg", "/chat-bg/bg-helmets.jpg", "/chat-bg/bg-starburst.jpg", "/chat-bg/bg-robot.jpg", "/chat-bg/bg-saucer.jpg", "/chat-bg/bg-raygun.jpg", "/chat-bg/bg-car.jpg", "/chat-bg/bg-pilot.jpg", "/chat-bg/bg-moonbase.jpg", "/chat-bg/bg-diner.jpg", "/chat-bg/bg-launchpad.jpg", "/chat-bg/bg-spacestation.jpg"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches
       .open(CACHE)
-      .then((c) => c.addAll(SHELL))
+      .then((c) =>
+        // The shell first; the film after it, best effort — a slow or
+        // failed film fetch must not fail the whole install and leave
+        // the old worker in place. The film is fetched plain (no
+        // Range), so it stores as a whole 200 the Range handler below
+        // can slice from.
+        c.addAll(SHELL).then(() => c.add("/opening-v5.mp4").catch(() => {})),
+      )
       .then(() => self.skipWaiting()),
   );
 });
@@ -75,11 +91,54 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
   if (event.request.method !== "GET") return;
   if (url.pathname.startsWith("/api/") || url.pathname === "/healthz") return;
-  // Range requests (video streaming and seeking) go straight to the
-  // origin, untouched: the Cache API cannot store a 206 partial
-  // response, so intercepting one only adds failure modes — the put
-  // would reject and the video would gain nothing from the worker.
-  if (event.request.headers.has("Range")) return;
+  // Range requests (video streaming and seeking): serve a 206 slice
+  // out of the cache when the whole file is cached, so the opening
+  // film plays from the installed copy on reopen even on a slow
+  // connection. Before this the Range requests bypassed the worker
+  // entirely, so every reopen streamed the 3.7 MB film off the
+  // network — on a slow connection it stalled and the splash sat
+  // black. When the file is not cached yet, fall through to the
+  // network untouched. (The Cache API cannot store a 206 partial
+  // response, so only whole 200s are ever cached and sliced here.)
+  if (event.request.headers.has("Range")) {
+    event.respondWith(
+      caches.match(event.request).then(async (cached) => {
+        const range = event.request.headers.get("Range") || "";
+        if (cached && cached.status === 200) {
+          const m = /^bytes=(\d*)-(\d*)$/.exec(range);
+          if (m) {
+            const buf = await cached.arrayBuffer();
+            const total = buf.byteLength;
+            let start;
+            let end;
+            if (m[1] === "" && m[2] !== "") {
+              // Suffix range: the last N bytes.
+              start = Math.max(0, total - parseInt(m[2], 10));
+              end = total - 1;
+            } else {
+              start = parseInt(m[1] || "0", 10);
+              end = m[2] !== "" ? parseInt(m[2], 10) : total - 1;
+            }
+            if (!Number.isNaN(start) && !Number.isNaN(end) && start <= end && start < total) {
+              start = Math.max(0, start);
+              end = Math.min(end, total - 1);
+              return new Response(buf.slice(start, end + 1), {
+                status: 206,
+                headers: {
+                  "content-type": cached.headers.get("content-type") || "video/mp4",
+                  "content-range": `bytes ${start}-${end}/${total}`,
+                  "content-length": String(end - start + 1),
+                  "accept-ranges": "bytes",
+                },
+              });
+            }
+          }
+        }
+        return fetch(event.request);
+      }),
+    );
+    return;
+  }
   event.respondWith(
     caches.match(event.request).then((cached) => {
       const network = fetch(event.request)
