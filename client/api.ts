@@ -40,20 +40,32 @@ export function clearAccountId(): void {
   }
 }
 
-async function req(path: string, opts: RequestInit = {}): Promise<any> {
-  const res = await fetch(path, {
-    ...opts,
-    headers: {
-      "content-type": "application/json",
-      "x-account-id": getAccountId(),
-      ...(opts.headers || {}),
-    },
-  });
-  const text = await res.text();
+// Every API call answers instead of hanging: a stalled request used
+// to leave the app on a loading line with no error and no state — the
+// "connecting forever" the owner reported. Calls answer
+// { ok: false, error: "timeout" } after `ms` (30s by default) or
+// { ok: false, error: "network" } when the fetch itself fails, so boot
+// and every tab load always reach render. Chat replies can legitimately
+// take longer than 30s, so chat() passes a longer budget.
+async function req(path: string, opts: RequestInit = {}, ms = 30000): Promise<any> {
   try {
-    return JSON.parse(text);
-  } catch {
-    return { ok: false, error: "bad_response", raw: text.slice(0, 200) };
+    const res = await fetch(path, {
+      ...opts,
+      signal: AbortSignal.timeout(ms),
+      headers: {
+        "content-type": "application/json",
+        "x-account-id": getAccountId(),
+        ...(opts.headers || {}),
+      },
+    });
+    const text = await res.text();
+    try {
+      return JSON.parse(text);
+    } catch {
+      return { ok: false, error: "bad_response", raw: text.slice(0, 200) };
+    }
+  } catch (e: any) {
+    return { ok: false, error: e?.name === "TimeoutError" ? "timeout" : "network" };
   }
 }
 
@@ -95,10 +107,14 @@ export const api = {
   thread: (photon: string) =>
     req(`/api/threads/${encodeURIComponent(photon)}?accountId=${encodeURIComponent(getAccountId())}`),
   chat: (photon: string, message: string) =>
-    req("/api/chat", {
-      method: "POST",
-      body: JSON.stringify({ accountId: getAccountId(), photon, message }),
-    }),
+    req(
+      "/api/chat",
+      {
+        method: "POST",
+        body: JSON.stringify({ accountId: getAccountId(), photon, message }),
+      },
+      120000,
+    ),
   // Streaming chat: the reply arrives as server-sent events, one
   // {"delta": "..."} per piece, then {"done": true, ...} at the end.
   // onEvent fires for every event. Throws only when the request itself
@@ -303,6 +319,18 @@ export const api = {
   authStatus: () => req(`/api/auth/status?accountId=${encodeURIComponent(getAccountId())}`),
   authSession: (token: string) =>
     reqTimeout("/api/auth/session", { method: "POST", body: JSON.stringify({ token }) }),
+  // Sign-in recovery: ask the server which account this device id was
+  // linked to, if it ever signed in. The OAuth callback records the
+  // link at sign-in time; when the callback was completed in another
+  // browsing context (Android diverts the installed app's sign-in to a
+  // browser tab, and the one-time token is spent there), this is how
+  // the installed app learns its account in its own context instead of
+  // asking the owner to sign in again.
+  authRecover: () =>
+    reqTimeout("/api/auth/recover", {
+      method: "POST",
+      body: JSON.stringify({ accountId: getAccountId() }),
+    }),
   inboxes: () => req(`/api/inboxes?accountId=${encodeURIComponent(getAccountId())}`),
   gmailMessage: (label: string, id: string) =>
     req(

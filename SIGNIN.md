@@ -42,6 +42,37 @@ Same OAuth client as Gmail, no new service, no new cost.
 - **Staying signed in.** The account id lives in localStorage, same as
   before. Clearing browser data wipes the local copy, and the account
   itself is untouched on the server — sign in again and it comes back.
+- **Sign-in recovery (Nov 19, 2026).** The session handoff above
+  assumes the callback loads in the same browsing context that asked
+  to sign in. On Android it does not: the installed app's navigation
+  to Google is diverted to a browser tab (a Custom Tab, with its own
+  bar and X), the callback loads there, and the one-time token is
+  spent there — the installed app never learns the linked account id,
+  and the token cannot be spent twice. Worse, when the Google identity
+  was already linked (signed in once before from another context), the
+  sign-in migrates the app's anonymous device id into the linked
+  account and deletes it, so the app recreates itself as a fresh
+  anonymous account on every open — the "must reconnect Google every
+  time" loop, with Calendar/Drive tokens stranded under the linked
+  account while the app asks under the orphaned id. The fix is
+  server-side and does not depend on which context spent the token:
+  the callback records device id -> account id (`signin_links`) at
+  link time, and the client asks `POST /api/auth/recover` on boot (and
+  when the app comes back from the browser) and adopts the linked id
+  in its own context, finishing the migration — including any
+  Calendar/Drive tokens connected while the app was orphaned. The
+  device id is already the whole credential for the account, so this
+  reveals nothing new.
+- **Connection state, in plain words (Nov 19, 2026).** The header
+  carries a glanceable pill — Google connected / not connected /
+  checking / unreachable — and the Upkeep account card carries the
+  same four states, so the two can never disagree. While the server is
+  still answering the card says it is checking, never "not signed
+  in"; when the server does not answer at all it says so and offers a
+  retry. Boot can no longer sit on a loading line forever: every API
+  call answers within a bounded time, the tab's data load cannot hold
+  the first render past 8s, and the returning splash cover has a 6s
+  backstop that fades it away on the slow fade.
 - **What Google sees.** Only the standard OAuth consent for name,
   email, and profile picture scope. The app reads no mailbox, calendar,
   or Drive content through the sign-in itself; Gmail/Calendar/Drive
@@ -81,22 +112,34 @@ Created once, when a Google identity is first linked:
 
 - `src/shared/backstories.ts` — the 12 backstories + rendering.
 - `src/server/auth.ts` — identities, sessions, perks, backstories,
-  migration, the OAuth callback handler.
+  migration, the OAuth callback handler; sign-in links and recovery
+  (`recordSigninLink`, `lookupSigninLink`, `recoverSignin`).
 - `src/server.ts` — `stateFor` gains `auth`, `perk`, `backstories`;
-  routes `start-signin`, `auth/session`, `auth/status`; the Gmail
-  callback branches on `:signin` state.
+  routes `start-signin`, `auth/session`, `auth/status`, `auth/recover`;
+  the Gmail callback branches on `:signin` state.
 - `src/server/stripe.ts` — webhook spends the welcome perk on a
   discounted checkout.
 - `client/api.ts` — `setAccountId` / `clearAccountId`, `authStatus`,
-  `authSession`.
+  `authSession`, `authRecover`; every call bounded (30s, chat 120s).
 - `client/main.ts` — sign-in return handling, sign in/out actions,
   account card in Upkeep, perk banner in the Store, prefilled promo
-  code on Buy buttons, backstory under the empty-thread intro.
-- `scripts/test-auth.ts` — 40 checks (see below).
+  code on Buy buttons, backstory under the empty-thread intro; boot
+  and return-from-browser recovery, the header Google-state pill, the
+  three-state account card, the 6s returning-splash backstop.
+- `public/sw.js` — cache v33 for this change.
+- `scripts/test-auth.ts` — 76 checks (see below).
 
 ## Tests
 
-`bun scripts/test-auth.ts` — 40 checks, all passing (Nov 17, 2026):
+`bun scripts/test-auth.ts` — 76 checks, all passing (Nov 19, 2026).
+Needs `OWNER_EMAILS` set (owner-grant checks read it):
+
+```
+DATA_DIR=/tmp/prism-auth-test GOOGLE_CLIENT_ID=x GOOGLE_CLIENT_SECRET=x \
+  GOOGLE_REDIRECT_URI=http://localhost:3111/api/oauth/google/callback \
+  OWNER_EMAILS="prism5labscontact@gmail.com,aode1282@gmail.com" \
+  bun scripts/test-auth.ts
+```
 
 - HTTP: unsigned account reads not signed in; start-signin 302s to
   Google with the Gmail redirect URI, identity-only scopes, offline
@@ -111,9 +154,20 @@ Created once, when a Google identity is first linked:
 - Sessions: spend once, second spend refused, expired refused.
 - Perks: spend once, second spend refused, expired reads inactive.
 - State: carries auth, perk, and 12 backstories.
+- Recovery (Nov 19, 2026): the link is recorded for both devices at
+  sign-in time and absent for a device that never signed in;
+  `POST /api/auth/recover` returns the linked account for an orphaned
+  device id, moves a Calendar/Drive token connected while orphaned
+  onto the linked account, and says unlinked for an unknown device;
+  state for the orphaned id reads not signed in, state for the
+  recovered id reads signed in.
 - Client (jsdom): signed-in Upkeep shows the account, the offer, and
   Prism's story; the Store shows the banner and Buy links carry
-  `prefilled_promo_code=WELCOME15`.
+  `prefilled_promo_code=WELCOME15`; the header pill says Google
+  connected when signed in; an orphaned device adopts its linked
+  account on boot and shows signed in; an unreachable server shows
+  "Prism didn't answer just now" with a retry, and the pill says
+  Google unreachable — never "not signed in" before the answer.
 
 One bug found by the tests and fixed: migration first deleted rows
 whose primary key does not include `account_id` (messages, reminders,

@@ -27,12 +27,25 @@ const dom = new JSDOM(html, {
 });
 const { window } = dom;
 
-// Route the client's relative fetches to the running server.
+// jsdom has no matchMedia; the splash checks it on boot (same stub as
+// scripts/test-auth.ts — without it the bundle throws before render).
+(window as any).matchMedia = () => ({
+  matches: false,
+  addEventListener: () => {},
+  removeEventListener: () => {},
+});
+
+// Route the client's relative fetches to the running server. The
+// signal is dropped: the bundle's AbortSignal comes from the jsdom
+// realm, and Node's fetch rejects it ("signal is not of type
+// AbortSignal"). In a real browser both come from the same realm, so
+// this is a harness-only difference.
 const realFetch = fetch;
 (window as any).fetch = (input: any, init: any) => {
   const url = String(input);
   const abs = url.startsWith("http") ? url : BASE + url;
-  return realFetch(abs, init);
+  const { signal, ...rest } = init || {};
+  return realFetch(abs, rest);
 };
 
 // Capture console errors from the app.
@@ -65,9 +78,9 @@ function check(name: string, cond: boolean, detail = "") {
 const ok = await waitFor(() => window.document.querySelectorAll("#nav .nav-btn").length === 4);
 check("nav renders 4 tabs", ok, `found ${window.document.querySelectorAll("#nav .nav-btn").length}`);
 check("front page greeting", text("#view").includes("Howdy, neighbor!"));
-check("front page empty panel", text("#view").includes("Your counter's empty"));
+check("front page empty panel", text("#view").includes("Nothing to talk to yet."));
 check("front page make-it-yours", text("#view").includes("Make it yours"));
-check("front page logo", !!window.document.querySelector("#view .logo-plate svg"));
+check("front page logo", !!window.document.querySelector("#view .sputnik-hero img"));
 check("front page meter line", text("#view").includes("0 of 300 chats used this month"));
 
 // Switch to the Store tab.

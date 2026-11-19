@@ -107,6 +107,7 @@ import {
   authUrlSignin,
   handleSigninCallback,
   exchangeSigninSession,
+  recoverSignin,
   authStatus,
   getPerk,
   getBackstories,
@@ -761,6 +762,26 @@ async function handleApi(req: Request, path: string): Promise<Response> {
     const accountId = accountIdFrom(req, {});
     if (!isValidAccountId(accountId)) return bad("accountId required", 400);
     return json({ ok: true, ...authStatus(accountId) });
+  }
+
+  // POST /api/auth/recover — find the account this device id was
+  // linked to, if it ever signed in. The OAuth callback records the
+  // link at sign-in time; a device whose sign-in was completed in
+  // another browsing context (the installed PWA's flow is diverted to
+  // a browser tab on Android, and the one-time token is spent there)
+  // asks here on boot and adopts the linked account id in its own
+  // context, instead of signing in again. When the device id is not
+  // the account id, any rows that landed under the orphaned device id
+  // (Calendar/Drive tokens connected while the app was orphaned) move
+  // into the linked account as part of the recovery, so the services
+  // work under the adopted id. The device id is already the whole
+  // credential for the account, so this reveals nothing new.
+  if (path === "/api/auth/recover" && method === "POST") {
+    const body = await readBody(req);
+    const accountId = accountIdFrom(req, body);
+    if (!isValidAccountId(accountId)) return bad("accountId required", 400);
+    const linked = recoverSignin(accountId);
+    return json({ ok: true, linked: linked !== null, accountId: linked });
   }
 
   // Steps 4 + 6 — GET /api/oauth/google/start-extra — begin a Calendar +

@@ -27,6 +27,11 @@
 // It mints a one-time session token (10 minutes), the client exchanges
 // it once for the account id, and the token is spent. The account id
 // itself is still the only credential after that, same as before.
+// Recovery: because that token can be spent in a different browsing
+// context than the installed app (see recoverSignin), the callback
+// also records device id -> account id at link time, so any context
+// holding the device id can find its account again without signing in
+// a second time.
 //
 // Perks, created when an account is first linked:
 //   - A backstory for every Photon (src/shared/backstories.ts), rendered
@@ -64,6 +69,16 @@ CREATE TABLE IF NOT EXISTS signin_sessions (
   created_at TEXT NOT NULL,
   expires_at TEXT NOT NULL,
   used INTEGER NOT NULL DEFAULT 0
+);
+-- Sign-in links: which account a device id was linked to, and when.
+-- The OAuth callback records this at link time, before any token is
+-- spent, so a device can always find its account again — even when the
+-- callback (and its one-time token) was spent in a different browsing
+-- context than the one that asked to sign in. See recoverSignin below.
+CREATE TABLE IF NOT EXISTS signin_links (
+  device_account_id TEXT PRIMARY KEY,
+  account_id TEXT NOT NULL,
+  created_at TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS account_perks (
   account_id TEXT PRIMARY KEY,
@@ -332,6 +347,63 @@ export function migrateAccount(fromId: string, toId: string): { moved: number; m
   return { moved, merged: !!from };
 }
 
+// --- Sign-in recovery: find the account a device id was linked to ---
+//
+// WHY THIS EXISTS. The sign-in is a full-page navigation out of the
+// app to accounts.google.com, and the OAuth callback hands the result
+// back as a one-time session token in a URL, spent by whichever
+// browsing context loads that URL. On Android the installed PWA's
+// navigation is diverted to a browser tab (a Custom Tab, with its own
+// bar and X): the callback loads there, the token is spent there, and
+// the linked account id is written to that tab's storage — never to
+// the installed app's. The token is single-use, so there is no second
+// spend. The installed app keeps its old anonymous device id, and if
+// that id was already migrated into the linked account (the identity
+// was linked before, from another context), the server has deleted
+// the anonymous account row — so the app recreates itself as a fresh
+// anonymous account on every open, and every sign-in replays the same
+// loop. That is the "must reconnect Google every time" report.
+//
+// The fix is server-side and does not depend on which context spent
+// the token: at link time the callback records device id -> account
+// id here. Any context holding that device id can ask for its account
+// and adopt it. The device id is already the whole credential for the
+// account (it is sent as X-Account-Id on every call), so revealing the
+// linked account id to its holder exposes nothing new.
+//
+// A link is recorded on every sign-in, new identity or known one, so
+// recovery also covers a device whose id changed after a successful
+// sign-in (reinstall, cleared storage).
+
+export function recordSigninLink(deviceAccountId: string, accountId: string): void {
+  db.query(
+    `INSERT INTO signin_links (device_account_id, account_id, created_at)
+     VALUES (?, ?, ?)
+     ON CONFLICT(device_account_id) DO UPDATE SET account_id = excluded.account_id, created_at = excluded.created_at`,
+  ).run(deviceAccountId, accountId, new Date().toISOString());
+}
+
+export function lookupSigninLink(deviceAccountId: string): string | null {
+  const row = db
+    .query(`SELECT account_id FROM signin_links WHERE device_account_id = ?`)
+    .get(deviceAccountId) as { account_id: string } | null;
+  return row ? row.account_id : null;
+}
+
+// Recover the account for a device id: the linked account id, or null
+// when this device never signed in. When the device id is not the
+// account id, finishing the migration this device started — moving any
+// rows that landed under the orphaned device id (Calendar/Drive tokens
+// connected while the app was orphaned, chats, meter) into the linked
+// account — is part of the recovery, so the services work under the
+// adopted id instead of staying stranded under the old one.
+export function recoverSignin(deviceAccountId: string): string | null {
+  const accountId = lookupSigninLink(deviceAccountId);
+  if (!accountId) return null;
+  if (accountId !== deviceAccountId) migrateAccount(deviceAccountId, accountId);
+  return accountId;
+}
+
 // --- Link a Google identity to a Prism account ---
 //
 // The device account id becomes the permanent account id when the
@@ -367,6 +439,7 @@ export function linkGoogleIdentity(
     // Owner grant: an owner signing in gets Upkeep free, so the app
     // can be tested with the upgraded features. A re-sign-in re-grants.
     if (isOwnerEmail(identity.email)) setUpkeep(accountId, true);
+    recordSigninLink(deviceAccountId, accountId);
     return { accountId, isNew: false, migrated };
   }
   getOrCreateAccount(deviceAccountId);
@@ -386,6 +459,7 @@ export function linkGoogleIdentity(
   createBackstories(deviceAccountId);
   // Owner grant: see the existing-identity branch above.
   if (isOwnerEmail(identity.email)) setUpkeep(deviceAccountId, true);
+  recordSigninLink(deviceAccountId, deviceAccountId);
   return { accountId: deviceAccountId, isNew: true, migrated: 0 };
 }
 

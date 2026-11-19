@@ -46,6 +46,14 @@ function voiceNameOf(photon: string): string {
 }
 
 let state: any = null;
+// The last state load failed (server unreachable, timed out): the app
+// has no state to show, and the account card must say that plainly
+// instead of claiming "not signed in" or sitting on a loading line.
+let stateFailed = false;
+// Set when boot (or a return from the browser) adopted the linked
+// account for this device through sign-in recovery, so the welcome
+// toast can say the sign-in landed.
+let authRecovered = false;
 let tab: Tab = "chat";
 let activePhoton: string | null = null;
 let storeVariant: "personal" | "business" = "personal";
@@ -2614,6 +2622,25 @@ async function loadStripeStatus() {
 // email. Signing out leaves everything on the server; signing back in
 // with the same Google account brings it all back.
 function accountCard(): string {
+  // No state yet: say which of the two it is. While the server is
+  // still answering, the card says it is checking — it must never
+  // claim "not signed in" before the answer arrives, because that
+  // false negative is what the owner kept seeing. When the server
+  // did not answer at all, the card says so plainly and offers a
+  // retry, instead of sitting on a loading line forever.
+  if (!state) {
+    if (stateFailed) {
+      return `<div class="card">
+      <h2>Your account</h2>
+      <p>Prism didn't answer just now, so your Google connection couldn't be checked. Nothing about your account has changed — check your connection and try again.</p>
+      <div class="row"><button class="btn primary" data-action="retry-state">Check again</button></div>
+    </div>`;
+    }
+    return `<div class="card">
+      <h2>Your account</h2>
+      <p>Checking your Google connection…</p>
+    </div>`;
+  }
   const auth = (state as any)?.auth;
   if (!auth || !auth.signedIn) {
     return `<div class="card">
@@ -2920,14 +2947,57 @@ function render() {
   );
   syncBodyLook();
   syncAppBackground();
+  syncGoogleState();
   // The chat input is never focused for the user: focusing it after
   // every render keeps the keyboard up and can scroll the messages
   // around. The owner taps it when they want to write.
 }
 
-async function refreshState() {
+async function refreshState(): Promise<boolean> {
   const r = await api.state();
-  if (r && r.ok) state = r;
+  if (r && r.ok) {
+    state = r;
+    stateFailed = false;
+    return true;
+  }
+  stateFailed = true;
+  return false;
+}
+
+// The Google connection, in plain words, from what the app actually
+// knows right now. Four states, never a silent endless "connecting":
+// checking (state still loading), connected, not connected, and
+// unreachable (the server did not answer). The header pill and the
+// Upkeep account card both read this, so the two can never disagree.
+type GoogleConnection = "checking" | "connected" | "not-connected" | "unreachable";
+function googleConnectionState(): GoogleConnection {
+  if (!state) return stateFailed ? "unreachable" : "checking";
+  return (state as any)?.auth?.signedIn ? "connected" : "not-connected";
+}
+
+// The glanceable pill in the header: the owner can tell at a glance,
+// on any tab, whether Google is connected. A state change fades the
+// pill out and back in slowly (600ms) rather than swapping the words
+// in a chop — the fade rule.
+function syncGoogleState(): void {
+  const el = document.getElementById("google-state");
+  if (!el) return;
+  const s = googleConnectionState();
+  const label =
+    s === "connected"
+      ? "Google connected"
+      : s === "not-connected"
+        ? "Google not connected"
+        : s === "unreachable"
+          ? "Google unreachable"
+          : "Checking Google…";
+  if (el.dataset.state === s && el.textContent === label) return;
+  el.dataset.state = s;
+  el.classList.add("is-changing");
+  window.setTimeout(() => {
+    el.textContent = label;
+    el.classList.remove("is-changing");
+  }, 300);
 }
 
 async function loadInboxes() {
@@ -3186,6 +3256,15 @@ document.addEventListener("click", async (e) => {
     await refreshState();
     render();
     toast("Signed out. This device has a fresh, unsigned-in account now.");
+  } else if (action === "retry-state") {
+    // The server didn't answer on boot, and the account card said so:
+    // check again. The button answers while the check runs, and a
+    // second failure says so instead of going quiet.
+    t.setAttribute("disabled", "");
+    t.textContent = "Checking…";
+    await refreshState();
+    render();
+    if (!state) toast("Still can't reach Prism. Check your connection and try again.", "err");
   } else if (action === "call-mic") {
     toggleCallMic();
   } else if (action === "check-now") {
@@ -4027,7 +4106,16 @@ function playOpeningSplash(returning: boolean): void {
     // stays as a static branded cover in the scheme color while the
     // app loads underneath — no video, no 10s wait — and init
     // dismisses it fast the moment the first render lands.
+    // Backstop: that fast dismiss only runs after the first render,
+    // and a slow server can delay the render without bound — so the
+    // cover goes away on the slow fade after 6s regardless. The app
+    // underneath is usable, and state fills in when it arrives. A
+    // cover with no escape hatch is the "connecting forever" the
+    // owner reported.
     splash.addEventListener("click", dismissByTap, { once: true });
+    window.setTimeout(() => {
+      if (splash.isConnected) dismiss();
+    }, 6000);
     return;
   }
   if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
@@ -4238,6 +4326,23 @@ function dismissLanding(): void {
     signinResult = "error";
     history.replaceState(null, "", "/?tab=upkeep");
   }
+  // Sign-in recovery: the token above may have been spent in a
+  // different browsing context than this one — on Android the
+  // installed app's sign-in is diverted to a browser tab, the callback
+  // loads there, and the token is burned there, so this context never
+  // learns the linked account id from the URL. The server recorded
+  // device id -> account id at link time, so ask for it here and adopt
+  // it in this context instead of making the owner sign in again.
+  // This runs whenever the token exchange did not already hand us a
+  // state: a failed exchange (the token was already spent elsewhere)
+  // is exactly the case it rescues.
+  if (!state) {
+    const rec: any = await api.authRecover();
+    if (rec && rec.ok && rec.linked && rec.accountId && rec.accountId !== getAccountId()) {
+      setAccountId(rec.accountId);
+      authRecovered = true;
+    }
+  }
   if (!state) await refreshState();
   if (!state) {
     // Boot reached render with no state (the server did not answer in
@@ -4251,9 +4356,25 @@ function dismissLanding(): void {
       maybeShowLanding();
     }, 5000);
   }
-  if (tab === "inboxes") await loadInboxes();
-  if (tab === "upkeep") await loadUpkeep();
-  if (tab === "store") await loadStripeStatus();
+  // The tab's data loads before the first render, but it must never
+  // hold the render hostage: the calls are bounded now (see req in
+  // api.ts), and even so the first render lands after 8s at the
+  // latest, with the load finishing in the background and re-rendering
+  // when it arrives. Before this, a stalled load left the opening
+  // cover up with nothing behind it — the "connecting forever".
+  const preload =
+    tab === "inboxes"
+      ? loadInboxes()
+      : tab === "upkeep"
+        ? loadUpkeep()
+        : tab === "store"
+          ? loadStripeStatus()
+          : null;
+  if (preload) {
+    const settled = preload.catch(() => {});
+    await Promise.race([settled, new Promise((r) => window.setTimeout(r, 8000))]);
+    settled.then(() => render());
+  }
   render();
   if (returning) dismissSplashFast();
   maybeShowLanding();
@@ -4299,8 +4420,53 @@ function dismissLanding(): void {
   } else if (signinResult === "error") {
     toast("Sign-in didn't finish. Try again.", "err");
   }
+  // Boot adopted the linked account through recovery (the sign-in was
+  // completed in the browser tab, not in this context): say so, so the
+  // owner can see the sign-in landed instead of wondering.
+  if (authRecovered && state?.auth?.signedIn) {
+    toast(`Signed in — welcome back${state.auth.name ? ", " + state.auth.name : ""}.`);
+  }
   if (state && !state.brain) {
     // The brain is off until a key is set; the app still works.
     console.info("Brain not connected: set ANTHROPIC_API_KEY to turn chat on.");
   }
 })();
+
+// ---------- Return from the browser ----------
+// The owner just came back to the installed app — most often from the
+// browser tab a sign-in or a connect opened. The app process survived
+// in the background with its old in-memory state, so a sign-in
+// completed in that tab would otherwise sit invisible until the next
+// cold open. Ask the server whether this device id was linked to an
+// account in the meantime, and adopt it now. A re-render only happens
+// when nothing the owner is typing would be lost: a focused composer,
+// or one holding text, holds the render until the next navigation
+// (the toast still says the account is connected).
+function ownerIsTyping(): boolean {
+  const active = document.activeElement as HTMLElement | null;
+  if (active && (active.tagName === "INPUT" || active.tagName === "TEXTAREA")) return true;
+  const chatInput = document.getElementById("chat-input") as HTMLInputElement | null;
+  if (chatInput && chatInput.value) return true;
+  const draft = document.querySelector("#view textarea") as HTMLTextAreaElement | null;
+  if (draft && draft.value) return true;
+  return false;
+}
+async function resumeRecover(): Promise<void> {
+  const before = getAccountId();
+  const rec: any = await api.authRecover();
+  if (!rec || !rec.ok || !rec.linked || !rec.accountId || rec.accountId === before) return;
+  setAccountId(rec.accountId);
+  authRecovered = true;
+  await refreshState();
+  if (ownerIsTyping()) {
+    toast("Your Google account is connected now.");
+    return;
+  }
+  render();
+  if (state?.auth?.signedIn) {
+    toast(`Signed in — welcome back${state.auth.name ? ", " + state.auth.name : ""}.`);
+  }
+}
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) void resumeRecover();
+});

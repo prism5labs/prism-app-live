@@ -102,7 +102,7 @@ a { color: var(--teal); }
   line-height: 1;
 }
 .app-header-tag {
-  margin-left: auto;
+  margin-left: 12px;
   font-size: 0.62rem;
   font-weight: 800;
   letter-spacing: 0.16em;
@@ -112,6 +112,35 @@ a { color: var(--teal); }
   text-align: right;
   white-space: nowrap;
 }
+/* The glanceable Google connection state, in the header on every tab:
+   connected / not connected / checking / unreachable, always one of
+   the four, never a silent loading line. A state change fades the pill
+   out and back in slowly (600ms) rather than swapping the words in a
+   chop — the fade rule. The dot carries the state at a glance: green
+   connected, amber checking or unreachable, hollow not connected. */
+.google-state {
+  margin-left: auto;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #E8DCC0;
+  white-space: nowrap;
+  transition: opacity 0.6s ease;
+}
+.google-state::before {
+  content: "";
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  margin-right: 5px;
+  vertical-align: 1px;
+  background: #E8C86A;
+}
+.google-state[data-state="connected"]::before { background: #7BC47F; }
+.google-state[data-state="not-connected"]::before { background: transparent; box-shadow: inset 0 0 0 1.5px #E8DCC0; }
+.google-state[data-state="unreachable"]::before { background: #E8C86A; }
+.google-state.is-changing { opacity: 0; }
 .chrome-thin {
   height: 2px;
   background: linear-gradient(90deg, transparent, #C9CDD1 20%, #8E959B 50%, #C9CDD1 80%, transparent);

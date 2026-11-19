@@ -2,7 +2,8 @@
 // login. The OAuth consent click itself needs a browser and a Google
 // account, so it is tested live by hand; everything around it is
 // tested here: the sign-in URL, the error path against real Google, the
-// link/migrate/perk/backstory/session logic, and the client render.
+// link/migrate/perk/backstory/session logic, sign-in recovery, and the
+// client render.
 //
 // Run: DATA_DIR=/tmp/prism-auth-test GOOGLE_CLIENT_ID=x
 //   GOOGLE_CLIENT_SECRET=y OWNER_EMAILS=prism5labscontact@gmail.com,aode1282@gmail.com
@@ -167,6 +168,85 @@ try {
   const gone = db.query(`SELECT COUNT(*) AS n FROM accounts WHERE id = ?`).get(deviceB) as { n: number };
   check("old device account row is gone after migration", gone.n === 0);
 
+  // --- Sign-in recovery: the installed app's sign-in is completed in
+  // a browser tab, and the one-time token is spent there, so the app
+  // never learns the linked account id from the URL. The callback
+  // records device id -> account id at link time; the device asks for
+  // it on boot and adopts it. ---
+  console.log("Recovery");
+  const { lookupSigninLink, recoverSignin } = await import("../src/server/auth");
+  const { calendarStatus, driveStatus } = await import("../src/server/google");
+  check("link recorded for the first device", lookupSigninLink(deviceA) === deviceA);
+  check(
+    "link recorded for the second device, to the linked account",
+    lookupSigninLink(deviceB) === deviceA,
+  );
+  check(
+    "no link for a device that never signed in",
+    lookupSigninLink("acc_never0000000000000") === null,
+  );
+  // A Calendar/Drive token connected while the app was orphaned sits
+  // under the orphaned device id; recovery must move it with the rest.
+  db.query(
+    `INSERT INTO google_tokens (account_id, scope_set, email, refresh_token, access_token, token_expiry)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+  ).run(
+    deviceB,
+    "https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/drive.readonly",
+    "b@example.com",
+    "refresh-orphan",
+    null,
+    null,
+  );
+  check(
+    "orphaned token leaves Calendar disconnected on the linked account (before recovery)",
+    calendarStatus(deviceA).connected === false,
+  );
+  const recB: any = await (
+    await fetch(`${BASE}/api/auth/recover`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ accountId: deviceB }),
+    })
+  ).json();
+  check(
+    "recover returns the linked account for an orphaned device id",
+    recB.ok === true && recB.linked === true && recB.accountId === deviceA,
+    JSON.stringify(recB),
+  );
+  check(
+    "recovery moves the orphaned Calendar token onto the linked account",
+    calendarStatus(deviceA).connected === true && calendarStatus(deviceA).email === "b@example.com",
+  );
+  check("recovery moves the orphaned Drive token too", driveStatus(deviceA).connected === true);
+  check("link record survives recovery", lookupSigninLink(deviceB) === deviceA);
+  const stB: any = await (await fetch(`${BASE}/api/state?accountId=${deviceB}`)).json();
+  check(
+    "state for the orphaned id is not signed in (it was never the account)",
+    stB.auth?.signedIn === false,
+  );
+  const stA2: any = await (await fetch(`${BASE}/api/state?accountId=${deviceA}`)).json();
+  check("state for the recovered id is signed in", stA2.auth?.signedIn === true);
+  const recUnknown: any = await (
+    await fetch(`${BASE}/api/auth/recover`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ accountId: "acc_never0000000000000" }),
+    })
+  ).json();
+  check(
+    "recover says unlinked for a device that never signed in",
+    recUnknown.ok === true && recUnknown.linked === false && recUnknown.accountId === null,
+    JSON.stringify(recUnknown),
+  );
+  const recBad = await fetch(`${BASE}/api/auth/recover`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({}),
+  });
+  check("recover refuses a missing account id", recBad.status === 400, `got ${recBad.status}`);
+  check("recover of the linked id itself is a no-op that returns it", recoverSignin(deviceA) === deviceA);
+
   // --- Owner Upkeep grant: an owner signing in gets Upkeep free ---
   console.log("Owner Upkeep grant");
   const deviceD = "acc_deviceD0123456789gh";
@@ -292,6 +372,93 @@ console.log("Client render");
     buyLink.includes("prefilled_promo_code=WELCOME15") && buyLink.includes("client_reference_id="),
     buyLink.slice(0, 120),
   );
+  const pillSignedIn = upWin.document.getElementById("google-state")?.textContent || "";
+  check("header pill says Google connected when signed in", pillSignedIn === "Google connected", pillSignedIn);
+  check("header pill starts as checking before boot", html.includes("Checking Google…"));
+
+  // --- Client render (jsdom): orphaned device recovers on boot ---
+  // The device holds the orphaned id; the server says it was linked
+  // to the signed-in account. Boot must adopt the linked id in this
+  // context and show signed in, without another Google round trip.
+  async function bootOrphanDom() {
+    const dom = new JSDOM(html, { url: `${BASE}/?tab=upkeep`, runScripts: "outside-only", pretendToBeVisual: true });
+    const { window } = dom as any;
+    (window as any).matchMedia = () => ({
+      matches: false,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    });
+    (window as any).fetch = async (input: any) => {
+      const url = String(input);
+      if (url.includes("/api/auth/recover"))
+        return new Response(JSON.stringify({ ok: true, linked: true, accountId: "acc_deviceA0123456789ab" }), {
+          headers: { "content-type": "application/json" },
+        });
+      if (url.includes("/api/state"))
+        return new Response(JSON.stringify(signedInState), { headers: { "content-type": "application/json" } });
+      if (url.includes("/api/stripe/status"))
+        return new Response(JSON.stringify({ ok: true, configured: true }), { headers: { "content-type": "application/json" } });
+      return new Response(JSON.stringify({ ok: true }), { headers: { "content-type": "application/json" } });
+    };
+    (window as any).localStorage.setItem("prism5.accountId", "acc_deviceB0123456789cd");
+    (window as any).eval(js);
+    await new Promise((r) => setTimeout(r, 900));
+    return window;
+  }
+  const orWin = await bootOrphanDom();
+  const orHtml = orWin.document.getElementById("view")?.innerHTML || "";
+  check(
+    "orphaned device adopts its linked account on boot",
+    orWin.localStorage.getItem("prism5.accountId") === "acc_deviceA0123456789ab",
+    orWin.localStorage.getItem("prism5.accountId") || "",
+  );
+  check(
+    "orphaned device shows signed in after recovery",
+    orHtml.includes("Signed in as") && orHtml.includes("test@example.com"),
+  );
+  const orPill = orWin.document.getElementById("google-state")?.textContent || "";
+  check("header pill says Google connected after recovery", orPill === "Google connected", orPill);
+
+  // --- Client render (jsdom): server unreachable on boot ---
+  // State never loads: the account card must say the server didn't
+  // answer, not "not signed in", and the pill must say unreachable.
+  async function bootUnreachableDom() {
+    const dom = new JSDOM(html, { url: `${BASE}/?tab=upkeep`, runScripts: "outside-only", pretendToBeVisual: true });
+    const { window } = dom as any;
+    (window as any).matchMedia = () => ({
+      matches: false,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    });
+    (window as any).fetch = async (input: any) => {
+      const url = String(input);
+      if (url.includes("/api/auth/recover"))
+        return new Response(JSON.stringify({ ok: true, linked: false, accountId: null }), {
+          headers: { "content-type": "application/json" },
+        });
+      if (url.includes("/api/state"))
+        return new Response(JSON.stringify({ ok: false, error: "timeout" }), {
+          headers: { "content-type": "application/json" },
+        });
+      return new Response(JSON.stringify({ ok: true }), { headers: { "content-type": "application/json" } });
+    };
+    (window as any).localStorage.setItem("prism5.accountId", "acc_deviceA0123456789ab");
+    (window as any).eval(js);
+    await new Promise((r) => setTimeout(r, 900));
+    return window;
+  }
+  const unWin = await bootUnreachableDom();
+  const unHtml = unWin.document.getElementById("view")?.innerHTML || "";
+  check(
+    "unreachable boot says the server didn't answer, not 'not signed in'",
+    unHtml.includes("Prism didn't answer just now") && !unHtml.includes("You are not signed in"),
+  );
+  check(
+    "unreachable boot offers a retry",
+    unHtml.includes("Check again") && !!unWin.document.querySelector('[data-action="retry-state"]'),
+  );
+  const unPill = unWin.document.getElementById("google-state")?.textContent || "";
+  check("header pill says Google unreachable when the server doesn't answer", unPill === "Google unreachable", unPill);
 
   // --- Client render (jsdom): first-run landing ---
   const unsignedState = {

@@ -7,6 +7,14 @@
 // The cache bump makes existing installs fetch the new main.js and sw.js
 // instead of serving the cached ones, and clears any older cache entries
 // on activate.
+// CACHE v33: bumped Nov 19, 2026 for the Google sign-in fix — sign-in
+// recovery (POST /api/auth/recover, so a sign-in completed in the
+// browser tab lands in the installed app), the header Google-state pill
+// and the three-state account card, the 6s backstop on the returning
+// splash cover, and bounded API calls so boot can never sit on a
+// loading line forever. The cache bump makes existing installs fetch
+// the new main.js, index.html and styles.css instead of serving the
+// cached ones, and clears any older cache entries on activate.
 // CACHE v32: bumped Nov 18, 2026 for the interface sounds — tiny
 // synthesized click / toggle / swoosh (Web Audio, no files), wired to
 // every tap, switch, and screen change, with an on/off switch in
