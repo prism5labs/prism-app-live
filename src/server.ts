@@ -155,6 +155,16 @@ import {
   getPerk,
   getBackstories,
 } from "./server/auth";
+// Newsletter list: the landing promises Google sign-up also signs the
+// user up for the newsletter; this module is the store and the sender.
+import {
+  subscribeNewsletter,
+  unsubscribeNewsletter,
+  listSubscribers,
+  isOwnerAccount,
+  sendPendingNewsletterWelcomes,
+  startNewsletterScheduler,
+} from "./server/newsletter";
 
 // Switchboard is email. Reports to Prism 5 go to the Labs test inbox.
 export const PRISM_REPORT_ADDRESS = "prism5labstest@gmail.com";
@@ -1157,6 +1167,20 @@ async function handleApi(req: Request, path: string): Promise<Response> {
     const base = config.appUrl || "";
     if (state.endsWith(":signin")) {
       const r = await handleSigninCallback(code, state);
+      if (r.ok && r.isNew) {
+        // The landing promises sign-up also signs the user up for the
+        // newsletter. Subscribe them, then drain the welcome queue in
+        // the background — sign-in never waits on mail and never fails
+        // on it.
+        try {
+          subscribeNewsletter(r.email, r.name, "google-signin");
+        } catch (e) {
+          console.error("newsletter subscribe failed:", e);
+        }
+        void sendPendingNewsletterWelcomes().catch((e) =>
+          console.error("newsletter welcome drain failed:", e),
+        );
+      }
       // The sign-in started from the installed app's origin; the
       // callback itself always lands on the registered redirect URI
       // (the Render origin), inside a browser tab. A bare redirect
@@ -1256,6 +1280,51 @@ async function handleApi(req: Request, path: string): Promise<Response> {
     if (!isValidAccountId(accountId)) return bad("accountId required", 400);
     const linked = recoverSignin(accountId);
     return json({ ok: true, linked: linked !== null, accountId: linked });
+  }
+
+  // GET /api/newsletter/unsubscribe?token= — one tap out. No auth: the
+  // token in the link is the credential. A plain page either way.
+  if (path === "/api/newsletter/unsubscribe" && method === "GET") {
+    const token = url.searchParams.get("token") || "";
+    if (!token) {
+      return decisionPage(
+        "Invalid link",
+        "That unsubscribe link is missing its token. If you got it from an email, try opening it again from the email itself.",
+      );
+    }
+    const ok = unsubscribeNewsletter(token);
+    return ok
+      ? decisionPage(
+          "You're unsubscribed",
+          "You're unsubscribed from the Prism newsletter. You won't hear from us again — unless you sign up again, in which case welcome back.",
+        )
+      : decisionPage(
+          "Invalid link",
+          "That unsubscribe link doesn't match any subscription. You're already unsubscribed, or the link is out of date.",
+        );
+  }
+
+  // GET /api/newsletter/subscribers — the owner's list, newest first.
+  // Owner only: the caller must be signed in with Google under an
+  // owner email. Anything else gets a 403.
+  if (path === "/api/newsletter/subscribers" && method === "GET") {
+    const accountId = accountIdFrom(req, {});
+    if (!isValidAccountId(accountId)) return bad("accountId required", 400);
+    if (!isOwnerAccount(accountId)) {
+      return json({ ok: false, error: "forbidden" }, 403);
+    }
+    const subs = listSubscribers();
+    return json({
+      ok: true,
+      count: subs.length,
+      subscribers: subs.map((s) => ({
+        email: s.email,
+        name: s.name,
+        subscribed_at: s.subscribedAt,
+        unsubscribed_at: s.unsubscribedAt,
+        welcome_sent_at: s.welcomeSentAt,
+      })),
+    });
   }
 
   // Steps 4 + 6 — GET /api/oauth/google/start-extra — begin a Calendar +
@@ -2039,3 +2108,7 @@ console.log(`Data dir: ${config.dataDir}`);
 // runs only while the server is awake, so on the free tier it runs
 // while the app is in use and stops when it sleeps.
 startProactiveScheduler();
+
+// Newsletter welcome drain: one cycle at startup, then hourly. Same
+// deal — it only runs while the server is awake.
+startNewsletterScheduler();
