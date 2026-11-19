@@ -204,7 +204,90 @@ function accountIdFrom(req: Request, body: any): string {
   if (fromHeader.trim()) return fromHeader.trim();
   const url = new URL(req.url);
   const fromQuery = url.searchParams.get("accountId") || "";
-  return fromQuery.trim();
+  if (fromQuery.trim()) return fromQuery.trim();
+  // The shared session cookie (prism5_account) is the LAST resort,
+  // after body, header, and query — never the first source. It lets
+  // the website, which cannot read the app's localStorage, present the
+  // account the app already minted a cookie for.
+  return cookieValue(req, ACCOUNT_COOKIE).trim();
+}
+
+// --- Cross-origin website leg (Nov 19, 2026) ---
+// The website (prism5labs.com) reads the account's side from GET
+// /api/state and writes it with POST /api/profile, but it lives on a
+// different origin than the app and cannot read the app's localStorage
+// (prism5.accountId). CORS is opened ONLY on /api/state and /api/profile,
+// only for the two prism5labs.com origins and loopback dev origins, and
+// only ever echoes the exact request origin — never * — with
+// credentials. No other endpoint gets CORS. The shared session cookie
+// (prism5_account) is minted only on a successful GET /api/state or
+// POST /api/profile for a caller who already presented a valid
+// accountId; it is never minted for an unauthenticated caller and never
+// hands an account id to anyone who does not already have it.
+const CORS_ALLOWED_ORIGINS = ["https://prism5labs.com", "https://www.prism5labs.com"];
+const CORS_ALLOWED_PATHS = ["/api/state", "/api/profile"];
+const CORS_LOOPBACK_ORIGIN = /^https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?$/;
+const ACCOUNT_COOKIE = "prism5_account";
+
+// The exact origin to echo, or null when the origin is not allowed.
+function corsOriginFor(req: Request): string | null {
+  const origin = req.headers.get("origin") || "";
+  if (!origin) return null;
+  if (CORS_ALLOWED_ORIGINS.includes(origin)) return origin;
+  if (CORS_LOOPBACK_ORIGIN.test(origin)) return origin;
+  return null;
+}
+
+function corsHeaders(req: Request): Record<string, string> | null {
+  const origin = corsOriginFor(req);
+  if (!origin) return null;
+  return {
+    "Access-Control-Allow-Origin": origin,
+    "Access-Control-Allow-Credentials": "true",
+    Vary: "Origin",
+  };
+}
+
+// Apply the CORS headers to a response on /api/state or /api/profile.
+// When accountId is given and the response succeeded, also mint the
+// shared session cookie — only for a caller who already presented a
+// valid accountId.
+function corsResponse(req: Request, res: Response, accountId?: string): Response {
+  const headers = new Headers(res.headers);
+  const cors = corsHeaders(req);
+  if (cors) for (const [k, v] of Object.entries(cors)) headers.set(k, v);
+  if (accountId && isValidAccountId(accountId) && res.status >= 200 && res.status < 300) {
+    headers.append("Set-Cookie", accountCookieValue(req, accountId));
+  }
+  return new Response(res.body, { status: res.status, headers });
+}
+
+function accountCookieValue(req: Request, accountId: string): string {
+  const url = new URL(req.url);
+  // Secure only when the client-facing request is https. Behind Render
+  // the request to Bun is plain http, so the proxy's X-Forwarded-Proto
+  // is how that is known; local http dev stays without Secure.
+  const isHttps = url.protocol === "https:" || req.headers.get("x-forwarded-proto") === "https";
+  const parts = [
+    `${ACCOUNT_COOKIE}=${accountId}`,
+    "HttpOnly",
+    "SameSite=Lax",
+    "Path=/",
+    "Max-Age=31536000",
+  ];
+  if (isHttps) parts.push("Secure");
+  if (url.hostname.endsWith(".prism5labs.com")) parts.push("Domain=.prism5labs.com");
+  return parts.join("; ");
+}
+
+function cookieValue(req: Request, name: string): string {
+  const cookie = req.headers.get("cookie") || "";
+  for (const part of cookie.split(";")) {
+    const eq = part.indexOf("=");
+    if (eq === -1) continue;
+    if (part.slice(0, eq).trim() === name) return part.slice(eq + 1).trim();
+  }
+  return "";
 }
 
 function isValidAccountId(id: string): boolean {
@@ -367,6 +450,23 @@ async function handleApi(req: Request, path: string): Promise<Response> {
   const url = new URL(req.url);
   const method = req.method;
 
+  // CORS preflight, ONLY on /api/state and /api/profile, no auth
+  // needed. An allowed origin gets the full preflight answer; any
+  // other origin gets a bare 204 with no Access-Control-Allow-Origin,
+  // so the browser refuses the call.
+  if (method === "OPTIONS" && CORS_ALLOWED_PATHS.includes(path)) {
+    const origin = corsOriginFor(req);
+    const headers: Record<string, string> = { Vary: "Origin" };
+    if (origin) {
+      headers["Access-Control-Allow-Origin"] = origin;
+      headers["Access-Control-Allow-Credentials"] = "true";
+      headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS";
+      headers["Access-Control-Allow-Headers"] = "content-type, x-account-id";
+      headers["Access-Control-Max-Age"] = "86400";
+    }
+    return new Response(null, { status: 204, headers });
+  }
+
   // Step 10 — Stripe webhook. Mounted FIRST and routed straight to the
   // handler: it reads the raw body itself (req.text()) for the HMAC
   // signature, so nothing here may call readBody(req) for this path.
@@ -394,8 +494,8 @@ async function handleApi(req: Request, path: string): Promise<Response> {
   // GET /api/state
   if (path === "/api/state" && method === "GET") {
     const accountId = accountIdFrom(req, {});
-    if (!isValidAccountId(accountId)) return bad("accountId required", 400);
-    return json({ ok: true, ...stateFor(accountId) });
+    if (!isValidAccountId(accountId)) return corsResponse(req, bad("accountId required", 400));
+    return corsResponse(req, json({ ok: true, ...stateFor(accountId) }), accountId);
   }
 
   // GET /api/store — the full catalog (the client also bundles it).
@@ -1044,13 +1144,13 @@ async function handleApi(req: Request, path: string): Promise<Response> {
   // instead of starting cold.
   if (path === "/api/profile" && method === "GET") {
     const accountId = accountIdFrom(req, {});
-    if (!isValidAccountId(accountId)) return bad("accountId required", 400);
-    return json({ ok: true, profile: getProfile(accountId) });
+    if (!isValidAccountId(accountId)) return corsResponse(req, bad("accountId required", 400));
+    return corsResponse(req, json({ ok: true, profile: getProfile(accountId) }));
   }
   if (path === "/api/profile" && method === "POST") {
     const body = await readBody(req);
     const accountId = accountIdFrom(req, body);
-    if (!isValidAccountId(accountId)) return bad("accountId required", 400);
+    if (!isValidAccountId(accountId)) return corsResponse(req, bad("accountId required", 400));
     const profile = saveProfile(accountId, {
       displayName: typeof body.displayName === "string" || body.displayName === null ? body.displayName : undefined,
       about: typeof body.about === "string" || body.about === null ? body.about : undefined,
@@ -1060,7 +1160,7 @@ async function handleApi(req: Request, path: string): Promise<Response> {
       pronouns: typeof body.pronouns === "string" || body.pronouns === null ? body.pronouns : undefined,
       side: typeof body.side === "string" || body.side === null ? body.side : undefined,
     });
-    return json({ ok: true, profile });
+    return corsResponse(req, json({ ok: true, profile }), accountId);
   }
 
   // Nova settings (Nov 19, 2026): the gentler default — check-ins and

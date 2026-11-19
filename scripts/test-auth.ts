@@ -304,6 +304,70 @@ try {
   check("state says signed in", stA.auth?.signedIn === true && stA.auth?.email === "test@example.com");
   check("state carries the used perk", stA.perk?.code === "WELCOME15" && stA.perk?.active === false);
   check("state carries 24 backstories (12 Photons, 12 Atoms)", Object.keys(stA.backstories || {}).length === 24);
+
+  // --- CORS + shared session cookie (Nov 19, 2026): the website leg ---
+  // The website (prism5labs.com) cannot read the app's localStorage, so
+  // it calls GET /api/state and POST /api/profile cross-origin with
+  // credentials, and the app mints a prism5_account cookie the website
+  // then presents. CORS is open ONLY on those two paths, only for the
+  // prism5labs.com origins and loopback dev, never * with credentials.
+  console.log("CORS + cookie");
+  const webOrigin = "https://www.prism5labs.com";
+  const evilOrigin = "https://evil.example.com";
+  const cookieAcc = "acc_cookie0123456789zz";
+  const pre = await fetch(`${BASE}/api/state`, {
+    method: "OPTIONS",
+    headers: { Origin: webOrigin, "Access-Control-Request-Method": "POST", "Access-Control-Request-Headers": "content-type, x-account-id" },
+  });
+  check("preflight on /api/state answers 204", pre.status === 204, `got ${pre.status}`);
+  check("preflight echoes the exact origin, never *", pre.headers.get("access-control-allow-origin") === webOrigin, pre.headers.get("access-control-allow-origin") || "");
+  check("preflight allows credentials", pre.headers.get("access-control-allow-credentials") === "true");
+  check("preflight allows GET, POST, OPTIONS", (pre.headers.get("access-control-allow-methods") || "").includes("POST") && (pre.headers.get("access-control-allow-methods") || "").includes("GET"));
+  check("preflight allows content-type and x-account-id", (pre.headers.get("access-control-allow-headers") || "").includes("x-account-id"));
+  check("preflight caches for a day", pre.headers.get("access-control-max-age") === "86400");
+  const preEvil = await fetch(`${BASE}/api/state`, { method: "OPTIONS", headers: { Origin: evilOrigin, "Access-Control-Request-Method": "GET" } });
+  check("preflight from a disallowed origin gets no Allow-Origin", preEvil.headers.get("access-control-allow-origin") === null);
+  const preStore = await fetch(`${BASE}/api/store`, { method: "OPTIONS", headers: { Origin: webOrigin, "Access-Control-Request-Method": "GET" } });
+  check("no CORS on any endpoint besides /api/state and /api/profile", preStore.headers.get("access-control-allow-origin") === null);
+
+  // GET /api/state cross-origin with a valid account id mints the cookie.
+  const stCookie = await fetch(`${BASE}/api/state?accountId=${cookieAcc}`, { headers: { Origin: webOrigin } });
+  const stCookieJson: any = await stCookie.json();
+  const setCookie = stCookie.headers.get("set-cookie") || "";
+  check("cross-origin state carries CORS headers", stCookie.headers.get("access-control-allow-origin") === webOrigin && stCookie.headers.get("access-control-allow-credentials") === "true" && (stCookie.headers.get("vary") || "").includes("Origin"));
+  check("state mints the prism5_account cookie", setCookie.startsWith(`prism5_account=${cookieAcc}`), setCookie);
+  check("cookie is HttpOnly, SameSite=Lax, Path=/, one year", setCookie.includes("HttpOnly") && setCookie.includes("SameSite=Lax") && setCookie.includes("Path=/") && setCookie.includes("Max-Age=31536000"), setCookie);
+  check("local http dev gets no Secure and no Domain", !setCookie.includes("Secure") && !setCookie.includes("Domain="), setCookie);
+  check("state for the cookie account starts with no side", stCookieJson.ok === true && stCookieJson.side === null);
+  // No account id, no cookie: an unauthenticated caller gets nothing.
+  const stAnon = await fetch(`${BASE}/api/state`, { headers: { Origin: webOrigin } });
+  check("unauthenticated state gets no cookie", stAnon.status === 400 && stAnon.headers.get("set-cookie") === null, `got ${stAnon.status}`);
+  check("unauthenticated state still gets CORS headers so the error is readable", stAnon.headers.get("access-control-allow-origin") === webOrigin);
+  const stEvil = await fetch(`${BASE}/api/state?accountId=${cookieAcc}`, { headers: { Origin: evilOrigin } });
+  check("disallowed origin gets no CORS headers on state", stEvil.headers.get("access-control-allow-origin") === null);
+
+  // The cookie alone authenticates: POST /api/profile with only the
+  // cookie persists the side, and GET /api/state with only the cookie
+  // returns it — the website flow, end to end, with no account id in
+  // the URL, header, or body.
+  const cookieHeader = `prism5_account=${cookieAcc}`;
+  const postCookie: any = await (
+    await fetch(`${BASE}/api/profile`, {
+      method: "POST",
+      headers: { Origin: webOrigin, "content-type": "application/json", Cookie: cookieHeader },
+      body: JSON.stringify({ side: "personal" }),
+    })
+  ).json();
+  check("POST /api/profile with only the cookie persists the side", postCookie.ok === true && postCookie.profile?.side === "personal", JSON.stringify(postCookie));
+  const stCookieOnly: any = await (
+    await fetch(`${BASE}/api/state`, { headers: { Origin: webOrigin, Cookie: cookieHeader } })
+  ).json();
+  check("GET /api/state with only the cookie returns the side", stCookieOnly.ok === true && stCookieOnly.side === "personal", JSON.stringify(stCookieOnly.side));
+  // The cookie is the last resort: body, header, and query still win.
+  const stPrecedence: any = await (
+    await fetch(`${BASE}/api/state?accountId=${deviceA}`, { headers: { Cookie: cookieHeader } })
+  ).json();
+  check("query account id still beats the cookie", stPrecedence.accountId === deviceA, stPrecedence.accountId || "");
 } finally {
   server.kill();
 }
