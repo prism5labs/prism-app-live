@@ -104,6 +104,8 @@ const owner: OwnerContext = {
   about: null,
   preferences: null,
   notes: null,
+  title: null,
+  pronouns: null,
   memoryDigest: digest,
   personaSeed: seed,
   identityBlock: identity,

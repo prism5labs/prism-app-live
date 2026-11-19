@@ -293,6 +293,8 @@ async function prepareChat(
     about: profile.about,
     preferences: profile.preferences,
     notes: profile.notes,
+    title: profile.title,
+    pronouns: profile.pronouns,
     memoryDigest: memoryDigest(accountId, message),
     personaSeed: personaSeed(accountId),
     identityBlock: identityBlock(accountId),
@@ -1003,6 +1005,8 @@ async function handleApi(req: Request, path: string): Promise<Response> {
       about: typeof body.about === "string" || body.about === null ? body.about : undefined,
       preferences: typeof body.preferences === "string" || body.preferences === null ? body.preferences : undefined,
       notes: typeof body.notes === "string" || body.notes === null ? body.notes : undefined,
+      title: typeof body.title === "string" || body.title === null ? body.title : undefined,
+      pronouns: typeof body.pronouns === "string" || body.pronouns === null ? body.pronouns : undefined,
     });
     return json({ ok: true, profile });
   }

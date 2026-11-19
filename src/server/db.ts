@@ -100,6 +100,8 @@ CREATE TABLE IF NOT EXISTS profile (
   about TEXT,
   preferences TEXT,
   notes TEXT,
+  title TEXT,
+  pronouns TEXT,
   updated_at TEXT NOT NULL
 );
 -- Memory imported from other AIs, so the owner keeps continuity and does
@@ -183,6 +185,21 @@ try {
   migrateUnsectionedSelfExports();
 } catch (err) {
   console.error("imported_memory migration failed:", err);
+}
+
+// --- Profile columns added Nov 18, 2026 (preferred form of address) ---
+// Older databases have profile without title/pronouns. Add them the
+// same way as the imported_memory columns above: idempotent, and any
+// failure must never stop the server starting, so it is caught and
+// logged. Existing rows keep working with both fields null, which is
+// the default: no title, no gendered address.
+try {
+  const _pcols = db.query(`PRAGMA table_info(profile)`).all() as { name: string }[];
+  const _pnames = new Set(_pcols.map((c) => c.name));
+  if (!_pnames.has("title")) db.exec(`ALTER TABLE profile ADD COLUMN title TEXT`);
+  if (!_pnames.has("pronouns")) db.exec(`ALTER TABLE profile ADD COLUMN pronouns TEXT`);
+} catch (err) {
+  console.error("profile migration failed:", err);
 }
 
 export const MONTH_LIMIT = 300;
@@ -599,34 +616,62 @@ export function deleteFacebookPage(accountId: string, pageId: string): void {
   db.query(`DELETE FROM facebook_pages WHERE account_id = ? AND page_id = ?`).run(accountId, pageId);
 }
 
+// Titles the app may use to address the owner. A whitelist, not free
+// text: a title rides straight into the chat system prompt, so only
+// these exact values are ever stored. Anything else arrives as null,
+// which is the default: no title, no gendered address. "Sir",
+// "M'Lady", and "M'Lord" are offered only as opt-in choices
+// (Nov 18, 2026, Neil's word); nobody is addressed that way
+// unless they pick it.
+export const ADDRESS_TITLES = ["Mr.", "Ms.", "Mx.", "Dr.", "Sir", "M'Lady", "M'Lord"] as const;
+export type AddressTitle = (typeof ADDRESS_TITLES)[number];
+
+export function normalizeTitle(value: unknown): AddressTitle | null {
+  if (typeof value !== "string") return null;
+  const v = value.trim();
+  return (ADDRESS_TITLES as readonly string[]).includes(v) ? (v as AddressTitle) : null;
+}
+
+export function normalizePronouns(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  // One line, capped: pronouns ride in the system prompt, so no
+  // newlines and no long free text.
+  const v = value.replace(/[\r\n]+/g, " ").trim().slice(0, 40) || null;
+  return v;
+}
+
 // --- About you (the owner's profile) ---
 export type Profile = {
   displayName: string | null;
   about: string | null;
   preferences: string | null;
   notes: string | null;
+  title: AddressTitle | null;
+  pronouns: string | null;
   updatedAt: string | null;
 };
 
 export function getProfile(accountId: string): Profile {
   const row = db
-    .query(`SELECT display_name, about, preferences, notes, updated_at FROM profile WHERE account_id = ?`)
+    .query(`SELECT display_name, about, preferences, notes, title, pronouns, updated_at FROM profile WHERE account_id = ?`)
     .get(accountId) as any;
   if (!row) {
-    return { displayName: null, about: null, preferences: null, notes: null, updatedAt: null };
+    return { displayName: null, about: null, preferences: null, notes: null, title: null, pronouns: null, updatedAt: null };
   }
   return {
     displayName: row.display_name || null,
     about: row.about || null,
     preferences: row.preferences || null,
     notes: row.notes || null,
+    title: normalizeTitle(row.title),
+    pronouns: normalizePronouns(row.pronouns),
     updatedAt: row.updated_at || null,
   };
 }
 
 export function saveProfile(
   accountId: string,
-  patch: { displayName?: string | null; about?: string | null; preferences?: string | null; notes?: string | null },
+  patch: { displayName?: string | null; about?: string | null; preferences?: string | null; notes?: string | null; title?: string | null; pronouns?: string | null },
 ): Profile {
   const now = new Date().toISOString();
   const current = getProfile(accountId);
@@ -654,14 +699,20 @@ export function saveProfile(
       : patch.notes === null
         ? null
         : String(patch.notes).trim().slice(0, 4000) || null;
+  // A title is only ever one of the whitelisted values; anything else
+  // (including "sir") arrives as null, which is the no-title default.
+  // Pronouns are one capped line. Undefined means "leave it as it is".
+  const title = patch.title === undefined ? current.title : normalizeTitle(patch.title);
+  const pronouns = patch.pronouns === undefined ? current.pronouns : normalizePronouns(patch.pronouns);
   db.query(
-    `INSERT INTO profile (account_id, display_name, about, preferences, notes, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?)
+    `INSERT INTO profile (account_id, display_name, about, preferences, notes, title, pronouns, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(account_id) DO UPDATE SET
        display_name = excluded.display_name, about = excluded.about,
        preferences = excluded.preferences, notes = excluded.notes,
+       title = excluded.title, pronouns = excluded.pronouns,
        updated_at = excluded.updated_at`,
-  ).run(accountId, displayName, about, preferences, notes, now);
+  ).run(accountId, displayName, about, preferences, notes, title, pronouns, now);
   return getProfile(accountId);
 }
 

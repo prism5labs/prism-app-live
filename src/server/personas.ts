@@ -78,6 +78,12 @@ export type OwnerContext = {
   about: string | null;
   preferences: string | null;
   notes: string | null;
+  // How the owner wants to be addressed: a title from the About you
+  // form (Mr./Ms./Mx./Dr./Sir/M'Lady/M'Lord, or null for no title) and
+  // their pronouns. Both are null by default, and the default address
+  // is the owner's name with no title at all.
+  title: string | null;
+  pronouns: string | null;
   memoryDigest: string;
   personaSeed: string | null;
   identityBlock: string;
@@ -87,6 +93,21 @@ function ownerContextBlock(owner: OwnerContext | null | undefined): string {
   if (!owner) return "";
   const parts: string[] = [];
   if (owner.name) parts.push(`Their name is ${owner.name}. You may call them ${owner.name}.`);
+  // The default address is neutral: name only, no title, and never a
+  // gendered form of address unless the owner has told you otherwise
+  // (their own export, or the title they chose in About you). A title
+  // the owner chose is the only title ever used.
+  parts.push(
+    "Unless the owner has told you otherwise, never address them as sir, ma'am, madam, gentleman, or lady. Address them by their name, or by the title they chose.",
+  );
+  if (owner.title) {
+    // "Sir", "M'Lady", and "M'Lord" stand alone — never "Sir Neil" or
+    // "M'Lady Rivera". The other titles take the name after them.
+    if (owner.title === "Sir" || owner.title === "M'Lady" || owner.title === "M'Lord")
+      parts.push(`They prefer to be addressed as ${owner.title}.`);
+    else parts.push(`They prefer to be addressed as ${owner.title}${owner.name ? " " + owner.name : ""}.`);
+  }
+  if (owner.pronouns) parts.push(`Their pronouns are ${owner.pronouns}. Use those pronouns when you refer to them.`);
   if (owner.about) parts.push(`About them: ${owner.about}`);
   if (owner.preferences) parts.push(`How they like things done: ${owner.preferences}`);
   if (owner.notes) parts.push(`Anything else they want you to know: ${owner.notes}`);

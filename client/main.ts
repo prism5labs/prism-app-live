@@ -3,6 +3,7 @@
 
 import { api, getAccountId, setAccountId, clearAccountId } from "./api";
 import { portraitHtml } from "./ui";
+import { soundsEnabled, setSoundsEnabled, playClick, playToggle, playSwoosh } from "./sounds";
 import { SUPERNOVA, SATELLITE, UPKEEP, PRODUCTS, CATEGORIES } from "../src/shared/catalog";
 import { TIER_COPY, UPKEEP_COPY, FREE_CHATS_COPY } from "../src/shared/tiers";
 import { PHOTONS } from "../src/shared/photons";
@@ -2167,6 +2168,22 @@ function renderProfile(): string {
       <label class="field-label">What should they call you?
         <input name="displayName" type="text" placeholder="Your name" value="${esc(p.displayName || "")}" maxlength="80">
       </label>
+      <label class="field-label">How should they address you?
+        <select name="title">
+          <option value=""${!p.title ? " selected" : ""}>No title — just my name</option>
+          <option value="Mr."${p.title === "Mr." ? " selected" : ""}>Mr.</option>
+          <option value="Ms."${p.title === "Ms." ? " selected" : ""}>Ms.</option>
+          <option value="Mx."${p.title === "Mx." ? " selected" : ""}>Mx.</option>
+          <option value="Dr."${p.title === "Dr." ? " selected" : ""}>Dr.</option>
+          <option value="Sir"${p.title === "Sir" ? " selected" : ""}>Sir</option>
+          <option value="M'Lady"${p.title === "M'Lady" ? " selected" : ""}>M'Lady</option>
+          <option value="M'Lord"${p.title === "M'Lord" ? " selected" : ""}>M'Lord</option>
+        </select>
+      </label>
+      <label class="field-label">Pronouns (optional)
+        <input name="pronouns" type="text" placeholder="she/her, he/him, they/them…" value="${esc(p.pronouns || "")}" maxlength="40">
+      </label>
+      <p class="fine">Leave the title blank and they will just use your name — never sir or ma'am unless you ask for a title.</p>
       <label class="field-label">About you
         <textarea name="about" rows="3" placeholder="Who you are, what matters to you, what you do…">${esc(p.about || "")}</textarea>
       </label>
@@ -2659,6 +2676,23 @@ function openingCard(): string {
   </div>`;
 }
 
+// The interface-sounds switch: the same on-this-device setting as
+// Reading and Opening, in the same place. On means every tap, switch,
+// and screen change plays its tiny sound; off means silence, except
+// the one blip that confirms flipping this very switch (so the switch
+// never feels dead). The sounds are synthesized in the app itself, so
+// they play instantly with nothing to download. Saved on this device.
+function soundsCard(): string {
+  const on = soundsEnabled();
+  return `<div class="card">
+    <h2>Interface sounds</h2>
+    <p class="fine">Tiny sounds for taps, switches, and screen changes — a click, a toggle blip, a swoosh. Quiet on purpose: they sit under everything else and never get in the way.</p>
+    <div class="row">
+      <button class="btn${on ? " primary" : ""}" data-action="sound-toggle" aria-pressed="${on}">${on ? "Interface sounds: on" : "Interface sounds: off"}</button>
+    </div>
+  </div>`;
+}
+
 function renderUpkeep(): string {
   const ownedPhotons: string[] = state?.ownedPhotons || [];
   const ownedProducts: string[] = state?.ownedProducts || [];
@@ -2678,6 +2712,8 @@ function renderUpkeep(): string {
     ${readabilityCard()}
 
     ${openingCard()}
+
+    ${soundsCard()}
 
     <div class="card">
       <h2>Your chats</h2>
@@ -2996,10 +3032,53 @@ document.addEventListener(
     const d = e.target as HTMLDetailsElement;
     if (d && d.tagName === "DETAILS" && d.id.startsWith("store-")) {
       storeOpen[d.id.slice("store-".length)] = d.open;
+      // A section opening or closing is a switch: the toggle blip,
+      // up when it opens, down when it closes.
+      playToggle(d.open);
     }
   },
   true,
 );
+
+// ---------- Interface sounds: which tap makes which sound ----------
+// Every tap answers with its tiny sound, before anything else runs,
+// so a slow network or a redirect never leaves the tap silent.
+// A switch gets the toggle blip (up when it turns on, down when it
+// turns off), a screen change or a dismissal gets the swoosh, and
+// everything else gets the click. The sound-toggle itself is not in
+// either set: its handler plays its own blip with force, so flipping
+// sounds off still answers the tap.
+const SWOOSH_ACTIONS = new Set([
+  "goto",
+  "back-to-front",
+  "open-photon",
+  "card-chat",
+  "landing-skip",
+  "day-start",
+  "day-back",
+  "custom-back",
+  "custom-design-back",
+  "msg-thread",
+  "goto-messenger",
+  "drive-open",
+  "drive-close",
+  "research-close",
+  "photon-info",
+  "product-info",
+  "tier-info",
+  "card-close",
+  "connect-open",
+]);
+const TOGGLE_DIRECTIONS: Record<string, () => boolean> = {
+  // The direction is read before the handler runs, so the blip knows
+  // which way the switch is going.
+  "opening-toggle": () => !playOpening,
+  "opening-off": () => false,
+  "push-toggle": () => !(pushData && pushData.subscribed),
+  "read-contrast": () => !readContrast,
+  "day-move-show": () => !dayMoveOpen,
+  "call-mic": () => callPhase !== "recording",
+};
 
 document.addEventListener("click", async (e) => {
   // A connect link leaves for Google or Microsoft: say so on the link
@@ -3013,7 +3092,10 @@ document.addEventListener("click", async (e) => {
   }
   const t = (e.target as HTMLElement).closest("[data-action]") as HTMLElement | null;
   if (!t) return;
-  const action = t.dataset.action;
+  const action = t.dataset.action || "";
+  if (action in TOGGLE_DIRECTIONS) playToggle(TOGGLE_DIRECTIONS[action]());
+  else if (SWOOSH_ACTIONS.has(action)) playSwoosh();
+  else if (action !== "sound-toggle") playClick();
   if (action === "goto") {
     tab = t.dataset.tab as Tab;
     activePhoton = null;
@@ -3075,6 +3157,16 @@ document.addEventListener("click", async (e) => {
         ? "The opening animation will play when the app opens."
         : "The opening animation is off — the app will open straight in.",
     );
+  } else if (action === "sound-toggle") {
+    // Upkeep switch: flip the interface sounds on or off, on this
+    // device. The blip is forced, so flipping them off still answers
+    // the tap and flipping them on is heard at once; every other
+    // sound respects the setting from the next tap on.
+    const on = !soundsEnabled();
+    setSoundsEnabled(on);
+    playToggle(on, true);
+    render();
+    toast(on ? "Interface sounds are on." : "Interface sounds are off.");
   } else if (action === "opening-off") {
     // The persistent off switch on the opening itself: turn the film
     // off for every later open, then skip the rest of this one. The
@@ -3464,6 +3556,10 @@ document.addEventListener("click", async (e) => {
 
 document.addEventListener("submit", async (e) => {
   const form = e.target as HTMLFormElement;
+  // A submit button is a tap too, even though it carries no
+  // data-action: the click answers it. (Enter key submits count the
+  // same — the tap was still the owner's.)
+  playClick();
   if (form.id === "name-form") {
     e.preventDefault();
     const input = document.getElementById("name-input") as HTMLInputElement;
@@ -3581,6 +3677,8 @@ document.addEventListener("submit", async (e) => {
       about: String(fd.get("about") || ""),
       preferences: String(fd.get("preferences") || ""),
       notes: String(fd.get("notes") || ""),
+      title: String(fd.get("title") || ""),
+      pronouns: String(fd.get("pronouns") || ""),
     });
     if (r && r.ok) {
       profileData = r.profile || profileData;
@@ -3913,6 +4011,15 @@ function playOpeningSplash(returning: boolean): void {
       maybeShowLanding();
     }, 800);
   };
+  // A tap on the film skips it with a swoosh — except a tap on the
+  // "Don't play again" pill, which already answered with its own
+  // toggle blip. The film ending on its own, the 13s backstop, and
+  // the stall watchdogs dismiss without a sound: no sound without a
+  // user gesture.
+  const dismissByTap = (e: Event) => {
+    if (!(e.target as HTMLElement).closest("[data-action]")) playSwoosh();
+    dismiss();
+  };
   if (returning) {
     // Coming back from Google (a sign-in or a connect): the film
     // already played on the way out, and sitting through it again is
@@ -3920,7 +4027,7 @@ function playOpeningSplash(returning: boolean): void {
     // stays as a static branded cover in the scheme color while the
     // app loads underneath — no video, no 10s wait — and init
     // dismisses it fast the moment the first render lands.
-    splash.addEventListener("click", dismiss, { once: true });
+    splash.addEventListener("click", dismissByTap, { once: true });
     return;
   }
   if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
@@ -3928,7 +4035,7 @@ function playOpeningSplash(returning: boolean): void {
     maybeShowLanding();
     return;
   }
-  splash.addEventListener("click", dismiss, { once: true });
+  splash.addEventListener("click", dismissByTap, { once: true });
   video.addEventListener("ended", dismiss, { once: true });
   // If the v5 film fails to load or play, fall back to the v3 opening
   // instead of a black screen. If that fails too, dismiss — the chat

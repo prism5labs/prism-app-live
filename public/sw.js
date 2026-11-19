@@ -1,5 +1,11 @@
 // Prism 5 service worker. Cache-first for the app shell and static assets,
 // network-first for the API (chat, state, and inboxes must always be fresh).
+// CACHE v32: bumped Nov 18, 2026 for the interface sounds — tiny
+// synthesized click / toggle / swoosh (Web Audio, no files), wired to
+// every tap, switch, and screen change, with an on/off switch in
+// Upkeep saved per device in localStorage. The cache bump makes
+// existing installs fetch the new main.js and sw.js instead of serving
+// the cached ones, and clears any older cache entries on activate.
 // CACHE v31: bumped Nov 18, 2026 for the opening-animation switch —
 // the film can now be turned off for good (Upkeep, or "Don't play
 // the opening again" on the opening itself), saved per device in
@@ -74,7 +80,7 @@
 // Start My Day Stripe links. The cache bump makes existing installs
 // fetch the new main.js and the new sputnik.jpg instead of serving the
 // cached ones.
-const CACHE = "prism5-v31";
+const CACHE = "prism5-v32";
 const SHELL = ["/", "/index.html", "/styles.css", "/main.js", "/manifest.json", "/opening-animation-v3.mp4", "/opening-v5-poster.jpg", "/chat-bg/bg-rocket.jpg", "/chat-bg/bg-helmets.jpg", "/chat-bg/bg-starburst.jpg", "/chat-bg/bg-robot.jpg", "/chat-bg/bg-saucer.jpg", "/chat-bg/bg-raygun.jpg", "/chat-bg/bg-car.jpg", "/chat-bg/bg-pilot.jpg", "/chat-bg/bg-moonbase.jpg", "/chat-bg/bg-diner.jpg", "/chat-bg/bg-launchpad.jpg", "/chat-bg/bg-spacestation.jpg"];
 
 self.addEventListener("install", (event) => {
