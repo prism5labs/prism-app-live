@@ -136,11 +136,21 @@ process is up — the exact window in which symptom 2 appeared.
 
 ## Deployment
 
-- Commit: (filled after push)
-- Live verification: live /sw.js must read `prism5-v29`; live
-  main.js must contain `__prismMainLoaded`, `TimeoutError`, and
-  "Couldn't reach the server"; live index.html must contain
-  `__prismSplashFallback`. (Filled after deploy.)
+- Commit: `7097a9c` — "Freeze fix: opening plays from the service-worker
+  cache; boot can no longer hang (SW v29)", pushed to origin/main
+  (Render auto-deploys on push). 6 files: client/api.ts,
+  client/main.ts, public/index.html, public/styles.css, public/sw.js,
+  freeze-diagnosis-2026-11-18.md.
+- Live verification (fresh fetches, Nov 19 ~01:44–01:46 UTC):
+  live /main.js contains the v29 code — the retry toast ("Couldn't
+  reach the server just now — checking again in a moment."), the 5s
+  watchdog WITHOUT the readyState qualifier, and the new 9s second
+  watchdog. Live /sw.js reads `prism5-v29` with the best-effort film
+  precache and the Range-slicing handler. The local build hash is
+  `33ec9da9…`; the Dockerfile rebuilds main.js at deploy from the
+  same source. Live index.html was not fetchable as text (JS app
+  shell — the text fetcher returns nothing for it), but it ships in
+  the same container as the verified sw.js and main.js.
 
 ## Still required: Neil's phone test
 
