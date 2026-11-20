@@ -77,6 +77,23 @@ import {
   outlookLabelTitle,
   type OutlookLabel,
 } from "./server/outlook";
+// IMAP mail (Yahoo, Apple Mail, any other IMAP mailbox): the same shape
+// as Gmail and Outlook, so an IMAP mailbox shows as its own card in
+// Inboxes and can save real drafts. No OAuth client needed — the owner
+// signs in with an app-specific password, tested before it is stored.
+import {
+  IMAP_PROVIDERS,
+  connectImap,
+  listInbox as imapListInbox,
+  getMessage as imapGetMessage,
+  saveDraft as imapSaveDraft,
+  disconnectImap,
+  connectedLabels as imapConnectedLabels,
+  isValidImapLabel,
+  imapLabelTitle,
+  providerFor as imapProviderFor,
+  type ImapLabel,
+} from "./server/imap";
 // Capability steps (design doc): each module owns its own routes and
 // tables and reads its env vars directly; server.ts only mounts them.
 import {
@@ -1282,6 +1299,112 @@ async function handleApi(req: Request, path: string): Promise<Response> {
     const r = await outlookSaveDraft(accountId, label as OutlookLabel, to, subject, draftBody);
     if (!r.ok) return json({ ok: false, error: r.error || "draft_failed" });
     return json({ ok: true, draftId: r.draftId });
+  }
+
+  // IMAP mail (Yahoo Mail, Apple Mail, any other IMAP mailbox): the same
+  // shape as Gmail and Outlook, so an IMAP mailbox shows as its own card
+  // in Inboxes and can save real drafts. The sign-in is an app-specific
+  // password, tested against the real mail server before it is stored;
+  // a wrong password never lands in the database.
+  if (path === "/api/imap/providers" && method === "GET") {
+    return json({
+      ok: true,
+      providers: IMAP_PROVIDERS.map((p) => ({ id: p.id, name: p.name, host: p.host, port: p.port })),
+    });
+  }
+
+  // POST /api/imap/connect — connect an IMAP mailbox. Body: accountId,
+  // provider ("yahoo" | "apple" | "other"), email, password, and for
+  // "other" a custom host (port is always 993). The password is never
+  // sent back to the client.
+  if (path === "/api/imap/connect" && method === "POST") {
+    const body = await readBody(req);
+    const accountId = accountIdFrom(req, body);
+    if (!isValidAccountId(accountId)) return bad("accountId required", 400);
+    const provider = String(body.provider || "");
+    const email = String(body.email || "");
+    const password = String(body.password || "");
+    const host = String(body.host || "");
+    const r = await connectImap(accountId, provider, email, password, host || undefined);
+    if (!r.ok) return json({ ok: false, error: r.error || "connect_failed", message: r.message || "That mailbox didn't connect." });
+    return json({ ok: true, label: r.label, email: r.email });
+  }
+
+  // GET /api/imap/inboxes — every IMAP account actually connected, each
+  // with its messages, the same shape as /api/inboxes and
+  // /api/outlook/inboxes.
+  if (path === "/api/imap/inboxes" && method === "GET") {
+    const accountId = accountIdFrom(req, {});
+    if (!isValidAccountId(accountId)) return bad("accountId required", 400);
+    const connected = imapConnectedLabels(accountId);
+    const results = await Promise.all(
+      connected.map(async (c) => {
+        const r = await imapListInbox(accountId, c.label, 10);
+        const provider = imapProviderFor(c.provider);
+        return {
+          label: c.label,
+          title: imapLabelTitle(c.label, c.email),
+          provider: c.provider,
+          providerName: provider ? provider.name : "IMAP",
+          webmail: provider ? provider.webmail : null,
+          connected: r.connected,
+          email: r.email || c.email,
+          messages: r.messages,
+          unreadCount: typeof r.unreadCount === "number" ? r.unreadCount : null,
+          error: r.error || null,
+        };
+      }),
+    );
+    return json({
+      ok: true,
+      accounts: results,
+      _connectedLabels: connected.map((c) => c.label),
+    });
+  }
+
+  // GET /api/imap/message?accountId&label&id — read one IMAP message
+  // in full. The id is the message's IMAP UID.
+  if (path === "/api/imap/message" && method === "GET") {
+    const accountId = accountIdFrom(req, {});
+    if (!isValidAccountId(accountId)) return bad("accountId required", 400);
+    const label = url.searchParams.get("label") || "";
+    if (!isValidImapLabel(label)) return bad("bad label", 400);
+    const id = url.searchParams.get("id") || "";
+    if (!id) return bad("id required", 400);
+    const r = await imapGetMessage(accountId, label as ImapLabel, id);
+    if (!r.ok) return json({ ok: false, error: r.error || "message_failed" });
+    return json({ ok: true, id: r.id, from: r.from, subject: r.subject, date: r.date, body: r.body });
+  }
+
+  // POST /api/imap/draft — save a real draft into an IMAP mailbox. IMAP
+  // cannot send, so the draft lands in the mailbox's Drafts folder and
+  // the owner sends it from their mail app.
+  if (path === "/api/imap/draft" && method === "POST") {
+    const body = await readBody(req);
+    const accountId = accountIdFrom(req, body);
+    if (!isValidAccountId(accountId)) return bad("accountId required", 400);
+    const label = String(body.label || "");
+    if (!isValidImapLabel(label)) return bad("bad label", 400);
+    const to = String(body.to || "").trim();
+    const subject = String(body.subject || "").trim();
+    const draftBody = String(body.body || "");
+    if (!to || !draftBody) return bad("to and body required", 400);
+    const r = await imapSaveDraft(accountId, label as ImapLabel, to, subject, draftBody);
+    if (!r.ok) return json({ ok: false, error: r.error || "draft_failed" });
+    return json({ ok: true });
+  }
+
+  // POST /api/imap/disconnect — forget an IMAP mailbox and its
+  // app-specific password. The mail itself is untouched.
+  if (path === "/api/imap/disconnect" && method === "POST") {
+    const body = await readBody(req);
+    const accountId = accountIdFrom(req, body);
+    if (!isValidAccountId(accountId)) return bad("accountId required", 400);
+    const label = String(body.label || "");
+    if (!isValidImapLabel(label)) return bad("bad label", 400);
+    const ok = disconnectImap(accountId, label as ImapLabel);
+    if (!ok) return json({ ok: false, error: "not_connected" });
+    return json({ ok: true });
   }
 
   // About you: what the owner tells Prism about themselves. GET reads

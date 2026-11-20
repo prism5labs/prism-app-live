@@ -77,6 +77,22 @@ CREATE TABLE IF NOT EXISTS outlook_accounts (
   token_expiry INTEGER,
   PRIMARY KEY (account_id, label)
 );
+-- IMAP accounts (Yahoo Mail, Apple Mail, any other IMAP mailbox): one
+-- row per connected mailbox, labelled imap-1, imap-2, ... so anyone can
+-- add as many as they like. The credential is the app-specific password
+-- the owner pastes in (IMAP has no refresh token); it is stored the
+-- same way Gmail and Outlook refresh tokens are stored, and it is never
+-- sent back to the client. Disconnect deletes the row.
+CREATE TABLE IF NOT EXISTS imap_accounts (
+  account_id TEXT NOT NULL,
+  label TEXT NOT NULL,
+  provider TEXT NOT NULL,
+  host TEXT NOT NULL,
+  port INTEGER NOT NULL,
+  email TEXT NOT NULL,
+  password TEXT NOT NULL,
+  PRIMARY KEY (account_id, label)
+);
 -- Facebook Pages connected from the app. A Page access token is pasted in
 -- by the owner (from Meta's developer console) and stored here, the same
 -- way Gmail refresh tokens are stored. The token is never sent back to
@@ -755,6 +771,53 @@ export function updateOutlookAccessToken(
   db.query(
     `UPDATE outlook_accounts SET access_token = ?, token_expiry = ? WHERE account_id = ? AND label = ?`,
   ).run(accessToken, tokenExpiry, accountId, label);
+}
+
+// --- IMAP accounts (Yahoo Mail, Apple Mail, other IMAP mailboxes) ---
+export type ImapAccount = {
+  label: string;
+  provider: string;
+  host: string;
+  port: number;
+  email: string;
+  password: string;
+};
+
+export function setImapAccount(
+  accountId: string,
+  label: string,
+  provider: string,
+  host: string,
+  port: number,
+  email: string,
+  password: string,
+): void {
+  db.query(
+    `INSERT INTO imap_accounts (account_id, label, provider, host, port, email, password)
+     VALUES (?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(account_id, label) DO UPDATE SET
+       provider = excluded.provider, host = excluded.host, port = excluded.port,
+       email = excluded.email, password = excluded.password`,
+  ).run(accountId, label, provider, host, port, email, password);
+}
+
+export function getImapAccounts(accountId: string): ImapAccount[] {
+  return db
+    .query(`SELECT label, provider, host, port, email, password FROM imap_accounts WHERE account_id = ?`)
+    .all(accountId) as ImapAccount[];
+}
+
+export function getImapAccount(accountId: string, label: string): ImapAccount | null {
+  const row = db
+    .query(
+      `SELECT label, provider, host, port, email, password FROM imap_accounts WHERE account_id = ? AND label = ?`,
+    )
+    .get(accountId, label) as ImapAccount | null;
+  return row ?? null;
+}
+
+export function deleteImapAccount(accountId: string, label: string): void {
+  db.query(`DELETE FROM imap_accounts WHERE account_id = ? AND label = ?`).run(accountId, label);
 }
 
 // --- Facebook Pages connected from the app ---

@@ -365,6 +365,31 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ accountId: getAccountId(), label, to, subject, body }),
     }),
+  // IMAP mail (Yahoo, Apple Mail, any other IMAP mailbox): the same
+  // shape as Gmail and Outlook, so an IMAP mailbox shows as its own
+  // card and can save real drafts. The sign-in is an app-specific
+  // password, tested by the server before it is stored.
+  imapProviders: () => req("/api/imap/providers"),
+  imapInboxes: () => req(`/api/imap/inboxes?accountId=${encodeURIComponent(getAccountId())}`),
+  imapConnect: (provider: string, email: string, password: string, host?: string) =>
+    req("/api/imap/connect", {
+      method: "POST",
+      body: JSON.stringify({ accountId: getAccountId(), provider, email, password, host: host || "" }),
+    }),
+  imapMessage: (label: string, id: string) =>
+    req(
+      `/api/imap/message?accountId=${encodeURIComponent(getAccountId())}&label=${encodeURIComponent(label)}&id=${encodeURIComponent(id)}`,
+    ),
+  imapDraft: (label: string, to: string, subject: string, body: string) =>
+    req("/api/imap/draft", {
+      method: "POST",
+      body: JSON.stringify({ accountId: getAccountId(), label, to, subject, body }),
+    }),
+  imapDisconnect: (label: string) =>
+    req("/api/imap/disconnect", {
+      method: "POST",
+      body: JSON.stringify({ accountId: getAccountId(), label }),
+    }),
   // About you: what the owner tells Prism about themselves, so the
   // Photons know them instead of starting cold.
   profileGet: () => req(`/api/profile?accountId=${encodeURIComponent(getAccountId())}`),

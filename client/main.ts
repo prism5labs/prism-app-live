@@ -2151,10 +2151,16 @@ async function openMessengerThread(id: string) {
 // section (a toast alone is too easy to miss), connectError puts the
 // failure there with a one-tap retry. Both clear when the owner leaves
 // Connected, or when a later load shows the account is fine.
-let justConnected: "" | "gmail" | "google" | "outlook" = "";
+let justConnected: "" | "gmail" | "google" | "outlook" | "imap" = "";
 let connectError = "";
 // Which sign-in failed, so the retry goes straight back to it.
 let connectErrorKind: "" | "gmail" | "google" | "outlook" = "";
+// IMAP providers (Yahoo, Apple Mail, Other), from the server; the
+// connect form's select is built from these.
+let imapProvidersData: any[] | null = null;
+// The last IMAP connect result, shown under the connect form.
+let imapConnectMsg = "";
+let imapConnectOk = false;
 // True while an inbox load is in flight: the Email section says
 // "Checking your inbox…" instead of flashing the false "No email
 // accounts connected yet" empty state before the data lands.
@@ -2173,6 +2179,13 @@ function nextOutlookLabel(): string {
   return `outlook-${n}`;
 }
 
+function nextImapLabel(): string {
+  const used = new Set((state?.imapAccounts || []).map((a: any) => String(a.label || "")));
+  let n = 1;
+  while (used.has(`imap-${n}`)) n++;
+  return `imap-${n}`;
+}
+
 // ---------- Email summary cards ----------
 // The inbox used to render every message the server returned, which
 // read as an unbelievably huge dump. Now each account is a tidy
@@ -2182,7 +2195,7 @@ function nextOutlookLabel(): string {
 // below the list); nothing here renders the entire inbox at once.
 const EMAIL_SUMMARY_CAP = 10;
 
-function emailRowHtml(m: any, provider: "gmail" | "outlook", label: string): string {
+function emailRowHtml(m: any, provider: "gmail" | "outlook" | "imap", label: string): string {
   const unread = m.unread === true;
   return `<button class="inbox-msg email-row${unread ? " unread" : " read"}" data-action="email-open" data-provider="${provider}" data-label="${esc(String(label))}" data-id="${esc(String(m.id || ""))}">
       <span class="email-row-top"><span class="unread-dot" aria-hidden="true"></span><span class="inbox-subject">${esc(m.subject || "(no subject)")}</span></span>
@@ -2191,7 +2204,7 @@ function emailRowHtml(m: any, provider: "gmail" | "outlook", label: string): str
     </button>`;
 }
 
-function emailCard(acct: any, provider: "gmail" | "outlook"): string {
+function emailCard(acct: any, provider: "gmail" | "outlook" | "imap"): string {
   const label = String(acct.label || "");
   const unreadCount = typeof acct.unreadCount === "number" ? acct.unreadCount : null;
   const unreadLine =
@@ -2207,21 +2220,41 @@ function emailCard(acct: any, provider: "gmail" | "outlook"): string {
     .sort((a: any, b: any) => Number(b.unread === true) - Number(a.unread === true))
     .slice(0, EMAIL_SUMMARY_CAP);
   const errorHtml =
-    acct.error === "token_failed"
+    acct.error === "token_failed" || acct.error === "auth_failed"
       ? `<p class="chat-error">That account's sign-in ran out, so the inbox wouldn't open. Reconnect it from the button above — nothing was lost.</p>`
       : acct.error
         ? `<p class="chat-error">That inbox didn't answer just now. <button class="btn small" data-action="inbox-retry">Try again</button></p>`
         : "";
-  const webmail =
-    provider === "outlook"
-      ? `<p class="fine"><a href="https://outlook.live.com/mail/" target="_blank" rel="noopener">Open in Outlook</a> for older mail.</p>`
-      : `<p class="fine"><a href="https://mail.google.com/" target="_blank" rel="noopener">Open in Gmail</a> for older mail.</p>`;
+  // Gmail and Outlook have no disconnect in the app; an IMAP account
+  // does, because its app-specific password must be removable here.
+  // The provider name rides on the card, and the webmail link goes to
+  // that provider's own webmail when there is one.
+  const providerName =
+    provider === "imap"
+      ? String(acct.providerName || "IMAP")
+      : provider === "outlook"
+        ? "Outlook"
+        : "Gmail";
+  const webmailUrl =
+    provider === "imap"
+      ? String(acct.webmail || "")
+      : provider === "outlook"
+        ? "https://outlook.live.com/mail/"
+        : "https://mail.google.com/";
+  const webmail = webmailUrl
+    ? `<p class="fine"><a href="${esc(webmailUrl)}" target="_blank" rel="noopener">Open in ${esc(providerName)}</a> for older mail.</p>`
+    : "";
+  const disconnect =
+    provider === "imap"
+      ? `<p class="fine"><button class="btn small" data-action="imap-disconnect" data-label="${esc(String(acct.label || ""))}">Disconnect this mailbox</button></p>`
+      : "";
   return `<div class="card inbox-card">
         <h3>${esc(acct.title || acct.email || "Email")}</h3>
-        <p class="fine">${esc(acct.email || "")} · ${provider === "outlook" ? "Outlook" : "Gmail"}</p>
+        <p class="fine">${esc(acct.email || "")} · ${esc(providerName)}</p>
         ${unreadLine}
         ${errorHtml || (msgs.length ? msgs.map((m: any) => emailRowHtml(m, provider, label)).join("") : `<p class="fine">Nothing in the inbox right now.</p>`)}
         ${msgs.length ? webmail : ""}
+        ${disconnect}
         <form class="draft-form" data-label="${esc(String(acct.label || ""))}" data-provider="${provider}">
           <h4>Save a draft</h4>
           <input name="to" type="text" placeholder="To" required>
@@ -2236,10 +2269,10 @@ function emailCard(acct: any, provider: "gmail" | "outlook"): string {
 // A summary row opens the whole message in the character-card modal:
 // subject, sender, date, and the plain-text body. While it loads the
 // modal says so; if it fails, plain words and a one-tap retry.
-let emailOpenRetry: { provider: "gmail" | "outlook"; label: string; id: string } | null = null;
+let emailOpenRetry: { provider: "gmail" | "outlook" | "imap"; label: string; id: string } | null = null;
 
 async function openEmailMessage(
-  provider: "gmail" | "outlook",
+  provider: "gmail" | "outlook" | "imap",
   label: string,
   id: string,
   opener: HTMLElement | null,
@@ -2247,7 +2280,11 @@ async function openEmailMessage(
   emailOpenRetry = { provider, label, id };
   openCard(cardShell("Message", `<p class="fine">Opening that message…</p>`), opener);
   const r: any =
-    provider === "gmail" ? await api.gmailMessage(label, id) : await api.outlookMessage(label, id);
+    provider === "gmail"
+      ? await api.gmailMessage(label, id)
+      : provider === "outlook"
+        ? await api.outlookMessage(label, id)
+        : await api.imapMessage(label, id);
   if (r && r.ok) {
     emailOpenRetry = null;
     openCard(
@@ -2276,16 +2313,19 @@ async function openEmailMessage(
 // each service shows its state in plain words — Connected (with the
 // account), Not connected, or Checking — and carries its own single
 // control. There is no separate chooser any more: the Google row's
-// button is the Google sign-in, the Outlook row's is Outlook's, and
-// the Page row jumps to the Messenger form below, where the Page
-// token goes in. One Google sign-in covers Gmail, Calendar, and
-// Drive; an account connected before that change shows Calendar and
-// Drive as not connected until it signs in once more, and the row's
-// button is the one place to do that. Gmail and Outlook have no
-// disconnect in the app — a connected account stays connected — so a
-// connected row shows a badge, not a button that pretends otherwise.
-// The Facebook Page disconnects from its chip in the Messenger
-// section, the one place that control lives.
+// button is the Google sign-in, the Outlook row's is Outlook's, the
+// IMAP row carries its own connect form (Yahoo, Apple Mail, or any
+// other IMAP mailbox, with an app-specific password), and the Page row
+// jumps to the Messenger form below, where the Page token goes in. One
+// Google sign-in covers Gmail, Calendar, and Drive; an account
+// connected before that change shows Calendar and Drive as not
+// connected until it signs in once more, and the row's button is the
+// one place to do that. Gmail and Outlook have no disconnect in the
+// app — a connected account stays connected — so a connected row shows
+// a badge, not a button that pretends otherwise. An IMAP account does
+// disconnect, from its card below, because its app-specific password
+// must be removable here. The Facebook Page disconnects from its chip
+// in the Messenger section, the one place that control lives.
 function renderConnections(): string {
   const accounts = (state?.inboxAccounts || []) as any[];
   const outlookAccounts = (state?.outlookAccounts || []) as any[];
@@ -2333,6 +2373,41 @@ function renderConnections(): string {
         ? `<p><span class="owned-badge">Outlook connected</span></p><div class="row"><a class="btn" href="/api/oauth/microsoft/start?accountId=${encodeURIComponent(getAccountId())}&label=${nextOutlookLabel()}">Add another Outlook account</a></div>`
         : `<div class="row"><a class="btn primary" href="/api/oauth/microsoft/start?accountId=${encodeURIComponent(getAccountId())}&label=${nextOutlookLabel()}">Connect Outlook</a></div>`;
 
+  // Other mail (IMAP): Yahoo Mail, Apple Mail (iCloud), or any other
+  // IMAP mailbox. No OAuth setup anywhere: the owner signs in with an
+  // app-specific password, and the server tests it against the real
+  // mail server before storing it. The form stays visible so another
+  // mailbox can be added the same way.
+  const imapAccounts = (state?.imapAccounts || []) as any[];
+  const imapChecking = inboxesLoading && !imapAccounts.length;
+  const imapOn = imapAccounts.length > 0;
+  const imapEmail = imapOn ? String(imapAccounts[0].email || "") : "";
+  const imapState = imapChecking
+    ? `<p class="fine">Checking your other mailboxes…</p>`
+    : imapOn
+      ? `<p class="fine">Connected${imapEmail ? ` as ${esc(imapEmail)}` : ""}${imapAccounts.length > 1 ? ` · ${imapAccounts.length} accounts` : ""}</p>`
+      : `<p class="fine">Not connected</p>`;
+  const imapProviderOptions = (
+    imapProvidersData && imapProvidersData.length
+      ? imapProvidersData
+      : [
+          { id: "yahoo", name: "Yahoo Mail" },
+          { id: "apple", name: "Apple Mail (iCloud)" },
+          { id: "other", name: "Other IMAP account" },
+        ]
+  )
+    .map((p: any) => `<option value="${esc(String(p.id))}">${esc(String(p.name))}</option>`)
+    .join("");
+  const imapControl = `<form id="imap-connect-form" class="row">
+      <select name="provider" id="imap-provider-select" aria-label="Mail provider">${imapProviderOptions}</select>
+      <input name="email" type="email" inputmode="email" autocapitalize="off" autocomplete="email" placeholder="Email address" required aria-label="Email address">
+      <input name="password" type="password" placeholder="App-specific password" required autocomplete="off" aria-label="App-specific password">
+      <input name="host" type="text" id="imap-custom-host" placeholder="Mail server, e.g. imap.example.com" aria-label="Mail server (other providers only)" hidden>
+      <button class="btn primary" type="submit">Connect mailbox</button>
+    </form>
+    <p class="fine">Yahoo and Apple Mail need an app-specific password — made in the provider's account settings — not the mailbox password. It is tested before it is stored, kept on the server like a Gmail sign-in, and never shown back. IMAP can read mail and save drafts; it cannot send, so a draft is sent from the mail app.</p>
+    ${imapConnectMsg ? `<p class="${imapConnectOk ? "inbox-connected" : "chat-error"}">${esc(imapConnectMsg)}</p>` : ""}`;
+
   // Facebook Page: connected from the Messenger form below, where the
   // token goes in and the disconnect chip lives.
   const pageChecking = inboxesLoading && messengerPagesData === null;
@@ -2358,36 +2433,43 @@ function renderConnections(): string {
     <h3>Outlook</h3>
     ${outlookState}
     ${outlookControl}
+    <h3>Other mail (Yahoo, Apple Mail, IMAP)</h3>
+    ${imapState}
+    ${imapControl}
     <h3>Facebook Page</h3>
     ${pageState}
     ${pageControl}
-    <p class="fine">Google and Outlook connect from here. Yahoo, Apple Mail, and other mail providers aren't supported yet — they need a mail connection this app does not have. Texts and calls are set up on the server, not from the app.</p>
+    <p class="fine">Google and Outlook connect from here. Yahoo, Apple Mail, and other mail providers connect above with an app-specific password. Texts and calls are set up on the server, not from the app.</p>
   </div>`;
 }
 
 function renderConnected(): string {
   const accounts = (state?.inboxAccounts || []) as any[];
   const outlookAccounts = (state?.outlookAccounts || []) as any[];
+  const imapAccounts = (state?.imapAccounts || []) as any[];
   const googleConfigured = state?.googleConfigured;
   const microsoftConfigured = state?.microsoftConfigured;
   const cards = [
     ...accounts.map((acct: any) => emailCard(acct, "gmail")),
     ...outlookAccounts.map((acct: any) => emailCard(acct, "outlook")),
+    ...imapAccounts.map((acct: any) => emailCard(acct, "imap")),
   ].join("");
   const emailEmpty =
-    inboxesLoading && !accounts.length && !outlookAccounts.length
+    inboxesLoading && !accounts.length && !outlookAccounts.length && !imapAccounts.length
       ? `<p class="fine">Checking your inbox…</p>`
       : googleConfigured || microsoftConfigured
-        ? `<p class="fine">No email accounts connected yet — tap Connect Google or Connect Outlook above to add one.</p>`
-        : `<p class="fine">Email sign-in isn't set up on this server yet.</p>`;
+        ? `<p class="fine">No email accounts connected yet — tap Connect Google or Connect Outlook above, or connect a Yahoo, Apple Mail, or other IMAP mailbox below, to add one.</p>`
+        : `<p class="fine">No email accounts connected yet — connect a Yahoo, Apple Mail, or other IMAP mailbox above to add one.</p>`;
   const connectedBanner =
     justConnected === "gmail"
       ? `<p class="inbox-connected">Gmail connected — your inbox is below.</p>`
       : justConnected === "outlook"
         ? `<p class="inbox-connected">Outlook connected — your inbox is below.</p>`
-        : justConnected === "google"
-          ? `<p class="inbox-connected">Calendar and Drive connected.</p>`
-          : "";
+        : justConnected === "imap"
+          ? `<p class="inbox-connected">Mailbox connected — your inbox is below.</p>`
+          : justConnected === "google"
+            ? `<p class="inbox-connected">Calendar and Drive connected.</p>`
+            : "";
   // A failed connect retries from the same place it failed: the
   // banner's button goes straight to that sign-in, not to a chooser.
   const connectRetry =
@@ -2425,7 +2507,7 @@ function renderConnected(): string {
     ${connectedBanner}
     ${connectErrorHtml}
     <div class="inbox-grid">${cards}</div>
-    ${accounts.length || outlookAccounts.length ? "" : emailEmpty}
+    ${accounts.length || outlookAccounts.length || imapAccounts.length ? "" : emailEmpty}
   </section>`;
 }
 
@@ -3462,9 +3544,11 @@ async function loadConnected() {
   // false "nothing connected yet").
   inboxesLoading = true;
   try {
-    const [r, o, c, prof, mem] = await Promise.all([
+    const [r, o, im, pr, c, prof, mem] = await Promise.all([
       api.inboxes(),
       api.outlookInboxes(),
+      api.imapInboxes(),
+      api.imapProviders(),
       api.contacts(),
       api.profileGet(),
       api.memoryList(),
@@ -3476,6 +3560,12 @@ async function loadConnected() {
     if (o && o.ok) {
       state.outlookAccounts = o.accounts;
       state.microsoftConfigured = o.microsoftConfigured;
+    }
+    if (im && im.ok) {
+      state.imapAccounts = im.accounts;
+    }
+    if (pr && pr.ok) {
+      imapProvidersData = pr.providers || [];
     }
     if (c && c.ok) state.contacts = c.contacts || [];
     if (prof && prof.ok) {
@@ -3662,12 +3752,28 @@ document.addEventListener("click", async (e) => {
     else doSwitch();
   } else if (action === "email-open") {
     // A summary row opens the whole message, one tap.
+    const p = t.dataset.provider || "";
     openEmailMessage(
-      t.dataset.provider === "outlook" ? "outlook" : "gmail",
+      p === "outlook" ? "outlook" : p === "imap" ? "imap" : "gmail",
       t.dataset.label || "",
       t.dataset.id || "",
       t,
     );
+  } else if (action === "imap-disconnect") {
+    // Forget an IMAP mailbox and its app-specific password. The mail
+    // itself is untouched; the card goes away with it.
+    t.setAttribute("disabled", "");
+    const label = t.dataset.label || "";
+    const r = await api.imapDisconnect(label);
+    if (r && r.ok) {
+      toast("Mailbox disconnected.");
+      justConnected = "";
+      await loadConnected();
+      render();
+    } else {
+      toast("That mailbox didn't disconnect. Try again.", "err");
+      t.removeAttribute("disabled");
+    }
   } else if (action === "email-retry-open") {
     // The message didn't open: same message, one more try.
     if (emailOpenRetry) {
@@ -4270,19 +4376,57 @@ document.addEventListener("submit", async (e) => {
     e.preventDefault();
     const fd = new FormData(form);
     const label = form.dataset.label || "";
-    const provider = form.dataset.provider === "outlook" ? "outlook" : "gmail";
+    const rawProvider = form.dataset.provider || "";
+    const provider = rawProvider === "outlook" ? "outlook" : rawProvider === "imap" ? "imap" : "gmail";
     const to = String(fd.get("to") || "");
     const subject = String(fd.get("subject") || "");
     const body = String(fd.get("body") || "");
     const r =
       provider === "outlook"
         ? await api.outlookDraft(label, to, subject, body)
-        : await api.saveDraft(label, to, subject, body);
+        : provider === "imap"
+          ? await api.imapDraft(label, to, subject, body)
+          : await api.saveDraft(label, to, subject, body);
     if (r && r.ok) {
-      toast(provider === "outlook" ? "Draft saved to Outlook drafts." : "Draft saved to Gmail drafts.");
+      toast(
+        provider === "outlook"
+          ? "Draft saved to Outlook drafts."
+          : provider === "imap"
+            ? "Draft saved to that mailbox's drafts."
+            : "Draft saved to Gmail drafts.",
+      );
       form.reset();
     } else {
       toast("That draft didn't save. Check the account is connected.", "err");
+    }
+  } else if (form.id === "imap-connect-form") {
+    // Connect a Yahoo, Apple Mail, or other IMAP mailbox. The server
+    // tests the app-specific password against the real mail server
+    // before storing anything; a wrong password never lands in the
+    // database. The custom host field only matters for Other.
+    e.preventDefault();
+    const fd = new FormData(form);
+    const provider = String(fd.get("provider") || "");
+    const email = String(fd.get("email") || "").trim();
+    const password = String(fd.get("password") || "");
+    const host = String(fd.get("host") || "").trim();
+    if (!email || !password) return;
+    imapConnectMsg = "";
+    imapConnectOk = false;
+    const r = await api.imapConnect(provider, email, password, host);
+    if (r && r.ok) {
+      imapConnectOk = true;
+      imapConnectMsg = `Connected: ${r.email || email}.`;
+      justConnected = "imap";
+      form.reset();
+      await loadConnected();
+      render();
+      toast(`Connected: ${r.email || email}.`);
+    } else {
+      imapConnectOk = false;
+      imapConnectMsg = r?.message || "That mailbox didn't connect. Try again.";
+      render();
+      toast(imapConnectMsg, "err");
     }
   } else if (form.id === "profile-form") {
     // About you: what the owner tells Prism about themselves.
@@ -4461,6 +4605,19 @@ document.addEventListener("change", async (e) => {
   }
   if (already > 0) console.info(`${already} imported contact(s) already in the address book.`);
   input.value = "";
+});
+
+// ---------- IMAP provider select ----------
+// The custom mail-server field only matters for Other: Yahoo and Apple
+// Mail fill their own server in. Show it when Other is picked, hide it
+// otherwise, so the form never asks for what it does not need.
+document.addEventListener("change", (e) => {
+  const sel = e.target as HTMLSelectElement;
+  if (!sel || sel.id !== "imap-provider-select") return;
+  const host = document.getElementById("imap-custom-host") as HTMLInputElement | null;
+  if (!host) return;
+  host.hidden = sel.value !== "other";
+  if (sel.value !== "other") host.value = "";
 });
 
 // ---------- Memory import (.json / .md / .txt) ----------
