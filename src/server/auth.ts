@@ -81,6 +81,17 @@ CREATE TABLE IF NOT EXISTS signin_links (
   account_id TEXT NOT NULL,
   created_at TEXT NOT NULL
 );
+-- Sign-in starts: which origin the installed app was on when a sign-in
+-- began. The OAuth callback always lands on the single registered
+-- redirect URI (the Render origin), so the return has to be routed back
+-- to the origin the sign-in started from — that is the installed app's
+-- origin. A row lives 30 minutes and is spent on first read, so a stale
+-- start can never steer a later sign-in.
+CREATE TABLE IF NOT EXISTS signin_starts (
+  device_account_id TEXT PRIMARY KEY,
+  origin TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS account_perks (
   account_id TEXT PRIMARY KEY,
   code TEXT NOT NULL,
@@ -427,6 +438,48 @@ export function recordSigninLink(deviceAccountId: string, accountId: string): vo
      VALUES (?, ?, ?)
      ON CONFLICT(device_account_id) DO UPDATE SET account_id = excluded.account_id, created_at = excluded.created_at`,
   ).run(deviceAccountId, accountId, new Date().toISOString());
+}
+
+// --- Sign-in start origin: route the return back to the installed app --
+//
+// WHY THIS EXISTS. The sign-in leaves the installed app for Google and
+// the callback comes back on the single registered redirect URI, which
+// is the Render origin — not necessarily the origin the app was
+// installed from. A bare redirect from the callback to the app URL
+// stays in the browser tab (a Custom Tab, with its bar and X): a
+// redirect is not a user gesture, so Android never hands it to the
+// installed app. The return has to be a tap: a plain link to an
+// in-scope URL, tapped by the owner, is routed by Android's intent
+// filters to the installed app window. So the callback sends the owner
+// to a small return page on the origin the sign-in started from, and
+// that page's button is the tap that opens the app. The page carries
+// the one-time session token in its link, exactly as the old redirect
+// did, and the app spends it on arrival as before.
+const SIGNIN_START_TTL_MS = 30 * 60 * 1000;
+
+export function recordSigninStart(deviceAccountId: string, origin: string): void {
+  if (!/^https?:\/\/[^\/]+$/.test(origin)) return;
+  db.query(`DELETE FROM signin_starts WHERE created_at < ?`).run(
+    new Date(Date.now() - SIGNIN_START_TTL_MS).toISOString(),
+  );
+  db.query(
+    `INSERT INTO signin_starts (device_account_id, origin, created_at)
+     VALUES (?, ?, ?)
+     ON CONFLICT(device_account_id) DO UPDATE SET origin = excluded.origin, created_at = excluded.created_at`,
+  ).run(deviceAccountId, origin, new Date().toISOString());
+}
+
+// Take the recorded start origin for a device id, if one is still
+// fresh. Consumed on first read, so a later sign-in is never steered
+// by an old start.
+export function takeSigninStart(deviceAccountId: string): string | null {
+  const row = db
+    .query(`SELECT origin, created_at FROM signin_starts WHERE device_account_id = ?`)
+    .get(deviceAccountId) as { origin: string; created_at: string } | null;
+  if (!row) return null;
+  db.query(`DELETE FROM signin_starts WHERE device_account_id = ?`).run(deviceAccountId);
+  if (Date.now() - new Date(row.created_at).getTime() > SIGNIN_START_TTL_MS) return null;
+  return row.origin;
 }
 
 export function lookupSigninLink(deviceAccountId: string): string | null {

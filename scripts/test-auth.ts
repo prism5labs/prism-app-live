@@ -89,6 +89,9 @@ try {
   check("start-signin asks offline access", locUrl.searchParams.get("access_type") === "offline");
 
   // --- HTTP: callback with a fake code fails honestly (real Google) ---
+  // The sign-in was started first, so the failure routes through the
+  // return page on the origin the sign-in started from, not straight to
+  // the app: /oauth-return?status=error is the honest error landing.
   const cbRes = await fetch(
     `${BASE}/api/oauth/google/callback?code=fake-code&state=${deviceA}%3Asignin`,
     { redirect: "manual" },
@@ -96,7 +99,7 @@ try {
   check(
     "callback with a fake code redirects to the error page",
     cbRes.status === 302 &&
-      (cbRes.headers.get("location") || "").includes("tab=you&signin=error"),
+      (cbRes.headers.get("location") || "") === `${BASE}/oauth-return?status=error`,
     `${cbRes.status} ${(cbRes.headers.get("location") || "")}`,
   );
 

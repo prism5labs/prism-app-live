@@ -112,6 +112,8 @@ import {
   handleSigninCallback,
   exchangeSigninSession,
   recoverSignin,
+  recordSigninStart,
+  takeSigninStart,
   authStatus,
   getPerk,
   getBackstories,
@@ -157,6 +159,37 @@ function contactRequestEmail(
 function decisionPage(title: string, line: string): Response {
   return new Response(
     `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${title}</title><style>body{font-family:Georgia,serif;background:#0f3d3e;color:#fdf6e3;text-align:center;padding:48px 20px}h1{font-size:28px}p{font-size:17px;line-height:1.5}</style></head><body><h1>${title}</h1><p>${line}</p></body></html>`,
+    { headers: { "content-type": "text/html; charset=utf-8" } },
+  );
+}
+
+// The sign-in return page: the tap that gets the owner back into the
+// installed app. After Google, the owner is sitting in a browser tab
+// (a Custom Tab, with its bar and X). A redirect from here to the app
+// would stay in that tab, so this page does not redirect: it shows one
+// big button, a plain link to the app on this origin, carrying the
+// one-time session token exactly as the old redirect did. Tapping a
+// link to an in-scope URL is a user gesture, so Android's intent
+// filters route it to the installed app window, which spends the token
+// on arrival as before. If the page already loaded inside the
+// installed app (display-mode standalone), it continues on its own
+// with no tap. The page is self-contained on purpose: it must work in
+// a bare tab with no app code loaded.
+function oauthReturnPage(url: URL): Response {
+  const session = url.searchParams.get("session") || "";
+  const ok = url.searchParams.get("status") === "ok" && session.length > 0;
+  const target = ok
+    ? `/?tab=you&signin=ok&session=${encodeURIComponent(session)}`
+    : "/?tab=you";
+  const title = ok ? "You're signed in" : "Sign-in didn't finish";
+  const line = ok
+    ? "Tap below to open Prism 5. If the app doesn't open, tap the Prism 5 icon on your home screen — you're signed in."
+    : "Tap below to try again.";
+  const button = ok ? "Open Prism 5" : "Try again";
+  const esc = (s: string) =>
+    s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  return new Response(
+    `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${title}</title><style>body{font-family:Georgia,serif;background:#FFF3DC;color:#0F5257;text-align:center;padding:48px 20px}h1{font-size:28px}p{font-size:17px;line-height:1.5;max-width:420px;margin:0 auto}a.btn{display:inline-block;margin-top:28px;padding:16px 36px;background:#D62828;color:#FFF3DC;font-size:20px;text-decoration:none;border-radius:12px}</style></head><body><h1>${title}</h1><p>${line}</p><a class="btn" href="${esc(target)}">${button}</a><script>if(window.matchMedia&&window.matchMedia('(display-mode: standalone)').matches){window.location.replace(${JSON.stringify(target)});}</script></body></html>`,
     { headers: { "content-type": "text/html; charset=utf-8" } },
   );
 }
@@ -848,6 +881,23 @@ async function handleApi(req: Request, path: string): Promise<Response> {
     const base = config.appUrl || "";
     if (state.endsWith(":signin")) {
       const r = await handleSigninCallback(code, state);
+      // The sign-in started from the installed app's origin; the
+      // callback itself always lands on the registered redirect URI
+      // (the Render origin), inside a browser tab. A bare redirect
+      // back to the app stays in that tab — a redirect is not a user
+      // gesture, so Android never hands it to the installed app. Route
+      // the owner through the return page on the origin the sign-in
+      // started from instead: its button is the tap that opens the
+      // app window. No start recorded (an old link, a direct hit):
+      // keep the previous direct redirect.
+      const deviceAccountId = state.split(":")[0] || "";
+      const startOrigin = takeSigninStart(deviceAccountId);
+      if (startOrigin) {
+        const dest = r.ok
+          ? `${startOrigin}/oauth-return?status=ok&session=${encodeURIComponent(r.sessionToken)}`
+          : `${startOrigin}/oauth-return?status=error`;
+        return Response.redirect(dest, 302);
+      }
       const dest = r.ok
         ? `${base}/?tab=you&signin=ok&session=${encodeURIComponent(r.sessionToken)}`
         : `${base}/?tab=you&signin=error`;
@@ -874,10 +924,13 @@ async function handleApi(req: Request, path: string): Promise<Response> {
 
   // GET /api/oauth/google/start-signin?accountId — begin an app
   // sign-in with Google. Same OAuth client as Gmail; scopes are only
-  // openid, email, profile (identity, nothing else).
+  // openid, email, profile (identity, nothing else). The origin this
+  // request arrived on is the installed app's origin: record it so the
+  // callback can route the return back there (see /oauth-return).
   if (path === "/api/oauth/google/start-signin" && method === "GET") {
     const accountId = url.searchParams.get("accountId") || "";
     if (!isValidAccountId(accountId)) return bad("accountId required", 400);
+    recordSigninStart(accountId, url.origin);
     const u = authUrlSignin(accountId);
     if (!u) {
       return json({
@@ -1538,6 +1591,11 @@ const server = Bun.serve({
     try {
       if (path === "/healthz") {
         return json({ ok: true, brain: brainConnected(), provider: brainProvider() });
+      }
+      // GET /oauth-return — the sign-in return page (see oauthReturnPage).
+      // Not under /api/, and it must not fall through to the SPA shell.
+      if (path === "/oauth-return") {
+        return oauthReturnPage(url);
       }
       if (path.startsWith("/api/")) {
         return await handleApi(req, path);
