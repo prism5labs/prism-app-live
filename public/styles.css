@@ -315,10 +315,25 @@ textarea { width: 100%; resize: vertical; }
   border-bottom: 2px solid;
   border-image: linear-gradient(90deg, transparent, #B9BDC2, #7E858C, #B9BDC2, transparent) 1;
 }
-.thread-head .portrait {
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
+/* Large Photon portrait at the top of a thread, above the conversation:
+   the Face you are talking to, big enough to see (Nov 19, 2026). It sits
+   fixed under the thread header — it never scrolls away with the messages
+   — and is capped at 44vw, so a 390px phone never overflows. The small
+   28px avatars on each bot message stay: they mark who is speaking, not
+   who you are talking to. The header's old 56px avatar is gone, so there
+   is one clear portrait at the top, not two competing ones. */
+.thread-hero {
+  flex: none;
+  display: flex;
+  justify-content: center;
+  padding: 16px 16px 4px;
+}
+.thread-hero .portrait {
+  width: 160px;
+  height: 160px;
+  max-width: 44vw;
+  max-height: 44vw;
+  border-radius: 24px;
   box-shadow: 0 0 0 1.5px var(--teal);
 }
 .thread-head .back-btn {
@@ -391,8 +406,8 @@ body.look-night-watch, .thread.look-night-watch, .photon-card.look-night-watch {
 }
 /* The dark sets get a red glow on the portrait ring, like a signal
    light; Night Watch glows harder, and its send button glows too. */
-.thread.look-signal-red .thread-head .portrait { box-shadow: 0 0 0 1.5px var(--teal), 0 0 10px rgba(214, 40, 40, 0.35); }
-.thread.look-night-watch .thread-head .portrait { box-shadow: 0 0 0 1.5px var(--teal), 0 0 14px rgba(255, 74, 61, 0.5); }
+.thread.look-signal-red .thread-hero .portrait { box-shadow: 0 0 0 1.5px var(--teal), 0 0 10px rgba(214, 40, 40, 0.35); }
+.thread.look-night-watch .thread-hero .portrait { box-shadow: 0 0 0 1.5px var(--teal), 0 0 14px rgba(255, 74, 61, 0.5); }
 .thread.look-night-watch .composer .send { box-shadow: 0 0 14px rgba(255, 74, 61, 0.4); }
 /* A palette change fades in slowly across the whole app, like a
    Final Fantasy reskin, so picking a look feels like a different
@@ -858,13 +873,18 @@ html.kb-chat body.is-thread .composer-dock #research-results { display: none; }
 @media (prefers-reduced-motion: no-preference) {
   .app-header-mark { animation: gem-bob 5s ease-in-out infinite, gem-glow 5s ease-in-out infinite; }
   .chrome-thin { background-size: 200% 100%; animation: chrome-shimmer 9s linear infinite; }
-  .thread-head .portrait { animation: ring-breathe 4s ease-in-out infinite; }
+  .thread-hero .portrait { animation: ring-breathe 4s ease-in-out infinite; }
+  /* The large thread portrait fades in once, gently. Reduced motion
+     gets no animation at all: this rule only exists inside the
+     no-preference block. */
+  .thread-hero { animation: hero-fade 0.45s ease; }
   .switchboard-strip img { animation: poster-glow 5s ease-in-out infinite; }
 }
 @keyframes gem-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-2px); } }
 @keyframes gem-glow { 0%, 100% { box-shadow: 0 0 0 0 rgba(244, 201, 93, 0); } 50% { box-shadow: 0 0 12px 2px rgba(244, 201, 93, 0.55); } }
 @keyframes chrome-shimmer { 0% { background-position: 0% 0; } 100% { background-position: 200% 0; } }
 @keyframes ring-breathe { 0%, 100% { box-shadow: 0 0 0 1.5px var(--teal); } 50% { box-shadow: 0 0 0 1.5px var(--teal), 0 0 14px 2px rgba(244, 201, 93, 0.6); } }
+@keyframes hero-fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes poster-glow { 0%, 100% { box-shadow: none; } 50% { box-shadow: 0 0 12px rgba(244, 201, 93, 0.5); } }
 
 /* ---------- Store: posters as thumbnails, plain buying text ---------- */

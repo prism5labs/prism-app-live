@@ -1168,7 +1168,6 @@ function renderChatThread(): string {
   <section class="thread${look ? ` look-${look.id}` : ""}">
     <div class="thread-head">
       <button class="back-btn" data-action="back-to-front">← <span>All Photons</span></button>
-      ${portraitHtml(portrait, 56)}
       <div class="thread-title">
         <h2>${esc(face)}</h2>
         <span class="thread-tag">${esc(p.tagline)}</span>
@@ -1183,6 +1182,7 @@ function renderChatThread(): string {
         </div>
       </details>
     </div>
+    <div class="thread-hero">${portraitHtml(portrait, 160)}</div>
     <div class="messages" id="messages">${msgs}</div>
     <div class="composer-dock">
       <div id="chat-error" class="chat-error" hidden></div>
