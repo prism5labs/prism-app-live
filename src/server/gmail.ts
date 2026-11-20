@@ -6,6 +6,7 @@
 // disk is ephemeral, so connections reset when the service redeploys.
 
 import { config, googleConfigured } from "./config";
+import { decodeHtmlEntities } from "./htmlText";
 import { EXTRA_SCOPES, recordGoogleToken } from "./google";
 import {
   getGmailAccount,
@@ -231,7 +232,7 @@ export async function listInbox(
           from: headers["From"] || "",
           subject: headers["Subject"] || "(no subject)",
           date: headers["Date"] || "",
-          snippet: d.snippet || "",
+          snippet: decodeHtmlEntities(d.snippet || ""),
           unread: Array.isArray(d.labelIds) ? d.labelIds.includes("UNREAD") : undefined,
         } as InboxMessage;
       }),
@@ -309,17 +310,14 @@ function plainTextFromPayload(payload: any): string {
   if (plain) return plain;
   const html = walk(payload, "text/html");
   if (!html) return "";
-  return html
+  // Strip the markup first, then decode the entities: a literal &lt;
+  // in the source becomes a visible "<", not a tag. The old chain
+  // decoded only six entities, so &rsquo;, &#8217;, &#x27; and the rest
+  // survived into the reader and showed up literally.
+  const stripped = html
     .replace(/<(br|p|div|li|tr|h\d)[^>]*>/gi, "\n")
-    .replace(/<[^>]+>/g, "")
-    .replace(/&nbsp;/g, " ")
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
+    .replace(/<[^>]+>/g, "");
+  return decodeHtmlEntities(stripped).replace(/\n{3,}/g, "\n\n").trim();
 }
 
 function toBase64Url(s: string): string {

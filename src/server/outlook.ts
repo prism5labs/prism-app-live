@@ -16,6 +16,7 @@
 // account both sign in the same way.
 
 import { config, microsoftConfigured } from "./config";
+import { decodeHtmlEntities } from "./htmlText";
 import {
   getOutlookAccount,
   getOutlookAccounts,
@@ -237,15 +238,11 @@ export async function getMessage(
   const body =
     m.body?.contentType === "text"
       ? raw
-      : raw
-          .replace(/<(br|p|div|li|tr|h\d)[^>]*>/gi, "\n")
-          .replace(/<[^>]+>/g, "")
-          .replace(/&nbsp;/g, " ")
-          .replace(/&amp;/g, "&")
-          .replace(/&lt;/g, "<")
-          .replace(/&gt;/g, ">")
-          .replace(/&quot;/g, '"')
-          .replace(/&#39;/g, "'")
+      : decodeHtmlEntities(
+          raw
+            .replace(/<(br|p|div|li|tr|h\d)[^>]*>/gi, "\n")
+            .replace(/<[^>]+>/g, ""),
+        )
           .replace(/\n{3,}/g, "\n\n")
           .trim();
   return {
