@@ -834,11 +834,14 @@ async function handleApi(req: Request, path: string): Promise<Response> {
   }
 
   // GET /api/oauth/google/callback?code&state — finish a Gmail sign-in,
-  // or an app sign-in. App sign-in rides this same registered redirect
-  // URI (no new URI in the Google console); the state tells it apart:
-  // "<deviceAccountId>:signin" is an app sign-in, anything else is a
-  // Gmail label. A finished app sign-in mints a one-time session token
-  // and hands the browser back to You to spend it.
+  // an app sign-in, or a Calendar + Drive sign-in. All three ride this
+  // same registered redirect URI (no new URI in the Google console);
+  // the state tells them apart: "<deviceAccountId>:signin" is an app
+  // sign-in, "<deviceAccountId>:calendar-drive" is Calendar + Drive
+  // (authUrlExtra asks Google to return here, not to /callback-extra,
+  // because it reuses the single registered redirect URI), anything
+  // else is a Gmail label. A finished app sign-in mints a one-time
+  // session token and hands the browser back to You to spend it.
   if (path === "/api/oauth/google/callback" && method === "GET") {
     const code = url.searchParams.get("code") || "";
     const state = url.searchParams.get("state") || "";
@@ -848,6 +851,18 @@ async function handleApi(req: Request, path: string): Promise<Response> {
       const dest = r.ok
         ? `${base}/?tab=you&signin=ok&session=${encodeURIComponent(r.sessionToken)}`
         : `${base}/?tab=you&signin=error`;
+      return Response.redirect(dest, 302);
+    }
+    if (state.endsWith(":calendar-drive")) {
+      // The Calendar + Drive consent returns here, not to
+      // /callback-extra, because authUrlExtra reuses the Gmail
+      // redirect URI. Before this branch the state fell through to
+      // handleOAuthCallback, which rejected it as bad_state and the
+      // owner saw "Gmail sign-in didn't finish. Try again."
+      const r = await handleExtraOAuthCallback(code, state);
+      const dest = r.ok
+        ? `${base}/?tab=inboxes&google=connected`
+        : `${base}/?tab=inboxes&google=error`;
       return Response.redirect(dest, 302);
     }
     const r = await handleOAuthCallback(code, state);

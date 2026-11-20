@@ -1,5 +1,12 @@
 // Prism 5 service worker. Cache-first for the app shell and static assets,
 // network-first for the API (chat, state, and inboxes must always be fresh).
+// CACHE v37: bumped Nov 19, 2026 for the Calendar + Drive connect fix —
+// the Gmail OAuth callback now routes a ":calendar-drive" state to the
+// extra handler instead of rejecting it as bad_state, so "Connect
+// Calendar & Drive" finishes instead of showing "Gmail sign-in didn't
+// finish. Try again." The cache bump makes existing installs fetch the
+// new main.js, index.html and styles.css instead of serving the cached
+// ones, and clears any older cache entries on activate.
 // CACHE v36: bumped Nov 19, 2026 for Nova at $79 (one-time $79.00 / $81.37
 // at checkout, $10 a month, Personal Upkeep $9 a month), the twelve Atoms
 // in the Store and You, and the first-open Business/Personal chooser that
@@ -118,7 +125,7 @@
 // Start My Day Stripe links. The cache bump makes existing installs
 // fetch the new main.js and the new sputnik.jpg instead of serving the
 // cached ones.
-const CACHE = "prism5-v36";
+const CACHE = "prism5-v37";
 const SHELL = ["/", "/index.html", "/styles.css", "/main.js", "/manifest.json", "/opening-animation-v3.mp4", "/opening-v5-poster.jpg", "/chat-bg/bg-rocket.jpg", "/chat-bg/bg-helmets.jpg", "/chat-bg/bg-starburst.jpg", "/chat-bg/bg-robot.jpg", "/chat-bg/bg-saucer.jpg", "/chat-bg/bg-raygun.jpg", "/chat-bg/bg-car.jpg", "/chat-bg/bg-pilot.jpg", "/chat-bg/bg-moonbase.jpg", "/chat-bg/bg-diner.jpg", "/chat-bg/bg-launchpad.jpg", "/chat-bg/bg-spacestation.jpg"];
 
 self.addEventListener("install", (event) => {
