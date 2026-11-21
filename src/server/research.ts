@@ -7,12 +7,11 @@
 // One provider interface, one concrete adapter (Brave Search API, via
 // fetch, key from BRAVE_SEARCH_API_KEY). No new dependencies.
 //
-// This module is NOT wired into the brain yet: anthropic.ts is untouched,
-// so the brain cannot call this as a tool. For now the endpoint is for
-// the client UI (a "check this" action) and for pasted research. Brain
-// tool-use integration is a follow-up — see WIRING.md.
-//
-// Handler shape matches server.ts: handleResearch(req) reads its own JSON
+// This module IS wired into the brain: anthropic.ts offers web_search as
+// a tool (up to two searches per chat call) whenever a Brave key is set,
+// and the results ride back in as tool results with their sources. The
+// Gemini bridge stays text-only. The endpoint below is for the client UI
+// (a "check this" action) and for pasted research.
 // body and returns a Response, so the coordinator only has to mount it in
 // the route if-chain. Nothing here edits server.ts.
 
