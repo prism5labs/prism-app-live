@@ -1,4 +1,9 @@
-// Prism 5 service worker. Cache-first for the app shell and static assets,
+// Prism 5 service worker.
+// CACHE v49: bumped Nov 21, 2026 for the opening film re-encode — the
+// v5 film was 6.1 MB at ~4.9 Mbps and never started on a slow phone
+// connection; it is now ~1 MB capped near 750 kbps, same film. The
+// cache bump makes installs fetch the new film instead of serving
+// the cached heavy copy. Cache-first for the app shell and static assets,
 // network-first for the API (chat, state, and inboxes must always be fresh).
 // CACHE v37: bumped Nov 19, 2026 for the Calendar + Drive connect fix —
 // the Gmail OAuth callback now routes a ":calendar-drive" state to the
@@ -150,7 +155,7 @@
 // Drive as document pages, calmer look sets, and the motion sweep.
 // The cache bump makes existing installs fetch the new styles.css and
 // main.js instead of serving the cached ones.
-const CACHE = "prism5-v48";
+const CACHE = "prism5-v49";
 const SHELL = ["/", "/index.html", "/styles.css", "/main.js", "/manifest.json", "/opening-animation-v3.mp4", "/opening-v5-poster.jpg", "/chat-bg/bg-rocket.jpg", "/chat-bg/bg-helmets.jpg", "/chat-bg/bg-starburst.jpg", "/chat-bg/bg-robot.jpg", "/chat-bg/bg-saucer.jpg", "/chat-bg/bg-raygun.jpg", "/chat-bg/bg-car.jpg", "/chat-bg/bg-pilot.jpg", "/chat-bg/bg-moonbase.jpg", "/chat-bg/bg-diner.jpg", "/chat-bg/bg-launchpad.jpg", "/chat-bg/bg-spacestation.jpg"];
 
 self.addEventListener("install", (event) => {
