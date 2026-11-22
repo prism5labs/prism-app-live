@@ -4585,6 +4585,40 @@ const SPLASH_SCHEME_IDS = [
   "checkered-flag",
 ] as const;
 const SPLASH_OPENS_KEY = "prism5.splashOpens";
+// A plain black layer that fades over the splash film, or lifts off
+// the app, so the film never sits inside an element whose opacity
+// animates (see .film-curtain in styles.css for why).
+function filmCurtain(z: number): HTMLDivElement {
+  const c = document.createElement("div");
+  c.className = "film-curtain";
+  c.style.zIndex = String(z);
+  document.body.appendChild(c);
+  return c;
+}
+
+let splashDismissing = false;
+// Raise the curtain over the splash, take the splash away beneath
+// it, and lift the curtain off the app. Shared by both dismiss
+// paths; the splash itself is never faded. The fast variant (an
+// OAuth return) keeps the whole move under a second so the owner
+// is not left staring at black before the thing they just did.
+function dismissSplashWithCurtain(fast = false): void {
+  const splash = document.getElementById("opening-splash");
+  if (!splash || !splash.isConnected || splashDismissing) return;
+  splashDismissing = true;
+  const c = filmCurtain(110);
+  if (fast) c.style.transitionDuration = "0.35s";
+  c.classList.add("in");
+  window.setTimeout(() => {
+    splash.remove();
+    maybeShowChooser();
+    c.classList.remove("in");
+    if (fast) c.style.transitionDuration = "0.6s";
+    c.classList.add("out");
+    window.setTimeout(() => c.remove(), fast ? 700 : 1400);
+  }, fast ? 400 : 750);
+}
+
 function playOpeningSplash(returning: boolean): void {
   const splash = document.getElementById("opening-splash");
   const video = document.getElementById("opening-splash-video") as HTMLVideoElement | null;
@@ -4616,12 +4650,7 @@ function playOpeningSplash(returning: boolean): void {
   splash.setAttribute("data-scheme", SPLASH_SCHEME_IDS[(opens - 1) % SPLASH_SCHEME_IDS.length]);
   if (greeting) greeting.textContent = isFirst ? "Welcome" : "Welcome back";
   const dismiss = () => {
-    if (!splash.isConnected) return;
-    splash.classList.add("is-fading");
-    window.setTimeout(() => {
-      splash.remove();
-      maybeShowChooser();
-    }, 800);
+    dismissSplashWithCurtain();
   };
   // A tap on the film skips it with a swoosh — except a tap on the
   // "Don't play again" pill, which already answered with its own
@@ -4703,19 +4732,11 @@ function playOpeningSplash(returning: boolean): void {
   if (video.ended) dismiss();
 }
 
-// The fast dismiss for an OAuth return: the static cover goes away in
-// a slow 600ms fade once the first render has landed, instead of the
-// film's 800ms fade after a 10s play. The chooser check runs after, as
-// usual.
+// The fast dismiss for an OAuth return: the same black curtain as
+// the film's exit, at a quicker tempo, once the first render has
+// landed. The chooser check runs after, as usual.
 function dismissSplashFast(): void {
-  const splash = document.getElementById("opening-splash");
-  if (!splash || !splash.isConnected) return;
-  splash.classList.add("is-fading-fast");
-  splash.classList.add("is-fading");
-  window.setTimeout(() => {
-    splash.remove();
-    maybeShowChooser();
-  }, 650);
+  dismissSplashWithCurtain(true);
 }
 
 // ---------- First-open chooser ----------

@@ -492,7 +492,8 @@ textarea { width: 100%; resize: vertical; }
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: opacity var(--t-cine) var(--ease);
+  /* No opacity transition on the splash itself, ever: the film inside
+     it is dismissed by a black curtain instead (see .film-curtain). */
 }
 /* Ten splash color schemes, one per open, cycling in order
    (client/main.ts picks the scheme from the open count). All start
@@ -566,7 +567,21 @@ textarea { width: 100%; resize: vertical; }
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: none; }
 }
-.opening-splash.is-fading { opacity: 0; pointer-events: none; }
+/* The film curtain: a plain black layer that fades over the splash
+   film and lifts off the app, so the film never sits inside an
+   element whose opacity animates — on the owner's phone a film's
+   picture froze the moment an ancestor's opacity animated (proven
+   on Loremaster, Nov 22, 2026; the same curtain, at his word). */
+.film-curtain {
+  position: fixed;
+  inset: 0;
+  background: #000;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 1.2s ease;
+}
+.film-curtain.in { opacity: 1; transition-duration: 0.7s; }
+.film-curtain.out { opacity: 0; transition-duration: 1.2s; }
 /* The two ways past the opening, kept visibly apart. The one-time
    skip is plain text ("Tap anywhere to skip") — tapping anywhere on
    the splash dismisses this showing only, and the film plays again
@@ -1495,7 +1510,8 @@ html.read-contrast .btn.store-outline:hover { background: #FADFDF; }
   from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: none; }
 }
-.opening-splash.is-fading-fast { transition: opacity var(--t-view) var(--ease); }
+/* The fast splash dismiss uses the film curtain too, at a quicker
+   tempo (see dismissSplashWithCurtain in client/main.ts). */
 .nav-btn { transition: color var(--t-panel) var(--ease), box-shadow var(--t-panel) var(--ease); }
 @media (prefers-reduced-motion: reduce) {
   .view.view-enter, .chooser { animation: none; }
