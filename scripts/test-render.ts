@@ -149,13 +149,34 @@ await waitFor(
 check("redeem unlocks unlimited chat", window.document.querySelector(".meter-line")?.textContent === "Unlimited chat");
 check("redeem shows owned list", text("#view").includes("Prism — Photon"));
 
-// Back to Chat: the Photons should now be listed and tappable.
+// Back to Chat: the Photons should now be listed and tappable, and so
+// should the Atoms (Atom chat: an owned Atom opens the same thread view).
 const chatBtn = [...window.document.querySelectorAll("#nav .nav-btn")].find(
   (b) => b.textContent === "Chat",
 ) as HTMLElement;
 chatBtn.click();
-await waitFor(() => window.document.querySelectorAll("#view .photon-card").length === 12);
-check("chat lists all 12 owned Photons", window.document.querySelectorAll("#view .photon-card").length === 12, `found ${window.document.querySelectorAll("#view .photon-card").length}`);
+await waitFor(() => window.document.querySelectorAll("#view .photon-card[data-photon]").length === 12);
+check("chat lists all 12 owned Photons", window.document.querySelectorAll("#view .photon-card[data-photon]").length === 12, `found ${window.document.querySelectorAll("#view .photon-card[data-photon]").length}`);
+check("chat lists all 12 owned Atoms", window.document.querySelectorAll("#view .photon-card[data-atom]").length === 12, `found ${window.document.querySelectorAll("#view .photon-card[data-atom]").length}`);
+
+// Open an Atom thread and send a message: the same thread view a
+// Photon uses, with the Atom's own intro, and no customization detour.
+const mabelCard = [...window.document.querySelectorAll("#view .photon-card")].find(
+  (c) => (c as HTMLElement).dataset.atom === "Mabel",
+) as HTMLElement;
+mabelCard.click();
+await waitFor(() => !!window.document.querySelector("#chat-form"));
+check("atom thread view opens", !!window.document.querySelector("#chat-form"));
+check("atom thread shows the Atom intro", text("#view").includes("I keep your personal inbox in order"));
+const atomInput = window.document.querySelector("#chat-input") as HTMLInputElement;
+atomInput.value = "Hello from the render test";
+const atomForm = window.document.querySelector("#chat-form") as HTMLFormElement;
+atomForm.dispatchEvent(new window.Event("submit", { bubbles: true, cancelable: true }));
+await waitFor(() => text("#view").includes("Mock reply"), 8000);
+check("atom chat reply renders in thread", text("#view").includes("Mock reply"));
+const backBtn = window.document.querySelector('[data-action="back-to-front"]') as HTMLElement;
+backBtn.click();
+await waitFor(() => window.document.querySelectorAll("#view .photon-card[data-photon]").length === 12);
 
 // Open a Photon thread and send a message (mock brain is running).
 const prismCard = [...window.document.querySelectorAll("#view .photon-card")].find(

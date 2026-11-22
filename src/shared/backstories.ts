@@ -52,10 +52,9 @@ export function renderBackstory(template: string, ownerName: string, sinceIso: s
 // piece of fiction about how they began, given to the owner when they
 // create an account. One per Atom. Same rules as the Photon stories —
 // {owner} and {date} filled in when shown, fixed text, display only,
-// never read into a chat system prompt as instructions. Atoms do not
-// chat yet, so their stories are read on their character cards, not in
-// a thread intro — the story is the same welcome, in the place an Atom
-// can actually be met.
+// never read into a chat system prompt as instructions. Their stories
+// are read on their character cards and as the intro of an empty chat
+// thread, the same welcome in both places an Atom can be met.
 export const ATOM_BACKSTORIES: Record<string, string> = {
   Mabel:
     "Mabel learned her trade at a letters desk in a post office that still answered every letter by hand. She read each one twice, answered it in the sender's own words, and never once mixed up whose news was whose. The red pencil was for the mistakes, and there were not many. She has kept inboxes honest ever since, and since {date} she has kept {owner}'s — every message triaged, every reply sounding like the person who sent it.",

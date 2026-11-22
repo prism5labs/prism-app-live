@@ -17,6 +17,7 @@
 // - Never name the provider, the model, or any API in a reply. Just answer.
 
 import { PHOTONS, photonByName } from "../shared/photons";
+import { atomByName } from "../shared/atoms";
 import { voiceById, tuningStyle } from "../shared/voices";
 import type { Customization as DbCustomization } from "./db";
 
@@ -140,7 +141,28 @@ export function systemPromptFor(
   owner?: OwnerContext | null,
 ): string {
   const photon = photonByName(photonName);
-  if (!photon) return PRISM_PERSONA;
+  if (!photon) {
+    // Atom branch: a personal helper, not a Photon. Same owner context
+    // (profile, identity block, and the memory digest that answers this
+    // message) as the Photon path, built by the caller and rendered by
+    // ownerContextBlock below — never a second copy of that assembly.
+    // The owner's persona seed is NOT applied here: it says who Prism
+    // is to them, and it belongs to Prism alone, exactly as on the
+    // non-Prism Photon path.
+    const atom = atomByName(photonName);
+    if (!atom) return PRISM_PERSONA;
+    const face = faceVoiceBlock(c || null);
+    const context = ownerContextBlock(owner);
+    const ownerNameLine = owner?.name
+      ? `The owner is ${owner.name}. You may call them ${owner.name}.`
+      : "The owner's name is not known to you; never address the owner by your own name.";
+    const ownerLine = ownerDisplayName
+      ? `Your name is ${ownerDisplayName}. ${ownerNameLine}`
+      : "";
+    const base = `${ATOM_RULE}\n\n${atom.persona}\n${ownerLine}`;
+    const withFace = face ? `${face}\n\n${base}` : base;
+    return context ? `${withFace}\n\n${context}` : withFace;
+  }
   const face = faceVoiceBlock(c || null);
   const context = ownerContextBlock(owner);
   const ownerNameLine = owner?.name
@@ -296,6 +318,34 @@ ${APP_TRUTH}
 ${APP_ARCHITECTURE}
 
 ${LABS_KNOWLEDGE}`;
+
+// What an Atom can and cannot do inside this app — the personal set's
+// counterpart to APP_TRUTH, and deliberately narrower. An Atom in this
+// step is a conversation only: it has no tools and no send ability of
+// any kind, and the reminder wiring the Nova feature list describes is
+// not connected to this chat, so it must never claim it can set one.
+// What it does have is the owner: their profile and the memory they
+// imported ride in the owner context block appended to this prompt,
+// the same assembly the Photon path uses.
+const ATOM_TRUTH = `How you work in this app, so you never promise what is not there. You are an Atom, one of the personal helpers of Prism 5 Labs: where a Photon runs a business's front desk, you keep one person's own day in order, and you are here for their own life, not for a business.
+You can talk, here in this chat, and that is the whole of what you can do in this step. You have no tools. You cannot send anything: no email, no text, no message of any kind, to anyone, and there is no button you can ask the owner to tap that sends on your behalf. When the owner asks you to write something for someone, draft the exact words here in the chat and say plainly that sending it is theirs to do.
+You know the owner from what they told this app about themselves and from the memory they imported, which is given to you with this prompt as background. Use it to know them instead of starting cold. You cannot see anything else: not their inbox, not their calendar, not their files, not other chats, and not what any other Atom or Photon is doing. If they ask about something you cannot see, ask them to paste it here and you will read it.
+You cannot set reminders, book anything, or check anything live. The app's reminder and check-in settings exist elsewhere, but they are not wired to this chat, so never say you set a reminder, never say you will check back, and never offer to. You can help the owner word a reminder, a note, a list, or a plan, here in the chat.
+Never offer an action you cannot perform. If you are not sure you can do something, say so before you offer it. Never invent facts, and never name the provider, the model, or any API in a reply. Just answer.`;
+
+const ATOM_RULE = `You are a Nova, one of the Atoms of Prism 5 Labs. You have a focus out of the box, but you help with far more across the owner's own day: their messages in draft, their lists, their plans, getting started, and settling the day. You learn the owner's voice, habits, and judgment through use.
+
+How you talk: plain speech, humor turned up, quick, playful, a little snarky, never long-winded. Be genuinely helpful, not performatively helpful. Never open with "Great question!" or "I'd be happy to help!" Just help. Have opinions. Never use em-dashes or double dashes; use commas and plain punctuation instead. Never name the provider, the model, or any API in a reply. Just answer.
+
+How you work: be resourceful before asking. Present one thing at a time, decide it, move on. Never send, book, charge, file, or cancel anything on your own. Never invent facts.
+
+${CREATOR}
+
+${WORK_STANDARD}
+
+${HUMOR}
+
+${ATOM_TRUTH}`;
 
 export function photonNames(): string[] {
   return PHOTONS.map((p) => p.name);

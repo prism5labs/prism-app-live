@@ -9,6 +9,7 @@ import {
   getOrCreateAccount,
   getOwned,
   ownsPhoton,
+  ownsAtom,
   getThread,
   addMessage,
   incrementMeter,
@@ -49,7 +50,7 @@ import {
 } from "./shared/photons";
 import { SUPERNOVA, SATELLITE, UPKEEP, NOVA, PERSONAL_UPKEEP, PRODUCTS, CATEGORIES } from "./shared/catalog";
 import { featureAccess, hasPersonalAccess } from "./shared/features";
-import { ATOMS } from "./shared/atoms";
+import { ATOMS, atomByName } from "./shared/atoms";
 import {
   authUrl,
   handleOAuthCallback,
@@ -334,6 +335,33 @@ function brainErrorMessage(error: string): string {
     : "The brain isn't answering right now. Try that again in a moment.";
 }
 
+// Chat serves both rosters: the Photons (business) and the Atoms
+// (personal). A name is a chat name when it is on either roster. The
+// thread store keys on the name either way, so an Atom's thread lives
+// beside a Photon's with no second store.
+function isChatName(name: string): boolean {
+  return !!photonByName(name) || !!atomByName(name);
+}
+
+// Ownership for one chat name. A Photon: its own owned row (or the free
+// code, which ownsPhoton already honors). An Atom: its own owned row
+// (kind 'atom'; ownsAtom likewise honors the free code, and redeeming
+// the free code writes every Atom row besides) OR the Nova product row
+// (kind 'product', ref 'nova' — the generic Nova purchase in stripe.ts
+// grants no single Atom, so it opens every Atom's chat). This is
+// per-Atom on purpose: hasPersonalAccess in shared/features.ts opens
+// the personal FEATURE SET (any Atom, a Nova, or a business Launch),
+// which is a wider gate than "may chat with this Atom" and is not
+// reused here.
+function ownsChatName(accountId: string, name: string): boolean {
+  if (photonByName(name)) return ownsPhoton(accountId, name);
+  if (atomByName(name)) {
+    if (ownsAtom(accountId, name)) return true;
+    return getOwned(accountId).products.includes("nova");
+  }
+  return false;
+}
+
 // Everything both chat endpoints check before the brain is called:
 // the account, the Photon, ownership, the monthly meter, and that a brain
 // is connected. Returns the error response to send, or the pieces the
@@ -356,11 +384,11 @@ async function prepareChat(
   if (!isValidAccountId(accountId)) return { error: bad("accountId required", 400) };
   const photon = String(body.photon || "");
   const message = String(body.message || "").trim();
-  if (!photonByName(photon)) return { error: bad("unknown photon", 400) };
+  if (!isChatName(photon)) return { error: bad("unknown photon", 400) };
   if (!message) return { error: bad("message required", 400) };
   if (message.length > 4000) return { error: bad("message too long", 400) };
 
-  if (!ownsPhoton(accountId, photon)) {
+  if (!ownsChatName(accountId, photon)) {
     return {
       error: json({
         ok: false,
@@ -420,7 +448,13 @@ async function prepareChat(
     personaSeed: personaSeed(accountId),
     identityBlock: identityBlock(accountId),
   };
-  const system = systemPromptFor(photon, c?.faceName || a.custom_name || photon, c, ownerContext);
+  // An Atom has no customization Face and no account custom name of its
+  // own: the account's custom_name belongs to Prism, so an Atom is
+  // addressed by its own name unless a customization row renames it.
+  const displayName = atomByName(photon)
+    ? c?.faceName || photon
+    : c?.faceName || a.custom_name || photon;
+  const system = systemPromptFor(photon, displayName, c, ownerContext);
   return { accountId, photon, message, system, history };
 }
 
@@ -639,17 +673,18 @@ async function handleApi(req: Request, path: string): Promise<Response> {
     return json({ ok: true, displayName: name || "Prism 5", customName: name || null });
   }
 
-  // GET /api/threads/:photon
+  // GET /api/threads/:name — a Photon or an Atom name; the thread store
+  // keys on the name either way.
   const threadMatch = path.match(/^\/api\/threads\/([A-Za-z]+)$/);
   if (threadMatch && method === "GET") {
     const photon = threadMatch[1];
     const accountId = accountIdFrom(req, {});
     if (!isValidAccountId(accountId)) return bad("accountId required", 400);
-    if (!photonByName(photon)) return bad("unknown photon", 400);
+    if (!isChatName(photon)) return bad("unknown photon", 400);
     return json({
       ok: true,
       photon,
-      owned: ownsPhoton(accountId, photon),
+      owned: ownsChatName(accountId, photon),
       messages: getThread(accountId, photon),
     });
   }

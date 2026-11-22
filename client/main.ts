@@ -485,16 +485,20 @@ function openPhotonCard(name: string, opener: HTMLElement | null) {
 }
 
 // An Atom's character card, mirroring a Photon's: portrait, tagline,
-// focus, introduction, and the plain price. No "Start chatting" button:
-// Atoms do not chat yet — the thread is Photon-only until the Atom
-// chat leg lands — so the card never promises a conversation it cannot
-// open.
+// focus, introduction, and the plain price. An owned Atom gets the
+// same "Start chatting" button a Photon gets, opening its thread;
+// an unowned Atom keeps the buy button.
 function atomCardHtml(a: (typeof ATOMS)[number]): string {
-  const owned = state?.freeCode === true || (state?.ownedAtoms || []).includes(a.name);
+  // The Nova product opens every Atom's chat on the server, so its
+  // owners count as owning each Atom here too.
+  const owned =
+    state?.freeCode === true ||
+    (state?.ownedAtoms || []).includes(a.name) ||
+    (state?.ownedProducts || []).includes("nova");
   // An Atom's backstory, from the day the owner's account was created —
   // the same welcome material as a Photon's. Empty for accounts that
-  // never signed in. Atoms do not chat yet, so the story is read here,
-  // on the card, instead of in a thread intro.
+  // never signed in. It is read here, on the card, and again as the
+  // thread intro when the thread is opened.
   const story = (state as any)?.backstories?.[a.name] || "";
   const body = `
     <div class="card-hero">${atomPortraitHtml(a.name, 140)}</div>
@@ -511,7 +515,7 @@ function atomCardHtml(a: (typeof ATOMS)[number]): string {
     ])}
     <p class="fine">A Nova is for your own day, not a business: one inbox triaged, your calendar and reminders, a morning briefing and an end-of-day wrap, and gentle check-ins.</p>
     <div class="card-actions">
-      ${owned ? `<span class="owned-badge">Owned — yours already</span>` : buyButton(buyUrl(NOVA.url, "Atom-" + a.name), "$81.37", false)}
+      ${owned ? `<span class="owned-badge">Owned — yours already</span><button class="btn primary" data-action="card-chat-atom" data-atom="${esc(a.name)}">Start chatting</button>` : buyButton(buyUrl(NOVA.url, "Atom-" + a.name), "$81.37", false)}
     </div>`;
   return cardShell(a.name, body);
 }
@@ -857,6 +861,16 @@ function photonCard(p: any, size = 220): string {
   </button>`;
 }
 
+// An Atom's slide on the Chat front, mirroring a Photon's: tap opens
+// the Atom's thread through the same openThread path.
+function atomCard(a: (typeof ATOMS)[number], size = 220): string {
+  return `<button class="photon-card" data-action="open-atom" data-atom="${esc(a.name)}">
+    ${atomPortraitHtml(a.name, size)}
+    <span class="photon-name">${esc(a.name)}</span>
+    <span class="photon-tag">${esc(a.tagline)}</span>
+  </button>`;
+}
+
 // ---------- Start My Day — the morning briefing Plug ----------
 // The briefing walks the day top to bottom, one item at a time. The
 // server is the source of truth: every confirm re-fetches, so the next
@@ -1101,9 +1115,23 @@ function carouselGo(id: string, next: number): void {
 
 function renderChatFront(): string {
   const owned = (state?.photons || []).filter((p: any) => p.owned);
+  // Owned Atoms, the same rule the server chats by: the Atom's own row,
+  // the Nova product (which opens every Atom), or the free code.
+  const ownsEveryAtom =
+    state?.freeCode === true || (state?.ownedProducts || []).includes("nova");
+  const ownedAtoms = ATOMS.filter(
+    (a) => ownsEveryAtom || (state?.ownedAtoms || []).includes(a.name),
+  );
   const ownedHtml =
-    owned.length > 0
-      ? carouselHtml("chat-photons", "Your Photons", owned.map((p: any) => photonCard(p)), owned.map((p: any) => p.name))
+    owned.length > 0 || ownedAtoms.length > 0
+      ? [
+          owned.length > 0
+            ? carouselHtml("chat-photons", "Your Photons", owned.map((p: any) => photonCard(p)), owned.map((p: any) => p.name))
+            : "",
+          ownedAtoms.length > 0
+            ? carouselHtml("chat-atoms", "Your Atoms", ownedAtoms.map((a) => atomCard(a)), ownedAtoms.map((a) => a.name))
+            : "",
+        ].join("")
       : `<div class="card empty-panel">
           <div class="card-head"><img class="mark" src="/brand/gem.jpg" alt=""><h2>Nothing to talk to yet.</h2></div>
           <p>There is no one to talk to here yet. A Launch is what gives this app a personality. Grab a Spark and run it, or pick up a Photon, and you will have someone on the line.</p>
@@ -1127,30 +1155,45 @@ function renderChatFront(): string {
   </section>`;
 }
 
-// A Photon's backstory, from the day the owner's account was created.
+// A helper's backstory, from the day the owner's account was created.
 // Display only, never saved into the thread. Empty for accounts that
-// never signed in — the stories are an account-creation perk.
+// never signed in — the stories are an account-creation perk. Atoms
+// carry backstories the same way Photons do.
 function backstoryBlock(photon: string): string {
   const story = (state as any)?.backstories?.[photon];
   if (!story) return "";
-  return `<div class="msg bot">${portraitHtml(portraitNameOf(PHOTONS.find((x) => x.name === photon) || { name: photon }), 28)}<div><p><b>How ${esc(photon)} began.</b></p><p>${esc(story)}</p></div></div>`;
+  const p = PHOTONS.find((x) => x.name === photon);
+  const portrait = p
+    ? portraitHtml(portraitNameOf(p), 28)
+    : atomPortraitHtml(photon, 28);
+  return `<div class="msg bot">${portrait}<div><p><b>How ${esc(photon)} began.</b></p><p>${esc(story)}</p></div></div>`;
 }
 
 // ---------- Chat thread ----------
 function renderChatThread(): string {
-  const p = PHOTONS.find((x) => x.name === activePhoton);
+  // One thread view for both rosters: a Photon, or an Atom when the
+  // active name is not a Photon. Atoms have no customization, look
+  // set, or call/report menu — those endpoints are Photon-only — so
+  // an Atom thread is the plain conversation: its own portrait, its
+  // own intro, and the same composer.
+  const photon = PHOTONS.find((x) => x.name === activePhoton);
+  const atom = photon ? undefined : ATOMS.find((x) => x.name === activePhoton);
+  const p: any = photon || atom;
   if (!p) return renderChatFront();
-  const face = faceNameOf(p);
-  const portrait = portraitNameOf(p);
-  const customized = !!(state as any)?.customizations?.[p.name];
+  const isAtom = !!atom;
+  const face = isAtom ? p.name : faceNameOf(p);
+  const portrait = isAtom ? p.name : portraitNameOf(p);
+  const portraitImg = (size: number) =>
+    isAtom ? atomPortraitHtml(portrait, size) : portraitHtml(portrait, size);
+  const customized = !isAtom && !!(state as any)?.customizations?.[p.name];
   // The owner's chosen look set reskins this Photon's whole chat.
   // The class lives on this section, and syncBodyLook() puts it on
   // <body> too, so the whole app follows; leaving the thread clears
   // the body class and restores the default look with no cleanup.
-  const look = lookSetById(customFor(p.name).lookSet || "");
+  const look = isAtom ? null : lookSetById(customFor(p.name).lookSet || "");
   // A streaming reply shows three dots until the first words land.
   const botMsg = (text: string, streaming = false) =>
-    `<div class="msg bot${streaming ? " streaming" : ""}">${portraitHtml(portrait, 28)}<div><p>${text ? esc(text) : '<span class="typing"><span></span><span></span><span></span></span>'}</p></div></div>`;
+    `<div class="msg bot${streaming ? " streaming" : ""}">${portraitImg(28)}<div><p>${text ? esc(text) : '<span class="typing"><span></span><span></span><span></span></span>'}</p></div></div>`;
   const msgs = threadMessages.length
     ? threadMessages
         .map((m: any) =>
@@ -1159,30 +1202,30 @@ function renderChatThread(): string {
             : botMsg(m.content, !!m.streaming),
         )
         .join("")
-    // Empty thread: the Photon introduces itself, who it is and what it
+    // Empty thread: the helper introduces itself, who it is and what it
     // was built for, instead of a generic greeting. Display only, never
     // saved into the thread. A signed-in owner also sees how this
-    // Photon began — the backstory from the day the account was created.
+    // helper began — the backstory from the day the account was created.
     : botMsg(p.intro.replaceAll("{name}", face)) + backstoryBlock(p.name);
   return `
   <section class="thread${look ? ` look-${look.id}` : ""}">
     <div class="thread-head">
-      <button class="back-btn" data-action="back-to-front">← <span>All Photons</span></button>
+      <button class="back-btn" data-action="back-to-front">← <span>${isAtom ? "Back" : "All Photons"}</span></button>
       <div class="thread-title">
         <h2>${esc(face)}</h2>
         <span class="thread-tag">${esc(p.tagline)}</span>
         ${customized ? `<span class="thread-voice">Voice: ${esc(voiceNameOf(p.name))}</span>` : ""}
       </div>
-      <details class="thread-menu">
+      ${isAtom ? "" : `<details class="thread-menu">
         <summary aria-label="More options">···</summary>
         <div class="thread-menu-list">
           <button class="btn small" data-action="customize" data-photon="${esc(p.name)}">Customize</button>
           <button class="btn small call" data-action="call" data-photon="${esc(p.name)}">Call · Upkeep</button>
           <button class="btn small" data-action="report-prism" data-photon="${esc(p.name)}">Report to Prism 5</button>
         </div>
-      </details>
+      </details>`}
     </div>
-    <div class="thread-hero">${portraitHtml(portrait, 160)}</div>
+    <div class="thread-hero">${portraitImg(160)}</div>
     <div class="messages" id="messages">${msgs}</div>
     <div class="composer-dock">
       <div id="chat-error" class="chat-error" hidden></div>
@@ -3504,7 +3547,9 @@ const SWOOSH_ACTIONS = new Set([
   "goto",
   "back-to-front",
   "open-photon",
+  "open-atom",
   "card-chat",
+  "card-chat-atom",
   "chooser-skip",
   "day-start",
   "day-back",
@@ -3766,8 +3811,14 @@ document.addEventListener("click", async (e) => {
     openPhotonCard(t.dataset.photon || "", t);
   } else if (action === "atom-info") {
     // An Atom portrait in the Store: the character card, same as a
-    // Photon's. Atoms do not chat yet, so the card has no chat button.
+    // Photon's. An owned Atom's card carries the chat button.
     openAtomCard(t.dataset.atom || "", t);
+  } else if (action === "open-atom") {
+    // An owned Atom on the Chat front: open its thread, the same
+    // thread view a Photon uses.
+    const name = t.dataset.atom || "";
+    dayOpen = false;
+    if (name) openThread(name);
   } else if (action === "carousel-prev") {
     // A roster carousel moves in place — no full re-render, so the
     // page does not jump and open Store sections stay open.
@@ -3872,6 +3923,13 @@ document.addEventListener("click", async (e) => {
     const name = t.dataset.photon || "";
     closeCard();
     if (name) openPhoton(name);
+  } else if (action === "card-chat-atom") {
+    // Owned Atom: close the card and open the thread, the same thread
+    // view a Photon uses. Atoms have no customization flow, so this
+    // goes straight to the thread.
+    const name = t.dataset.atom || "";
+    closeCard();
+    if (name) openThread(name);
   } else if (action === "back-to-front") {
     activePhoton = null;
     customizePhoton = null;
