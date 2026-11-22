@@ -166,7 +166,7 @@
 // paragraphs cut. The cache bump makes existing installs fetch the
 // new main.js, index.html and styles.css instead of serving the
 // cached ones, and clears any older shell cache entries on activate.
-const CACHE = "prism5-v52";
+const CACHE = "prism5-v53";
 // Images (portraits, thumbnails, brand art, chat backgrounds, icons)
 // live in their own cache whose name does NOT change with the shell
 // version. Before v52 every shell bump deleted the one cache on
