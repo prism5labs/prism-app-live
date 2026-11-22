@@ -2672,6 +2672,10 @@ function renderStore(): string {
   const upkeepCard = `    <div class="card upkeep-card" id="store-upkeep"><button class="poster-btn upkeep-poster-btn" data-action="tier-info" data-tier="upkeep" aria-label="More about Upkeep"><img src="/brand/starburst.jpg" alt=""></button><div><h2>Upkeep</h2><p>${esc(UPKEEP_COPY.body)}</p><p class="price">$29.00/month <span class="fine">($29.87 at checkout)</span></p><div class="row">${buyButton(buyUrl(UPKEEP.url, "upkeep"), "$29.87", state?.upkeep === true)}<button class="btn small more-info" data-action="tier-info" data-tier="upkeep">More info</button></div></div></div>`;
   return `
   <section>
+    <div class="store-side-switch" role="group" aria-label="Business or Personal">
+      <button class="btn${isPersonal ? "" : " primary"}" data-action="side-pick" data-side="business" aria-pressed="${isPersonal ? "false" : "true"}">Business</button>
+      <button class="btn${isPersonal ? " primary" : ""}" data-action="side-pick" data-side="personal" aria-pressed="${isPersonal ? "true" : "false"}">Personal</button>
+    </div>
     <div class="store-head"><img src="/brand/starburst.jpg" alt=""><div><h1 class="page-title">Store</h1><p>${isPersonal ? "A Nova is the helper for your own day." : "A Launch is the helper you talk with in this app."} Pick the helper that fits your day, then pick how you want to pay. The prices are further down, after a plain explanation of how it all works.</p></div></div>
     ${perkBanner()}
     ${stripeStatusData

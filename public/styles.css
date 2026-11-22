@@ -918,6 +918,8 @@ html.kb-chat body.is-thread .composer-dock #research-results { display: none; }
 @keyframes hero-fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
 
 /* ---------- Store: posters as thumbnails, plain buying text ---------- */
+.store-side-switch { display: flex; gap: var(--space-2); padding-top: var(--space-2); }
+.store-side-switch .btn { flex: 1; }
 .store-head { padding: var(--space-2) 0 var(--space-2); display: flex; align-items: center; gap: var(--space-3); }
 .store-head img { width: 40px; height: 37px; object-fit: cover; border-radius: var(--r-field); flex: none; }
 .store-head h1 { margin: 0; font-size: var(--t-page); color: var(--ink); }
