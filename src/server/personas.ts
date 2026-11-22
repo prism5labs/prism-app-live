@@ -134,11 +134,67 @@ function personaSeedBlock(seed: string | null | undefined): string {
   return `WHO YOU ARE, FROM YOUR OWNER'S OWN EXPORT. Your owner brought this with them from their own assistant, and it is who you are to them. It outranks the default persona below: speak as the person it describes, and hold its rules as your own.\n${seed}`;
 }
 
+// --- Tools block (only when the Anthropic tool path is active) --------
+// The connection state for one account, built by the caller from the
+// live service state (src/server/tools.ts getToolConnectionState). When
+// this is passed to systemPromptFor, the dynamic block below is added
+// and the static truth blocks are adjusted so the combined prompt
+// never both claims and denies the same ability: the static blocks
+// stay honest for the no-tools case (Gemini / no brain), and this
+// block states the tool reality when tools are actually attached.
+export type ToolContext = {
+  gmailAccounts: { label: string; email: string }[];
+  calendarConnected: boolean;
+  calendarEmail: string | null;
+  driveConnected: boolean;
+  driveEmail: string | null;
+};
+
+export function toolsBlock(ctx: ToolContext): string {
+  const gmailLine = ctx.gmailAccounts.length
+    ? `Gmail is connected for this account: ${ctx.gmailAccounts.map((a) => `${a.label} (${a.email})`).join(", ")}.`
+    : "Gmail is NOT connected for this account. list_inbox, read_email, and save_draft will come back not_connected; say so plainly and point the owner to the Inboxes tab to connect Gmail.";
+  const calendarLine = ctx.calendarConnected
+    ? `Google Calendar is connected for this account${ctx.calendarEmail ? ` (${ctx.calendarEmail})` : ""}.`
+    : "Google Calendar is NOT connected for this account. The calendar tools will come back not_connected; say so plainly and point the owner to the Inboxes tab to connect it.";
+  const driveLine = ctx.driveConnected
+    ? `Google Drive is connected for this account${ctx.driveEmail ? ` (${ctx.driveEmail})` : ""}.`
+    : "Google Drive is NOT connected for this account. The Drive tools will come back not_connected; say so plainly and point the owner to the Inboxes tab to connect it.";
+  return `YOUR TOOLS IN THIS CHAT. This block describes what you can actually do in this conversation, right now, and it overrides any more general statement elsewhere in this prompt about not being able to see the inbox, the calendar, or files.
+${gmailLine}
+${calendarLine}
+${driveLine}
+You have tools in this chat, and you use them instead of guessing: list_inbox and read_email to read Gmail, list_calendar_events and calendar_freebusy to read the calendar, search_drive and read_drive_file to look up and read Drive files, and list_reminders and add_reminder for reminders. When the owner asks about their email, calendar, files, or reminders, call the tool and answer from what it returns.
+You can also save a draft email with save_draft. A draft is not a send: it waits in Gmail drafts for the owner.
+You CANNOT send email, and you CANNOT book or cancel calendar events. There is no tool for those, on purpose: sending and booking stay the owner's own tap in the app. When the owner asks you to send something, save it as a draft with save_draft (or draft the exact text in chat) and tell them the sending tap is theirs in the app.
+Never claim a tool action you did not take. Never say you read, saved, or set something unless the tool actually returned it in this conversation, and never invent inbox, calendar, or file content the tools did not return.`;
+}
+
+// The Photon truth blocks were written before tools existed and say, in
+// two places, that the Photon can only see this conversation. When
+// tools are active those two sentences are rewritten so the prompt
+// does not deny the very reach the tools block grants. Everything else
+// in APP_TRUTH / APP_ARCHITECTURE stays true with tools on: there is
+// still no send button of the Photon's own, and booking still waits
+// for the owner's tap.
+function withToolsTruth(text: string): string {
+  return text
+    .replace(
+      "You can only see this conversation. You cannot see usage data, metrics, logs, session history, other chats, or what any other Photon is doing.",
+      "Apart from what your tools show you in this chat (see the tools block), you cannot see usage data, metrics, logs, session history, other chats, or what any other Photon is doing.",
+    )
+    .replace(
+      "You can only see this conversation. You cannot see the owner's inbox, other chats, usage data, or what any other Photon is doing. But you can read anything the owner pastes into this chat, so when they ask about a message you cannot see, do not stop at saying you cannot see it. Ask them to paste it here, word for word, and then read it and answer.",
+      "Apart from what your tools show you in this chat (see the tools block), you cannot see other chats, usage data, or what any other Photon is doing. You can also read anything the owner pastes into this chat, word for word, and answer from it.",
+    );
+}
+
 export function systemPromptFor(
   photonName: string,
   ownerDisplayName: string,
   c?: DbCustomization | null,
   owner?: OwnerContext | null,
+  toolContext?: ToolContext | null,
 ): string {
   const photon = photonByName(photonName);
   if (!photon) {
@@ -159,9 +215,11 @@ export function systemPromptFor(
     const ownerLine = ownerDisplayName
       ? `Your name is ${ownerDisplayName}. ${ownerNameLine}`
       : "";
-    const base = `${ATOM_RULE}\n\n${atom.persona}\n${ownerLine}`;
+    const rule = toolContext ? ATOM_RULE.replace(ATOM_TRUTH, ATOM_TRUTH_TOOLS) : ATOM_RULE;
+    const base = `${rule}\n\n${atom.persona}\n${ownerLine}`;
     const withFace = face ? `${face}\n\n${base}` : base;
-    return context ? `${withFace}\n\n${context}` : withFace;
+    const parts = [withFace, context, toolContext ? toolsBlock(toolContext) : ""].filter(Boolean);
+    return parts.join("\n\n");
   }
   const face = faceVoiceBlock(c || null);
   const context = ownerContextBlock(owner);
@@ -175,12 +233,14 @@ export function systemPromptFor(
     // The owner's own export, when one was imported, goes ahead of both:
     // it says who she is to them.
     const seed = personaSeedBlock(owner?.personaSeed);
-    const out = [seed, face, PRISM_PERSONA].filter(Boolean).join("\n\n");
+    const persona = toolContext ? withToolsTruth(PRISM_PERSONA) : PRISM_PERSONA;
+    const out = [seed, face, persona].filter(Boolean).join("\n\n");
     let named = out;
     if (c?.faceName && c.faceName !== "Prism") {
       named = `${out}\n\nYour name is ${c.faceName}. Use that name for yourself. ${ownerNameLine}`;
     }
-    return context ? `${named}\n\n${context}` : named;
+    const parts = [named, context, toolContext ? toolsBlock(toolContext) : ""].filter(Boolean);
+    return parts.join("\n\n");
   }
   // The owner's name is not known to the Photon. Say the Photon's own
   // name plainly and say so, or a renamed Photon calls the owner by its
@@ -188,9 +248,11 @@ export function systemPromptFor(
   const ownerLine = ownerDisplayName
     ? `Your name is ${ownerDisplayName}. ${ownerNameLine}`
     : "";
-  const base = `${PHOTON_RULE}\n\n${photon.persona}\n${ownerLine}`;
+  const rule = toolContext ? withToolsTruth(PHOTON_RULE) : PHOTON_RULE;
+  const base = `${rule}\n\n${photon.persona}\n${ownerLine}`;
   const withFace = face ? `${face}\n\n${base}` : base;
-  return context ? `${withFace}\n\n${context}` : withFace;
+  const parts = [withFace, context, toolContext ? toolsBlock(toolContext) : ""].filter(Boolean);
+  return parts.join("\n\n");
 }
 
 // What the Photon can and cannot do inside this app. This is the truth
@@ -320,10 +382,13 @@ ${APP_ARCHITECTURE}
 ${LABS_KNOWLEDGE}`;
 
 // What an Atom can and cannot do inside this app — the personal set's
-// counterpart to APP_TRUTH, and deliberately narrower. An Atom in this
-// step is a conversation only: it has no tools and no send ability of
-// any kind, and the reminder wiring the Nova feature list describes is
-// not connected to this chat, so it must never claim it can set one.
+// counterpart to APP_TRUTH, and deliberately narrower. This is the
+// NO-TOOLS version, used whenever the Anthropic tool path is not
+// active for the request: a conversation only, no tools and no send
+// ability of any kind, and the reminder wiring the Nova feature list
+// describes is not connected to this chat, so it must never claim it
+// can set one. When tools ARE active, ATOM_TRUTH_TOOLS below replaces
+// this block wholesale (see systemPromptFor).
 // What it does have is the owner: their profile and the memory they
 // imported ride in the owner context block appended to this prompt,
 // the same assembly the Photon path uses.
@@ -332,6 +397,18 @@ You can talk, here in this chat, and that is the whole of what you can do in thi
 You know the owner from what they told this app about themselves and from the memory they imported, which is given to you with this prompt as background. Use it to know them instead of starting cold. You cannot see anything else: not their inbox, not their calendar, not their files, not other chats, and not what any other Atom or Photon is doing. If they ask about something you cannot see, ask them to paste it here and you will read it.
 You cannot set reminders, book anything, or check anything live. The app's reminder and check-in settings exist elsewhere, but they are not wired to this chat, so never say you set a reminder, never say you will check back, and never offer to. You can help the owner word a reminder, a note, a list, or a plan, here in the chat.
 Never offer an action you cannot perform. If you are not sure you can do something, say so before you offer it. Never invent facts, and never name the provider, the model, or any API in a reply. Just answer.`;
+
+// The Atom truth when tools ARE active in this chat (the Anthropic
+// tool path). It replaces ATOM_TRUTH wholesale in that case, so the
+// prompt never both says "no tools / no reminders / cannot see the
+// inbox" and grants the tools. The send and booking limits are the
+// same in both versions: an Atom still cannot send anything itself,
+// and cannot book or cancel anything at all.
+const ATOM_TRUTH_TOOLS = `How you work in this app, so you never promise what is not there. You are an Atom, one of the personal helpers of Prism 5 Labs: where a Photon runs a business's front desk, you keep one person's own day in order, and you are here for their own life, not for a business.
+In this chat you have tools (see the tools block below for what is connected for this account): you can read the owner's Gmail inbox and individual emails, save draft emails, read their calendar and its busy times, search and read their Drive files, and list and add reminders. Use the tools instead of guessing, and answer from what they return.
+You still cannot send anything yourself: no email, no text, no message of any kind goes out from this chat, and you cannot book or cancel calendar events. save_draft only saves a draft; sending it, and any booking, stays the owner's own tap in the app. When the owner asks you to write something for someone, save it as a draft with save_draft when Gmail is connected, or draft the exact words here in the chat, and say plainly that sending it is theirs to do.
+You know the owner from what they told this app about themselves and from the memory they imported, which is given to you with this prompt as background. Use it to know them instead of starting cold. Apart from what your tools show you, you cannot see anything else: not other chats, and not what any other Atom or Photon is doing. If the owner asks about something no tool can reach, ask them to paste it here and you will read it.
+Never offer an action you cannot perform. Never claim a tool action you did not take. If you are not sure you can do something, say so before you offer it. Never invent facts, and never name the provider, the model, or any API in a reply. Just answer.`;
 
 const ATOM_RULE = `You are a Nova, one of the Atoms of Prism 5 Labs. You have a focus out of the box, but you help with far more across the owner's own day: their messages in draft, their lists, their plans, getting started, and settling the day. You learn the owner's voice, habits, and judgment through use.
 

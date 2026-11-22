@@ -39,7 +39,8 @@ import {
   personaSeed,
   type Contact,
 } from "./server/db";
-import { chat as brainChat } from "./server/anthropic";
+import { chatWithTools } from "./server/anthropic";
+import { TOOL_DEFINITIONS, executeTool, getToolConnectionState } from "./server/tools";
 import { chat as geminiChat, chatStream as geminiChatStream } from "./server/gemini";
 import { systemPromptFor, type OwnerContext } from "./server/personas";
 import { voiceById } from "./shared/voices";
@@ -454,7 +455,14 @@ async function prepareChat(
   const displayName = atomByName(photon)
     ? c?.faceName || photon
     : c?.faceName || a.custom_name || photon;
-  const system = systemPromptFor(photon, displayName, c, ownerContext);
+  // Tools ride only on the Anthropic path: when it is active, the
+  // prompt carries the account's live connection state and the tools
+  // block, and the chat handlers below call chatWithTools. On the
+  // Gemini / no-brain paths toolContext stays null and the prompt and
+  // the chat call are exactly as before (plain chat, no tools).
+  const toolContext =
+    brainProvider() === "anthropic" ? getToolConnectionState(accountId) : null;
+  const system = systemPromptFor(photon, displayName, c, ownerContext, toolContext);
   return { accountId, photon, message, system, history };
 }
 
@@ -700,7 +708,9 @@ async function handleApi(req: Request, path: string): Promise<Response> {
     // this call either way.
     const result =
       brainProvider() === "anthropic"
-        ? await brainChat(system, history, message)
+        ? await chatWithTools(system, history, message, TOOL_DEFINITIONS, (name, input) =>
+            executeTool(accountId, name, input),
+          )
         : await geminiChat(system, history, message);
     if (!result.ok) {
       return json({ ok: false, error: result.error, message: brainErrorMessage(result.error) });
@@ -746,7 +756,16 @@ async function handleApi(req: Request, path: string): Promise<Response> {
         let full = "";
         try {
           if (brainProvider() === "anthropic") {
-            const result = await brainChat(system, history, message);
+            // Anthropic has no streaming client here, so the tool loop
+            // runs to completion and the whole reply goes out as one
+            // delta, exactly the shape this handler already used.
+            const result = await chatWithTools(
+              system,
+              history,
+              message,
+              TOOL_DEFINITIONS,
+              (name, input) => executeTool(accountId, name, input),
+            );
             if (!result.ok) {
               send({ error: result.error, message: brainErrorMessage(result.error) });
               return;
