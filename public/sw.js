@@ -1,4 +1,6 @@
 // Prism 5 service worker.
+// CACHE v50: bumped Nov 21, 2026 — the opening film slimmed again to
+// ~550 kbps (713 KB) so it plays in real time on a slow connection.
 // CACHE v49: bumped Nov 21, 2026 for the opening film re-encode — the
 // v5 film was 6.1 MB at ~4.9 Mbps and never started on a slow phone
 // connection; it is now ~1 MB capped near 750 kbps, same film. The
@@ -155,7 +157,7 @@
 // Drive as document pages, calmer look sets, and the motion sweep.
 // The cache bump makes existing installs fetch the new styles.css and
 // main.js instead of serving the cached ones.
-const CACHE = "prism5-v49";
+const CACHE = "prism5-v50";
 const SHELL = ["/", "/index.html", "/styles.css", "/main.js", "/manifest.json", "/opening-animation-v3.mp4", "/opening-v5-poster.jpg", "/chat-bg/bg-rocket.jpg", "/chat-bg/bg-helmets.jpg", "/chat-bg/bg-starburst.jpg", "/chat-bg/bg-robot.jpg", "/chat-bg/bg-saucer.jpg", "/chat-bg/bg-raygun.jpg", "/chat-bg/bg-car.jpg", "/chat-bg/bg-pilot.jpg", "/chat-bg/bg-moonbase.jpg", "/chat-bg/bg-diner.jpg", "/chat-bg/bg-launchpad.jpg", "/chat-bg/bg-spacestation.jpg"];
 
 self.addEventListener("install", (event) => {
