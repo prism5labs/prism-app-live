@@ -174,7 +174,11 @@
 // so no customer's conversation is orphaned. The cache bump makes
 // existing installs fetch the new main.js instead of serving the
 // cached one.
-const CACHE = "prism5-v54";
+// v55: pronoun pass on the Atom backstories — Jude's story now reads
+// they/them and Pierce's he/him throughout, matching the declared
+// pronouns in src/shared/atoms.ts. Text-only change; the cache bump
+// makes existing installs fetch the corrected bundle.
+const CACHE = "prism5-v55";
 // Images (portraits, thumbnails, brand art, chat backgrounds, icons)
 // live in their own cache whose name does NOT change with the shell
 // version. Before v52 every shell bump deleted the one cache on
