@@ -246,6 +246,11 @@ try {
 // name (corrected by the first two updates), in which case the stale
 // old-name row is removed. Only Jude/Pierce (and June/Pearl) rows are
 // touched; every other Atom's stored text is left exactly as it stands.
+// The Cleo carry below is the same treatment for the third renamed
+// Atom, added as a final sweep: Cleo's template never had a pronoun
+// fault, so existing Clive rows are NOT rewritten — only a surviving
+// Cleo-keyed row is carried to Clive with the current template text,
+// or removed when the account already holds a Clive row.
 // Idempotent: after the first run the templates already match and no
 // old-name rows remain, so the updates match nothing that differs. Any
 // failure is caught and logged; it must never stop the server starting.
@@ -268,6 +273,11 @@ try {
       db.query(`UPDATE atom_backstories SET template = ? WHERE atom = 'Pierce'`).run(_pierceText);
       db.query(`UPDATE OR IGNORE atom_backstories SET atom = 'Pierce', template = ? WHERE atom = 'Pearl'`).run(_pierceText);
       db.query(`DELETE FROM atom_backstories WHERE atom = 'Pearl'`).run();
+    }
+    const _cliveText = ATOM_BACKSTORIES["Clive"];
+    if (_cliveText) {
+      db.query(`UPDATE OR IGNORE atom_backstories SET atom = 'Clive', template = ? WHERE atom = 'Cleo'`).run(_cliveText);
+      db.query(`DELETE FROM atom_backstories WHERE atom = 'Cleo'`).run();
     }
   }
 } catch (err) {

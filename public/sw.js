@@ -183,7 +183,12 @@
 // tables (seeded at linking with the old wording), and carries any
 // rows still keyed June/Pearl over with the corrected text. Server-only
 // change; the cache bump keeps the shell version honest.
-const CACHE = "prism5-v56";
+// v57: final sweep of the same migration — a stored atom_backstories
+// row still keyed Cleo (the v56 pass did not cover that table for the
+// third rename) is carried to Clive with the current template text, or
+// removed when the account already holds a Clive row. Server-only
+// change; the cache bump keeps the shell version honest.
+const CACHE = "prism5-v57";
 // Images (portraits, thumbnails, brand art, chat backgrounds, icons)
 // live in their own cache whose name does NOT change with the shell
 // version. Before v52 every shell bump deleted the one cache on

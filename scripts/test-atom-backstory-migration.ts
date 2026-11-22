@@ -13,6 +13,10 @@
 //   acct-both       — a June row AND a Jude row for one account (the
 //                     collision case), plus a lone Pearl row.
 //   acct-current    — Jude + Pierce rows already at the corrected text.
+//   acct-cleo-only  — a lone Cleo row (pre-v54 text): the final sweep
+//                     carries it to Clive with the current template.
+//   acct-cleo-both  — a Cleo row AND a corrected Clive row: the stale
+//                     Cleo row is removed, the Clive row left as it is.
 // It boots the real server against the scratch DB, checks every row,
 // then boots a second time and checks the state is identical
 // (idempotency). Usage: bun scripts/test-atom-backstory-migration.ts
@@ -39,6 +43,10 @@ const OLD_PEARL =
   "Pearl kept the ledger at a market stall where the money was counted in plain sight and explained in plain words. She never let a customer leave confused about what they had spent, and she never let a shilling go missing without knowing where it went. She has kept the books ever since, plainly and kindly, and since {date} she has kept {owner}'s — the money in plain words, no jargon, and nothing hidden.";
 const OLD_JUDE = OLD_JUNE.replace("June kept", "Jude kept");
 const OLD_PIERCE = OLD_PEARL.replace("Pearl kept", "Pierce kept");
+// The pre-v54 Cleo text (git history: 91d77df^). Cleo's template never
+// had a pronoun fault, so the old text differs from Clive's current
+// template only in the leading name.
+const OLD_CLEO = (ATOM_BACKSTORIES["Clive"] as string).replace("Clive ran", "Cleo ran");
 
 let failures = 0;
 function check(name: string, cond: boolean, extra?: string) {
@@ -74,6 +82,11 @@ function seed() {
   // acct-current: already corrected.
   ins.run("acct-current", "Jude", ATOM_BACKSTORIES["Jude"], NOW);
   ins.run("acct-current", "Pierce", ATOM_BACKSTORIES["Pierce"], NOW);
+  // acct-cleo-only: a lone pre-v54 Cleo row.
+  ins.run("acct-cleo-only", "Cleo", OLD_CLEO, NOW);
+  // acct-cleo-both: stale Cleo row beside a corrected Clive row.
+  ins.run("acct-cleo-both", "Cleo", OLD_CLEO, NOW);
+  ins.run("acct-cleo-both", "Clive", ATOM_BACKSTORIES["Clive"], NOW);
   db.close();
 }
 
@@ -92,7 +105,16 @@ function assertMigrated(label: string) {
   const byKey = new Map(rows.map((r) => [`${r.account_id}/${r.atom}`, r.template]));
   check(`${label}: no June rows survive`, !rows.some((r) => r.atom === "June"));
   check(`${label}: no Pearl rows survive`, !rows.some((r) => r.atom === "Pearl"));
-  check(`${label}: total row count is 10`, rows.length === 10, `got ${rows.length}`);
+  check(`${label}: no Cleo rows survive`, !rows.some((r) => r.atom === "Cleo"));
+  check(`${label}: total row count is 12`, rows.length === 12, `got ${rows.length}`);
+  check(
+    `${label}: acct-cleo-only row carried to Clive with the current template`,
+    byKey.get("acct-cleo-only/Clive") === ATOM_BACKSTORIES["Clive"],
+  );
+  check(
+    `${label}: acct-cleo-both keeps its corrected Clive row`,
+    byKey.get("acct-cleo-both/Clive") === ATOM_BACKSTORIES["Clive"],
+  );
   for (const acct of ["acct-old-keys", "acct-new-keys", "acct-both", "acct-current"]) {
     check(
       `${label}: ${acct} Jude row holds the corrected template`,
@@ -141,11 +163,12 @@ async function startApp() {
 check("old fixtures really are the old wording", OLD_JUDE.includes("her whole job") && OLD_PIERCE.includes("She never let"));
 check("corrected Jude template differs from old", ATOM_BACKSTORIES["Jude"] !== OLD_JUDE);
 check("corrected Pierce template differs from old", ATOM_BACKSTORIES["Pierce"] !== OLD_PIERCE);
+check("old Cleo fixture really is the old key text", OLD_CLEO.startsWith("Cleo ran") && OLD_CLEO !== ATOM_BACKSTORIES["Clive"]);
 
 await rm(DATA_DIR, { recursive: true, force: true });
 mkdirSync(DATA_DIR, { recursive: true });
 seed();
-check("seeded 11 rows", readRows().length === 11, `got ${readRows().length}`);
+check("seeded 14 rows", readRows().length === 14, `got ${readRows().length}`);
 
 // --- First boot: the migration runs ---
 let proc = await startApp();
