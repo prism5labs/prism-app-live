@@ -30,11 +30,49 @@
   --teal-soft: #DDEBE7;
   --meter-track: #EBDCB4;
   --radius: 16px;
+  /* ---------- Readability & elegance tokens (spec §2, Nov 21, 2026) ----------
+     One type scale, one spacing scale, four radii, five timings. Every
+     size below is in rem, so the Reading card's root-size settings
+     (html.read-large / html.read-xl) scale the whole app uniformly —
+     no per-surface override lists. */
+  --t-display: 1.75rem;
+  --t-page: 1.5rem;
+  --t-section: 1.25rem;
+  --t-card: 1.06rem;
+  --t-read: 1.06rem;
+  --lh-read: 1.65;
+  --t-body: 1rem;
+  --lh-body: 1.55;
+  --t-secondary: 0.875rem;
+  --t-caption: 0.78rem;
+  --t-label: 0.75rem;
+  --measure-prose: 38rem;
+  --measure-page: 45rem;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+  --r-field: 12px;
+  --r-card: 16px;
+  --r-sheet: 20px;
+  --r-pill: 999px;
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --t-press: 150ms;
+  --t-panel: 400ms;
+  --t-view: 600ms;
+  --t-world: 1200ms;
+  --t-cine: 1450ms;
+  /* Bottom nav height (8px top pad + 44px target + 10px bottom pad)
+     plus the spacing scale's 16px step: where toasts dock (§4 #11). */
+  --nav-dock: calc(62px + 16px + env(safe-area-inset-bottom));
   /* Phone shape: the app sits inside the phone's rounded frame, the
      way a native app fits — corners follow the screen, content clears
      the notch, the home indicator, and the curved edges. */
   --phone-radius: 28px;
-  --phone-radius-sm: 20px;
+  --phone-radius-sm: var(--r-sheet);
 }
 
 * { box-sizing: border-box; }
@@ -45,8 +83,8 @@ body {
   background: var(--cream);
   color: var(--ink);
   font-family: "Nunito", -apple-system, "Segoe UI", Roboto, sans-serif;
-  font-size: 16px;
-  line-height: 1.5;
+  font-size: var(--t-body);
+  line-height: var(--lh-body);
   min-height: 100vh;
 }
 
@@ -58,10 +96,10 @@ h1, h2, h3, h4 {
   line-height: 1.2;
 }
 
-h1 { font-size: 30px; }
-h2 { font-size: 22px; }
-h3 { font-size: 18px; }
-h4 { font-size: 15px; }
+h1 { font-size: var(--t-page); }
+h2 { font-size: var(--t-section); }
+h3 { font-size: var(--t-card); }
+h4 { font-size: var(--t-secondary); }
 
 p { margin: 0 0 10px; }
 a { color: var(--teal); }
@@ -91,10 +129,10 @@ a { color: var(--teal); }
   gap: 9px;
   padding: 14px max(18px, env(safe-area-inset-left)) 4px max(18px, env(safe-area-inset-right));
 }
-.app-header-mark { width: 30px; height: 34px; object-fit: cover; border-radius: 7px; flex: none; }
+.app-header-mark { width: 30px; height: 34px; object-fit: cover; border-radius: var(--r-field); flex: none; }
 .app-header-name {
   font-family: "Patua One", Georgia, serif;
-  font-size: 1.18rem;
+  font-size: var(--t-section);
   font-weight: 400;
   /* Butter on deep teal is 7.92:1; the neon glow is added below in the
      Neon Counter block. */
@@ -103,9 +141,9 @@ a { color: var(--teal); }
 }
 .app-header-tag {
   margin-left: 12px;
-  font-size: 0.62rem;
+  font-size: var(--t-label);
   font-weight: 800;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   /* Warm cream on deep teal, 10.0:1. */
   color: #E8DCC0;
@@ -120,12 +158,12 @@ a { color: var(--teal); }
    connected, amber checking or unreachable, hollow not connected. */
 .google-state {
   margin-left: auto;
-  font-size: 0.68rem;
+  font-size: var(--t-caption);
   font-weight: 700;
   letter-spacing: 0.04em;
   color: #E8DCC0;
   white-space: nowrap;
-  transition: opacity 0.6s ease;
+  transition: opacity var(--t-view) var(--ease);
 }
 .google-state::before {
   content: "";
@@ -151,27 +189,27 @@ a { color: var(--teal); }
 .view {
   position: relative;
   z-index: 1;
-  max-width: 720px;
+  max-width: var(--measure-page);
   margin: 0 auto;
   /* Phone shape: side padding clears the curved screen edges, and the
      bottom clears the tab bar plus the home indicator, so content
      never runs into the phone's square corners. */
-  padding: 20px max(16px, env(safe-area-inset-left)) calc(120px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-right));
+  padding: var(--space-6) max(16px, env(safe-area-inset-left)) calc(120px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-right));
 }
 
 /* Page titles: plain Patua, ink. Section titles: small caps Nunito. */
 .page-title { color: var(--ink); }
-.page-lede { color: var(--ink-soft); font-size: 15px; }
+.page-lede { color: var(--ink-soft); font-size: var(--t-secondary); line-height: 1.5; }
 .section-title {
-  margin: 18px 0 10px;
+  margin: var(--space-8) 0 10px;
   font-family: "Nunito", sans-serif;
   font-weight: 800;
-  font-size: 0.8rem;
-  letter-spacing: 0.1em;
+  font-size: var(--t-label);
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--ink);
 }
-.fine { color: var(--ink-soft); font-size: 13px; }
+.fine { color: var(--ink-soft); font-size: var(--t-caption); line-height: 1.45; }
 .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
 
 /* Buttons: light pills, Nunito 800. */
@@ -180,15 +218,26 @@ a { color: var(--teal); }
   background: var(--card);
   color: var(--teal);
   border: 1.5px solid var(--teal);
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   padding: 10px 18px;
+  min-height: 44px;
   font-family: "Nunito", sans-serif;
-  font-size: 0.9rem;
+  font-size: var(--t-secondary);
   font-weight: 800;
   text-decoration: none;
   cursor: pointer;
-  transition: background 0.15s, transform 0.15s;
+  transition: background var(--t-press) var(--ease), transform var(--t-press) var(--ease);
 }
+/* The one text-button: no pill, no border — a quiet inline action. */
+.btn.text, .text-btn {
+  background: none;
+  border: none;
+  min-height: 0;
+  padding: 6px 4px;
+  color: var(--teal);
+  text-decoration: underline;
+}
+.btn.text:hover, .text-btn:hover { background: none; }
 .btn:hover { background: var(--teal-soft); }
 .btn:active { transform: scale(0.97); }
 /* Neon Counter: the primary button is bright cherry, white text on it
@@ -199,17 +248,17 @@ a { color: var(--teal); }
 .btn.cherry:hover { background: var(--cherry); }
 .btn.store-outline { background: transparent; color: var(--cherry); border: 1.5px solid var(--cherry); }
 .btn.store-outline:hover { background: #FDECEC; }
-.btn.small { padding: 6px 12px; font-size: 13px; }
+.btn.small { padding: 6px 12px; min-height: 36px; font-size: var(--t-caption); }
 .btn:disabled { opacity: 0.5; cursor: default; }
 .btn .logo-mark { display: inline-block; vertical-align: -2px; margin-right: 5px; }
 
 input, textarea {
   font-family: "Nunito", sans-serif;
-  font-size: 16px;
+  font-size: var(--t-body);
   color: var(--ink);
   background: var(--field);
   border: 1.5px solid var(--field-line);
-  border-radius: 12px;
+  border-radius: var(--r-field);
   padding: 10px 14px;
   flex: 1 1 200px;
   min-width: 0;
@@ -222,35 +271,35 @@ textarea { width: 100%; resize: vertical; }
   background: var(--card);
   color: var(--ink);
   border: 1px solid var(--line);
-  border-radius: var(--radius);
-  padding: 14px 16px;
+  border-radius: var(--r-card);
+  padding: 20px;
   margin: 0 0 16px;
 }
 .card h2, .card h3 {
   font-family: "Nunito", sans-serif;
   font-weight: 800;
-  font-size: 0.95rem;
+  font-size: var(--t-card);
   color: var(--teal);
 }
 .card-head { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
-.card-head img.mark { width: 34px; height: 38px; object-fit: cover; border-radius: 8px; flex: none; }
+.card-head img.mark { width: 34px; height: 38px; object-fit: cover; border-radius: var(--r-field); flex: none; }
 .card-head h2, .card-head h3 { margin: 0; }
 
 /* ---------- Front page (redesign, Nov 19, 2026): no hero banner, no
    medallion — the greeting, the day, and the Faces are the home screen. */
 .front { text-align: center; }
 .front-body { padding: 20px 24px 0; text-align: center; }
-.greeting { font-family: "Patua One", Georgia, serif; font-size: 1.6rem; color: var(--ink); margin: 0 0 2px; }
+.greeting { font-family: "Patua One", Georgia, serif; font-size: var(--t-display); color: var(--ink); margin: 0 0 2px; }
 .greeting-accent { color: var(--ink); }
-.tagline { margin: 0; font-size: 0.88rem; font-weight: 700; color: var(--muted-2); }
-.front-lede { max-width: 480px; margin: 10px auto 0; color: var(--ink-soft); font-size: 0.95rem; }
+.tagline { margin: 0; font-size: var(--t-secondary); font-weight: 700; color: var(--ink-soft); }
+.front-lede { max-width: 480px; margin: 10px auto 0; color: var(--ink-soft); font-size: var(--t-secondary); line-height: 1.5; }
 .make-yours { text-align: left; margin-top: 16px; }
-.make-yours p { font-size: 0.83rem; color: var(--ink-soft); }
+.make-yours p { font-size: var(--t-secondary); color: var(--ink-soft); }
 .empty-panel { text-align: left; }
-.empty-panel p { font-size: 0.83rem; color: var(--ink-soft); }
+.empty-panel p { font-size: var(--t-secondary); color: var(--ink-soft); }
 .empty-panel .store-btn { width: 100%; font-size: 1rem; padding: 13px; margin-top: 4px; }
-.meter-bar { height: 7px; border-radius: 99px; background: var(--meter-track); overflow: hidden; margin-top: 5px; }
-.meter-fill { display: block; height: 100%; background: var(--teal); border-radius: 99px; }
+.meter-bar { height: 7px; border-radius: var(--r-pill); background: var(--meter-track); overflow: hidden; margin-top: 5px; }
+.meter-fill { display: block; height: 100%; background: var(--teal); border-radius: var(--r-pill); }
 
 /* Photon grid: simple gallery cards, portraits carry the 1950s. */
 .photon-grid {
@@ -269,7 +318,7 @@ textarea { width: 100%; resize: vertical; }
    same visible focus ring as the portrait buttons. */
 .carousel { margin: 0 0 16px; }
 .carousel-viewport { position: relative; }
-.carousel-slide { transition: opacity 300ms ease; }
+.carousel-slide { transition: opacity var(--t-panel) var(--ease); }
 .carousel-slide:not(.active) { opacity: 0; visibility: hidden; position: absolute; inset: 0; pointer-events: none; }
 .carousel-slide .photon-card { width: 100%; }
 .carousel-controls { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 12px; }
@@ -285,23 +334,23 @@ textarea { width: 100%; resize: vertical; }
   background: var(--card);
   color: var(--ink);
   border: 1px solid var(--line);
-  border-radius: var(--radius);
+  border-radius: var(--r-card);
   padding: 14px 10px;
   cursor: pointer;
   text-align: center;
   font-family: inherit;
-  transition: transform 0.15s, border-color 0.15s;
+  transition: transform var(--t-press) var(--ease), border-color var(--t-press) var(--ease);
 }
 .photon-card:hover { border-color: var(--teal); transform: translateY(-2px); }
 .photon-card:disabled { opacity: 0.55; cursor: default; }
 .photon-card .portrait {
   display: block;
   margin: 0 auto 8px;
-  border-radius: 16px;
+  border-radius: var(--r-card);
 }
-.photon-name { display: block; font-family: "Nunito", sans-serif; font-weight: 800; font-size: 0.92rem; color: var(--ink); }
-.photon-tag { display: block; font-size: 12px; color: var(--ink-soft); line-height: 1.35; margin-top: 4px; }
-.portrait { display: inline-block; border-radius: 24px; overflow: hidden; flex: none; }
+.photon-name { display: block; font-family: "Nunito", sans-serif; font-weight: 800; font-size: var(--t-body); color: var(--ink); }
+.photon-tag { display: block; font-size: var(--t-caption); color: var(--ink-soft); line-height: 1.45; margin-top: 4px; }
+.portrait { display: inline-block; border-radius: var(--r-card); overflow: hidden; flex: none; }
 .portrait img, .portrait svg { display: block; width: 100%; height: 100%; object-fit: cover; }
 
 /* ---------- Chat thread: gallery-quiet, Claude-style replies ---------- */
@@ -311,9 +360,8 @@ textarea { width: 100%; resize: vertical; }
   align-items: center;
   flex-wrap: nowrap;
   gap: 10px;
-  padding: 12px 16px 10px;
-  border-bottom: 2px solid;
-  border-image: linear-gradient(90deg, transparent, #B9BDC2, #7E858C, #B9BDC2, transparent) 1;
+  padding: var(--space-3) var(--space-4) 10px;
+  border-bottom: 1px solid var(--line);
 }
 /* Large Photon portrait at the top of a thread, above the conversation:
    the Face you are talking to, big enough to see (Nov 19, 2026). It sits
@@ -333,7 +381,7 @@ textarea { width: 100%; resize: vertical; }
   height: 160px;
   max-width: 44vw;
   max-height: 44vw;
-  border-radius: 24px;
+  border-radius: var(--r-card);
   box-shadow: 0 0 0 1.5px var(--teal);
 }
 .thread-head .back-btn {
@@ -341,7 +389,7 @@ textarea { width: 100%; resize: vertical; }
   border: none;
   color: var(--teal);
   font-family: "Nunito", sans-serif;
-  font-size: 0.9rem;
+  font-size: var(--t-secondary);
   font-weight: 800;
   cursor: pointer;
   padding: 6px;
@@ -360,15 +408,15 @@ textarea { width: 100%; resize: vertical; }
 .thread-title h2 {
   font-family: "Nunito", sans-serif;
   font-weight: 800;
-  font-size: 1.05rem;
+  font-size: var(--t-card);
   color: var(--ink);
   margin-bottom: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.thread-tag { display: block; font-size: 0.72rem; font-weight: 700; color: var(--muted-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.thread-voice { display: block; font-size: 0.72rem; font-weight: 700; color: var(--muted-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.thread-tag { display: block; font-size: var(--t-caption); font-weight: 700; color: var(--ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.thread-voice { display: block; font-size: var(--t-caption); font-weight: 700; color: var(--ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* ---------- Look sets: a skin is the whole feel, not a saved label ----------
    Each set overrides the palette variables for the whole app. The look
@@ -380,7 +428,7 @@ textarea { width: 100%; resize: vertical; }
    returns. Every skinned surface also sets its own text color from
    the skin, so text is never left dark on a dark ground (or light on
    a light one). */
-body.look-signal-red, .thread.look-signal-red, .photon-card.look-signal-red {
+.thread.look-signal-red, .photon-card.look-signal-red {
   --cream: #0E0E10; --card: #18181B; --field: #1E1E22;
   --ink: #F7F2E7; --ink-soft: #D9D3C3; --muted: #B9B2A2; --muted-2: #A69E8C;
   --teal: #D62828; --teal-deep: #8F1B1B; --teal-soft: #2B1214;
@@ -388,7 +436,7 @@ body.look-signal-red, .thread.look-signal-red, .photon-card.look-signal-red {
   --cherry: #FF3B30; --cherry-dark: #D62828; --butter: #F4C95D;
   --meter-track: #2E1A1C;
 }
-body.look-ledger-lake, .thread.look-ledger-lake, .photon-card.look-ledger-lake {
+.thread.look-ledger-lake, .photon-card.look-ledger-lake {
   --cream: #F7F0DC; --card: #FFFDF4; --field: #FFFDF4;
   --ink: #141210; --ink-soft: #3D3831; --muted: #6E6455; --muted-2: #7D7263;
   --teal: #B01E1E; --teal-deep: #7E1414; --teal-soft: #F3E3D8;
@@ -396,7 +444,7 @@ body.look-ledger-lake, .thread.look-ledger-lake, .photon-card.look-ledger-lake {
   --cherry: #D62828; --cherry-dark: #B01E1E; --butter: #E8B84B;
   --meter-track: #EAD9AE;
 }
-body.look-night-watch, .thread.look-night-watch, .photon-card.look-night-watch {
+.thread.look-night-watch, .photon-card.look-night-watch {
   --cream: #05070A; --card: #0C1116; --field: #10161D;
   --ink: #E9E4D6; --ink-soft: #C4BFAF; --muted: #9AA3AD; --muted-2: #8A94A0;
   --teal: #E0352B; --teal-deep: #5E1410; --teal-soft: #1E1214;
@@ -414,16 +462,14 @@ body.look-night-watch, .thread.look-night-watch, .photon-card.look-night-watch {
    world arriving, not a flicker. Skipped for reduced motion. The
    Photon card and the composer dock keep their own transitions
    (hover lift, keyboard slide) and gain the fade alongside. */
+/* Look changes ride --t-world, and only on the thread's own surfaces:
+   the brand bar and the bottom nav keep the house palette (§3A.6). */
 @media (prefers-reduced-motion: no-preference) {
-  body, .thread, .app-header, .view, .card, .nav, .messages,
-  .poster-row, .addon-row, .thread-menu-list {
-    transition: background-color 0.9s ease, color 0.9s ease, border-color 0.9s ease;
+  .thread, .thread .messages, .thread .composer-dock, .thread-menu-list {
+    transition: background-color var(--t-world) var(--ease), color var(--t-world) var(--ease), border-color var(--t-world) var(--ease);
   }
   .photon-card {
-    transition: transform 0.15s, border-color 0.9s ease, background-color 0.9s ease, color 0.9s ease;
-  }
-  .composer-dock {
-    transition: bottom 0.28s cubic-bezier(0.2, 0.8, 0.2, 1), background-color 0.9s ease, color 0.9s ease, border-color 0.9s ease;
+    transition: transform var(--t-press) var(--ease), border-color var(--t-world) var(--ease), background-color var(--t-world) var(--ease), color var(--t-world) var(--ease);
   }
 }
 /* Opening splash: the v3 animation plays on every app open, then fades
@@ -446,7 +492,7 @@ body.look-night-watch, .thread.look-night-watch, .photon-card.look-night-watch {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: opacity 0.75s ease;
+  transition: opacity var(--t-cine) var(--ease);
 }
 /* Ten splash color schemes, one per open, cycling in order
    (client/main.ts picks the scheme from the open count). All start
@@ -489,12 +535,12 @@ body.look-night-watch, .thread.look-night-watch, .photon-card.look-night-watch {
   align-items: center;
   gap: 6px;
   pointer-events: none;
-  animation: splash-caption-in 0.9s ease 0.7s both;
+  animation: splash-caption-in var(--t-panel) var(--ease) 0.7s both;
 }
 .opening-splash-eyebrow {
   font-family: Nunito, sans-serif;
   font-weight: 800;
-  font-size: 0.8rem;
+  font-size: var(--t-caption);
   letter-spacing: 0.35em;
   text-transform: uppercase;
   color: var(--splash-accent2, #f4c95d);
@@ -513,7 +559,7 @@ body.look-night-watch, .thread.look-night-watch, .photon-card.look-night-watch {
   width: 64px;
   height: 4px;
   margin: 10px auto 0;
-  border-radius: 2px;
+  border-radius: var(--r-pill);
   background: var(--splash-accent, #d62828);
 }
 @keyframes splash-caption-in {
@@ -540,12 +586,12 @@ body.look-night-watch, .thread.look-night-watch, .photon-card.look-night-watch {
   flex-direction: column;
   align-items: center;
   gap: 10px;
-  animation: splash-caption-in 0.9s ease 1.1s both;
+  animation: splash-caption-in var(--t-panel) var(--ease) 1.1s both;
 }
 .opening-splash-skip-hint {
   font-family: Nunito, sans-serif;
   font-weight: 700;
-  font-size: 0.8rem;
+  font-size: var(--t-caption);
   letter-spacing: 0.08em;
   color: var(--splash-ink, #fff3dc);
   opacity: 0.75;
@@ -554,7 +600,7 @@ body.look-night-watch, .thread.look-night-watch, .photon-card.look-night-watch {
 .opening-splash-off {
   font-family: Nunito, sans-serif;
   font-weight: 800;
-  font-size: 0.85rem;
+  font-size: var(--t-secondary);
   color: var(--splash-ink, #fff3dc);
   background: rgba(0, 0, 0, 0.25);
   border: 1.5px solid var(--splash-accent2, #f4c95d);
@@ -588,12 +634,12 @@ body.look-night-watch, .thread.look-night-watch, .photon-card.look-night-watch {
   overflow-y: auto;
 }
 .chooser-card { max-width: 420px; width: 100%; text-align: center; }
-.chooser-mark { width: 56px; height: 64px; object-fit: cover; border-radius: 12px; margin-bottom: 8px; }
-.chooser-card h1 { font-size: 34px; margin-bottom: 4px; }
-.chooser-lede { color: var(--ink-soft); font-size: 17px; margin-bottom: 16px; }
-.chooser-signin { width: 100%; padding: 12px; font-size: 16px; margin-bottom: 10px; }
-.chooser-door { width: 100%; padding: 12px; font-size: 16px; margin-bottom: 4px; }
-.chooser-skip { background: none; border: 0; color: var(--muted); font: inherit; font-size: 14px; text-decoration: underline; cursor: pointer; padding: 8px; }
+.chooser-mark { width: 56px; height: 64px; object-fit: cover; border-radius: var(--r-field); margin-bottom: 8px; }
+.chooser-card h1 { font-size: var(--t-display); margin-bottom: 4px; }
+.chooser-lede { color: var(--ink-soft); font-size: var(--t-read); line-height: var(--lh-read); margin-bottom: 16px; }
+.chooser-signin { width: 100%; padding: 12px; font-size: var(--t-body); margin-bottom: 10px; }
+.chooser-door { width: 100%; padding: 12px; font-size: var(--t-body); margin-bottom: 4px; }
+.chooser-skip { background: none; border: 0; color: var(--muted); font: inherit; font-size: var(--t-secondary); text-decoration: underline; cursor: pointer; padding: 8px; }
 
 /* ---------- Chat backgrounds: the room you talk in ---------- */
 /* A fixed poster-art layer behind the whole app, specific to the Photon
@@ -614,7 +660,7 @@ body.look-night-watch, .thread.look-night-watch, .photon-card.look-night-watch {
   pointer-events: none;
   opacity: 1;
   transform: translateX(0);
-  transition: opacity 0.7s ease, transform 0.7s ease;
+  transition: opacity var(--t-world) var(--ease), transform var(--t-world) var(--ease);
 }
 .app-bg.is-sliding {
   opacity: 0;
@@ -649,20 +695,20 @@ body.look-night-watch, .thread.look-night-watch, .photon-card.look-night-watch {
 /* Customization wizard: name, voice, look. Same gallery look as the rest. */
 .customize { max-width: 720px; margin: 0 auto; }
 .custom-steps { display: flex; gap: 8px; margin: 14px 0; }
-.custom-step-tab { flex: 1; border: 1.5px solid var(--field-line); background: var(--card); border-radius: 10px; padding: 9px 6px; font-family: "Nunito", system-ui, sans-serif; font-weight: 800; font-size: 0.85rem; color: var(--ink-soft); cursor: pointer; }
+.custom-step-tab { flex: 1; border: 1.5px solid var(--field-line); background: var(--card); border-radius: var(--r-pill); padding: 6px 12px; min-height: 36px; font-family: "Nunito", system-ui, sans-serif; font-weight: 800; font-size: var(--t-caption); color: var(--ink-soft); cursor: pointer; }
 .custom-step-tab.active { background: var(--teal); border-color: var(--teal); color: #fff; }
 .custom-step-tab.done { border-color: var(--teal); color: var(--teal); }
-.voice-opt, .look-pick { display: block; width: 100%; text-align: left; background: var(--card); border: 1.5px solid var(--field-line); border-radius: 12px; padding: 10px 14px; margin-bottom: 8px; cursor: pointer; font-family: "Nunito", system-ui, sans-serif; }
-.voice-opt b, .look-pick b { display: block; color: var(--ink); font-size: 0.95rem; font-weight: 800; }
-.voice-opt span, .look-pick span { display: block; font-size: 0.82rem; color: var(--ink-soft); margin-top: 2px; }
+.voice-opt, .look-pick { display: block; width: 100%; text-align: left; background: var(--card); border: 1.5px solid var(--field-line); border-radius: var(--r-field); padding: 10px 14px; margin-bottom: 8px; cursor: pointer; font-family: "Nunito", system-ui, sans-serif; }
+.voice-opt b, .look-pick b { display: block; color: var(--ink); font-size: var(--t-body); font-weight: 800; }
+.voice-opt span, .look-pick span { display: block; font-size: var(--t-secondary); color: var(--ink-soft); margin-top: 2px; }
 .voice-opt.selected, .look-pick.selected { border-color: var(--teal); background: var(--teal-soft); }
 .tune-row { display: flex; align-items: center; gap: 8px; padding: 10px 0; border-bottom: 1px solid var(--line); }
-.tune-row p { flex: 1; margin: 0; font-weight: 700; font-size: 0.9rem; }
-.tune-yn { border: 1.5px solid var(--field-line); background: var(--card); border-radius: 9px; padding: 7px 14px; font-family: "Nunito", system-ui, sans-serif; font-weight: 800; font-size: 0.85rem; color: var(--ink-soft); cursor: pointer; }
+.tune-row p { flex: 1; margin: 0; font-weight: 700; font-size: var(--t-secondary); }
+.tune-yn { border: 1.5px solid var(--field-line); background: var(--card); border-radius: var(--r-pill); padding: 6px 12px; min-height: 36px; font-family: "Nunito", system-ui, sans-serif; font-weight: 800; font-size: var(--t-caption); color: var(--ink-soft); cursor: pointer; }
 .tune-yn.on { background: var(--teal); border-color: var(--teal); color: #fff; }
 .portrait-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 12px 0; }
-.portrait-pick { background: none; border: 2px solid transparent; border-radius: 14px; padding: 6px 4px; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 4px; }
-.portrait-pick span { font-size: 0.72rem; font-weight: 800; color: var(--ink-soft); }
+.portrait-pick { background: none; border: 2px solid transparent; border-radius: var(--r-card); padding: 6px 4px; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.portrait-pick span { font-size: var(--t-caption); font-weight: 800; color: var(--ink-soft); }
 .portrait-pick.selected { border-color: var(--teal); background: var(--teal-soft); }
 .custom-skip-all { margin-top: 14px; }
 .switchboard-strip {
@@ -673,26 +719,29 @@ body.look-night-watch, .thread.look-night-watch, .photon-card.look-night-watch {
   border-bottom: 1px solid #EFE3C2;
   padding: 7px 12px;
 }
-.switchboard-strip img { width: 40px; height: 44px; object-fit: cover; object-position: top; border-radius: 7px; flex: none; }
-.switchboard-strip p { margin: 0; font-size: 0.7rem; font-weight: 700; color: var(--muted-2); line-height: 1.35; }
+.switchboard-strip img { width: 40px; height: 44px; object-fit: cover; object-position: top; border-radius: var(--r-field); flex: none; }
+.switchboard-strip p { margin: 0; font-size: var(--t-caption); font-weight: 700; color: var(--ink-soft); line-height: 1.45; }
 .switchboard-strip p b { color: var(--teal); }
 .messages {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  max-height: 55vh;
+  gap: var(--space-6);
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
-  padding: 16px 14px 120px;
-  margin-bottom: 12px;
+  padding: var(--space-6) var(--space-4);
+  width: 100%;
+  max-width: calc(var(--measure-prose) + 37px + var(--space-8));
+  margin: 0 auto;
 }
-.msg { max-width: 88%; font-size: 0.9rem; line-height: 1.45; }
+.msg { max-width: var(--measure-prose); font-size: var(--t-read); line-height: var(--lh-read); }
 .msg p { margin: 0; white-space: pre-wrap; word-break: break-word; }
 .msg.user {
   align-self: flex-end;
   background: var(--teal-soft);
   color: var(--ink);
-  border-radius: 18px 18px 4px 18px;
-  padding: 10px 13px;
+  border-radius: var(--r-card) var(--r-card) 4px var(--r-card);
+  padding: var(--space-3) var(--space-4);
 }
 .msg.bot {
   align-self: flex-start;
@@ -740,17 +789,15 @@ body.look-night-watch, .thread.look-night-watch, .photon-card.look-night-watch {
 /* Pinned composer dock: fixed just above the tab bar, solid cream ground so
    messages scrolling beneath never show through. The meter rides in the
    dock, legible, not fine print. */
+/* The composer dock is furniture, in flow at the column's foot —
+   the same in every conversation, never a fixed floating pane (§3A.2). */
 .composer-dock {
-  position: fixed;
-  left: 50%;
-  transform: translateX(-50%);
-  bottom: calc(70px + env(safe-area-inset-bottom) + var(--kb, 0px));
-  width: min(688px, calc(100% - 32px));
+  position: static;
+  width: 100%;
   background: var(--card);
   border-top: 1px solid var(--line);
-  padding: 8px 0 10px;
-  z-index: 30;
-  transition: bottom 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
+  padding: var(--space-3);
+  padding-bottom: calc(var(--space-3) + env(safe-area-inset-bottom));
 }
 .composer-dock .chat-error { margin-bottom: 8px; }
 /* ---------- Thread as a full-height flex column: the keyboard fix ----------
@@ -810,19 +857,10 @@ body.is-thread .messages {
   flex: 1;
   min-height: 0;
   max-height: none;
-  overflow-y: auto;
-  padding: 16px 14px;
-  margin-bottom: 0;
 }
 body.is-thread .composer-dock {
-  position: static;
   flex: none;
-  width: 100%;
-  max-width: none;
-  left: auto;
-  transform: none;
-  bottom: auto;
-  padding: 8px 16px calc(10px + env(safe-area-inset-bottom));
+  padding: var(--space-3) var(--space-4) calc(var(--space-3) + env(safe-area-inset-bottom));
 }
 html.kb-chat body.is-thread .composer-dock .research-row,
 html.kb-chat body.is-thread .composer-dock #research-results { display: none; }
@@ -866,32 +904,24 @@ html.kb-chat body.is-thread .composer-dock #research-results { display: none; }
   border-radius: var(--radius);
   padding: 10px 14px;
   margin-bottom: 12px;
-  font-size: 14px;
+  font-size: var(--t-secondary);
 }
 
 /* ---------- Brand in motion: the gallery breathes, slowly ---------- */
+/* Perpetual chrome animation retired (readability spec §2.5): the
+   gem-bob, chrome-shimmer, ring-breathe and poster-glow loops are
+   gone — the static neon glow paint stays, and the one-shot hero
+   fade remains. Nothing on the chrome moves when nothing changes. */
 @media (prefers-reduced-motion: no-preference) {
-  .app-header-mark { animation: gem-bob 5s ease-in-out infinite, gem-glow 5s ease-in-out infinite; }
-  .chrome-thin { background-size: 200% 100%; animation: chrome-shimmer 9s linear infinite; }
-  .thread-hero .portrait { animation: ring-breathe 4s ease-in-out infinite; }
-  /* The large thread portrait fades in once, gently. Reduced motion
-     gets no animation at all: this rule only exists inside the
-     no-preference block. */
-  .thread-hero { animation: hero-fade 0.45s ease; }
-  .switchboard-strip img { animation: poster-glow 5s ease-in-out infinite; }
+  .thread-hero { animation: hero-fade var(--t-panel) var(--ease); }
 }
-@keyframes gem-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-2px); } }
-@keyframes gem-glow { 0%, 100% { box-shadow: 0 0 0 0 rgba(244, 201, 93, 0); } 50% { box-shadow: 0 0 12px 2px rgba(244, 201, 93, 0.55); } }
-@keyframes chrome-shimmer { 0% { background-position: 0% 0; } 100% { background-position: 200% 0; } }
-@keyframes ring-breathe { 0%, 100% { box-shadow: 0 0 0 1.5px var(--teal); } 50% { box-shadow: 0 0 0 1.5px var(--teal), 0 0 14px 2px rgba(244, 201, 93, 0.6); } }
 @keyframes hero-fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
-@keyframes poster-glow { 0%, 100% { box-shadow: none; } 50% { box-shadow: 0 0 12px rgba(244, 201, 93, 0.5); } }
 
 /* ---------- Store: posters as thumbnails, plain buying text ---------- */
-.store-head { padding: 16px 18px 2px; display: flex; align-items: center; gap: 10px; }
-.store-head img { width: 40px; height: 37px; object-fit: cover; border-radius: 10px; flex: none; }
-.store-head h1 { margin: 0; font-size: 1.35rem; color: var(--ink); }
-.store-head p { margin: 2px 0 0; font-size: 0.83rem; color: var(--ink-soft); font-weight: 600; }
+.store-head { padding: var(--space-2) 0 var(--space-2); display: flex; align-items: center; gap: var(--space-3); }
+.store-head img { width: 40px; height: 37px; object-fit: cover; border-radius: var(--r-field); flex: none; }
+.store-head h1 { margin: 0; font-size: var(--t-page); color: var(--ink); }
+.store-head p { margin: 2px 0 0; font-size: var(--t-secondary); line-height: 1.5; color: var(--ink-soft); font-weight: 600; }
 .poster-row {
   display: flex;
   gap: 12px;
@@ -902,23 +932,23 @@ html.kb-chat body.is-thread .composer-dock #research-results { display: none; }
   margin-bottom: 10px;
   align-items: flex-start;
 }
-.poster-row img { width: 86px; height: 176px; object-fit: cover; object-position: top; border-radius: 10px; flex: none; }
+.poster-row img { width: 86px; height: 176px; object-fit: cover; object-position: top; border-radius: var(--r-field); flex: none; }
 .poster-row .pr-txt { flex: 1; display: flex; flex-direction: column; min-width: 0; }
-.poster-row b { font-weight: 800; font-size: 0.95rem; }
-.poster-row .desc { font-size: 0.76rem; color: var(--ink-soft); margin: 2px 0 6px; line-height: 1.4; }
-.poster-row .price { font-weight: 800; font-size: 0.92rem; }
-.poster-row .at { font-size: 0.66rem; color: var(--muted-2); font-weight: 700; }
+.poster-row b { font-weight: 800; font-size: var(--t-body); }
+.poster-row .desc { font-size: var(--t-secondary); color: var(--ink-soft); margin: 2px 0 6px; line-height: 1.5; }
+.poster-row .price { font-weight: 800; font-size: var(--t-body); }
+.poster-row .at { font-size: var(--t-caption); color: var(--ink-soft); font-weight: 700; }
 .poster-row .btn { margin-top: auto; align-self: flex-start; }
 .poster-row .owned-badge { align-self: flex-start; }
 .poster-row .monthly-row { margin-top: 8px; }
 .poster-row .monthly-row .btn { margin-top: 0; }
-.price { font-family: "Nunito", sans-serif; font-weight: 800; font-size: 17px; color: var(--ink); }
-.price .fine { font-family: "Nunito", sans-serif; font-size: 13px; font-weight: 600; }
+.price { font-family: "Nunito", sans-serif; font-weight: 800; font-size: var(--t-read); color: var(--ink); }
+.price .fine { font-family: "Nunito", sans-serif; font-size: var(--t-caption); font-weight: 600; }
 .kind {
   font-family: "Nunito", sans-serif;
-  font-size: 12px;
+  font-size: var(--t-label);
   font-weight: 800;
-  letter-spacing: 1px;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--ink-soft);
 }
@@ -928,13 +958,13 @@ html.kb-chat body.is-thread .composer-dock #research-results { display: none; }
   gap: 12px;
   margin-bottom: 8px;
 }
-.product-card { transition: transform 0.15s; }
+.product-card { transition: transform var(--t-press) var(--ease); }
 .product-card:hover { transform: translateY(-2px); }
 .product-card h3 { margin-bottom: 2px; }
 .product-card .portrait {
   display: block;
   margin: 0 auto 8px;
-  border-radius: 16px;
+  border-radius: var(--r-card);
 }
 /* Photon store cards: portrait fills the card top, name plain ink. */
 .photon-store { padding: 0 0 12px; overflow: hidden; text-align: center; }
@@ -942,13 +972,13 @@ html.kb-chat body.is-thread .composer-dock #research-results { display: none; }
   width: 100% !important;
   height: auto !important;
   aspect-ratio: 1 / 1;
-  border-radius: 16px 16px 0 0;
+  border-radius: var(--r-card) var(--r-card) 0 0;
   margin: 0 0 8px;
   display: block;
 }
 .photon-store .portrait img { object-position: top; }
 .photon-store h3 { margin-bottom: 2px; }
-.photon-store .photon-name { font-family: "Nunito", sans-serif; font-weight: 800; font-size: 0.92rem; color: var(--ink); }
+.photon-store .photon-name { font-family: "Nunito", sans-serif; font-weight: 800; font-size: var(--t-body); color: var(--ink); }
 .photon-store p { padding: 0 12px; }
 .photon-store .price { padding: 0 12px; }
 .owned-badge {
@@ -958,7 +988,7 @@ html.kb-chat body.is-thread .composer-dock #research-results { display: none; }
   border-radius: 999px;
   padding: 8px 14px;
   font-family: "Nunito", sans-serif;
-  font-size: 13px;
+  font-size: var(--t-caption);
   font-weight: 800;
 }
 .toggle { display: flex; gap: 8px; margin: 0 0 18px; }
@@ -967,10 +997,11 @@ html.kb-chat body.is-thread .composer-dock #research-results { display: none; }
   background: var(--card);
   border: 1.5px solid var(--teal);
   color: var(--teal);
-  border-radius: 999px;
-  padding: 10px;
+  border-radius: var(--r-pill);
+  padding: 10px 18px;
+  min-height: 44px;
   font-family: "Nunito", sans-serif;
-  font-size: 14px;
+  font-size: var(--t-secondary);
   font-weight: 800;
   cursor: pointer;
 }
@@ -983,10 +1014,11 @@ html.kb-chat body.is-thread .composer-dock #research-results { display: none; }
   background: var(--card);
   border: 1.5px solid var(--teal);
   color: var(--teal);
-  border-radius: 999px;
-  padding: 7px 14px;
+  border-radius: var(--r-pill);
+  padding: 6px 12px;
+  min-height: 36px;
   font-family: "Nunito", sans-serif;
-  font-size: 13px;
+  font-size: var(--t-caption);
   font-weight: 800;
   text-decoration: none;
 }
@@ -1005,8 +1037,8 @@ html.kb-chat body.is-thread .composer-dock #research-results { display: none; }
 .store-group summary .summary-title {
   font-family: "Nunito", sans-serif;
   font-weight: 800;
-  font-size: 0.85rem;
-  letter-spacing: 0.1em;
+  font-size: var(--t-label);
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--ink);
 }
@@ -1023,21 +1055,21 @@ html.kb-chat body.is-thread .composer-dock #research-results { display: none; }
   margin-bottom: 18px;
 }
 .pricing-explainer summary { padding: 12px 2px; }
-.pricing-body p { font-size: 0.85rem; line-height: 1.55; color: var(--ink-soft); margin: 0 0 10px; }
+.pricing-body p { font-size: var(--t-secondary); line-height: 1.5; color: var(--ink-soft); margin: 0 0 10px; }
 .pricing-body p b { color: var(--ink); }
 .pricing-body .pricing-contact {
   background: var(--card);
   border: 1px solid var(--butter);
-  border-radius: 10px;
+  border-radius: var(--r-field);
   padding: 10px 12px;
   margin-bottom: 8px;
 }
 .pricing-contact a, .store-foot a { color: var(--teal); font-weight: 800; }
 .cat-title {
   font-family: "Nunito", sans-serif;
-  font-size: 13px;
+  font-size: var(--t-label);
   font-weight: 800;
-  letter-spacing: 1px;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--ink-soft);
   margin: 16px 0 8px;
@@ -1052,23 +1084,23 @@ html.kb-chat body.is-thread .composer-dock #research-results { display: none; }
   gap: 10px;
   background: var(--card);
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: var(--r-field);
   padding: 10px 14px;
   margin-bottom: 8px;
 }
 .addon-row.featured { border: 1.5px solid var(--cherry); background: var(--card); }
-.addon-row b { font-size: 0.9rem; display: block; }
-.addon-row span { font-size: 0.72rem; color: var(--muted-2); font-weight: 700; }
+.addon-row b { font-size: var(--t-secondary); display: block; }
+.addon-row span { font-size: var(--t-caption); color: var(--ink-soft); font-weight: 700; }
 .addon-row .pb-desc { display: block; margin-top: 3px; line-height: 1.4; }
 .addon-row .price { font-weight: 800; white-space: nowrap; }
 
 /* Upkeep card: paper with a butter frame, Starburst seal. */
 .upkeep-card { border: 1.5px solid var(--butter); display: flex; gap: 12px; align-items: flex-start; }
-.upkeep-card img { width: 56px; height: 51px; object-fit: cover; border-radius: 12px; flex: none; }
+.upkeep-card img { width: 56px; height: 51px; object-fit: cover; border-radius: var(--r-field); flex: none; }
 .upkeep-card b { font-family: "Nunito", sans-serif; font-weight: 800; font-size: 1.05rem; }
 .upkeep-card .price { font-size: 1.2rem; font-weight: 800; }
-.upkeep-card p { font-size: 0.82rem; margin: 5px 0 0; }
-.store-foot { text-align: center; font-size: 0.72rem; color: var(--muted-2); font-weight: 700; padding: 14px 10px 4px; }
+.upkeep-card p { font-size: var(--t-secondary); margin: 5px 0 0; }
+.store-foot { text-align: center; font-size: var(--t-caption); color: var(--ink-soft); font-weight: 700; padding: 14px 10px 4px; }
 
 /* Inboxes. */
 .inbox-grid { display: grid; gap: 12px; }
@@ -1084,8 +1116,8 @@ html.kb-chat body.is-thread .composer-dock #research-results { display: none; }
 .inbox-card h3 { margin-bottom: 4px; }
 .inbox-msg { border-top: 1px solid var(--line); padding: 10px 0; }
 .inbox-subject { font-weight: 800; margin-bottom: 2px; }
-.inbox-meta { font-size: 12px; color: var(--ink-soft); margin-bottom: 4px; }
-.inbox-snippet { font-size: 14px; color: var(--ink-soft); }
+.inbox-meta { font-size: var(--t-caption); line-height: 1.45; color: var(--ink-soft); margin-bottom: 4px; }
+.inbox-snippet { font-size: var(--t-secondary); line-height: 1.5; color: var(--ink-soft); }
 .draft-form { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
 .draft-form input, .draft-form textarea { flex: none; width: 100%; }
 
@@ -1110,7 +1142,7 @@ html.kb-chat body.is-thread .composer-dock #research-results { display: none; }
   background: var(--teal-deep);
   border-top: 1px solid var(--butter);
   border-radius: var(--phone-radius-sm) var(--phone-radius-sm) 0 0;
-  padding: 8px max(10px, env(safe-area-inset-left)) calc(10px + env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-right));
+  padding: var(--space-2) max(10px, env(safe-area-inset-left)) calc(10px + env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-right));
   z-index: 40;
 }
 .nav-btn {
@@ -1123,12 +1155,12 @@ html.kb-chat body.is-thread .composer-dock #research-results { display: none; }
   flex-direction: column;
   align-items: center;
   gap: 2px;
-  font-size: 0.68rem;
+  font-size: var(--t-label);
   font-weight: 800;
   /* Warm cream on deep teal, 10.0:1. */
   color: #EFE6CE;
-  padding: 6px 2px;
-  border-radius: 12px;
+  padding: var(--space-2) 2px 6px;
+  border-radius: var(--r-field);
   min-height: 44px;
 }
 .nav-btn svg { width: 21px; height: 21px; }
@@ -1140,16 +1172,16 @@ html.kb-chat body.is-thread .composer-dock #research-results { display: none; }
 .toast {
   position: fixed;
   left: 50%;
-  bottom: calc(184px + env(safe-area-inset-bottom));
-  transform: translateX(-50%) translateY(20px);
+  bottom: var(--nav-dock);
+  transform: translateX(-50%) translateY(8px);
   background: var(--ink);
   color: var(--cream);
   border-radius: 999px;
   padding: 10px 18px;
-  font-size: 14px;
+  font-size: var(--t-secondary);
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.2s, transform 0.2s;
+  transition: opacity var(--t-panel) var(--ease), transform var(--t-panel) var(--ease);
   max-width: 90vw;
   text-align: center;
   z-index: 50;
@@ -1159,16 +1191,16 @@ html.kb-chat body.is-thread .composer-dock #research-results { display: none; }
 
 /* Inboxes extras — client-a (Messages, Contacts, Calendar, Drive). */
 .inbox-jump { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; }
-.inbox-jump a { font-size: 0.8rem; font-weight: 800; color: var(--teal); background: var(--card); border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; text-decoration: none; }
+.inbox-jump a { font-size: var(--t-caption); font-weight: 800; color: var(--teal); background: var(--card); border: 1px solid var(--line); border-radius: var(--r-pill); padding: 6px 12px; min-height: 36px; text-decoration: none; }
 .inbox-jump a:hover { border-color: var(--teal); }
 #messages, #contacts, #calendar, #drive { margin-bottom: 12px; }
-#messages h4, #contacts h4, #calendar h4, #drive h4 { margin: 14px 0 6px; font-size: 0.95rem; }
+#messages h4, #contacts h4, #calendar h4, #drive h4 { margin: 14px 0 6px; font-size: var(--t-card); }
 .text-form, .book-form { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
 .text-form select, .text-form textarea, .book-form input, .book-form textarea { width: 100%; }
-.field-label { font-size: 0.8rem; font-weight: 700; color: var(--ink-soft); display: flex; flex-direction: column; gap: 4px; }
-.review-box { border: 1.5px solid var(--teal); border-radius: 12px; background: var(--card); padding: 12px; margin-top: 12px; }
+.field-label { font-size: var(--t-secondary); font-weight: 700; color: var(--ink-soft); display: flex; flex-direction: column; gap: 4px; }
+.review-box { border: 1.5px solid var(--teal); border-radius: var(--r-field); background: var(--card); padding: 12px; margin-top: 12px; }
 .review-box h4 { margin-top: 0; }
-.review-body { white-space: pre-wrap; background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 10px; }
+.review-body { white-space: pre-wrap; background: var(--card); border: 1px solid var(--line); border-radius: var(--r-field); padding: 10px; }
 .import-box { border-top: 1px solid var(--line); margin-top: 14px; padding-top: 10px; }
 .import-box .btn { display: inline-block; margin: 4px 0 8px; cursor: pointer; }
 
@@ -1178,15 +1210,15 @@ html.kb-chat body.is-thread .composer-dock #research-results { display: none; }
 .page-chips { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0; }
 .page-chip { display: inline-flex; align-items: center; gap: 2px; border: 1px solid var(--line); border-radius: 999px; background: var(--card); padding: 2px 4px 2px 10px; }
 .page-chip.selected { border-color: var(--teal); background: #E6F2F0; }
-.page-chip-btn { background: none; border: none; padding: 4px 6px; cursor: pointer; font: inherit; font-size: 0.85rem; font-weight: 700; color: var(--ink); }
-.page-chip-x { background: none; border: none; padding: 4px 6px; cursor: pointer; font: inherit; font-size: 0.8rem; color: var(--ink-soft); }
-.memory-preview { border: 1.5px solid var(--teal); border-radius: 12px; background: var(--card); padding: 12px; margin-top: 12px; }
+.page-chip-btn { background: none; border: none; padding: 4px 6px; cursor: pointer; font: inherit; font-size: var(--t-secondary); font-weight: 700; color: var(--ink); }
+.page-chip-x { background: none; border: none; padding: 4px 6px; cursor: pointer; font: inherit; font-size: var(--t-caption); color: var(--ink-soft); }
+.memory-preview { border: 1.5px solid var(--teal); border-radius: var(--r-field); background: var(--card); padding: 12px; margin-top: 12px; }
 .memory-preview p { margin: 0 0 8px; }
 .drive-file { display: block; width: 100%; text-align: left; background: none; border: none; padding: 0; cursor: pointer; font-family: inherit; }
 .drive-file .inbox-subject { display: block; color: var(--teal); }
 .drive-file .inbox-meta { display: block; }
 .drive-read { border-top: 1px solid var(--line); margin-top: 12px; padding-top: 10px; }
-.drive-content { white-space: pre-wrap; word-break: break-word; background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 12px; font-size: 13px; line-height: 1.5; max-height: 50vh; overflow: auto; margin: 8px 0; }
+.drive-content { white-space: pre-wrap; word-break: break-word; overflow-wrap: anywhere; font-family: inherit; font-size: var(--t-read); line-height: var(--lh-read); max-width: var(--measure-prose); margin: 0 auto; }
 
 /* --- Client-B: live voice, proactive/reminders/push, Messenger,
        research, Stripe unlock status (Nov 15, 2026). One block, appended. --- */
@@ -1197,11 +1229,11 @@ html.kb-chat body.is-thread .composer-dock #research-results { display: none; }
 .call-hero { margin: 8px 0 4px; }
 .call-hero img { border-radius: 50%; }
 .call-status { font-family: "Nunito", sans-serif; font-weight: 800; color: var(--teal); margin: 12px 0 4px; }
-.call-heard { font-size: 14px; color: var(--ink-soft); font-style: italic; min-height: 1.4em; margin: 0 0 12px; }
+.call-heard { font-size: var(--t-secondary); color: var(--ink-soft); font-style: italic; min-height: 1.4em; margin: 0 0 12px; }
 .call-mic {
   display: block; margin: 8px auto; width: 120px; height: 120px; border-radius: 50%;
   border: none; cursor: pointer; background: var(--teal); color: #fff;
-  font-family: "Nunito", sans-serif; font-size: 18px; font-weight: 800;
+  font-family: "Nunito", sans-serif; font-size: var(--t-card); font-weight: 800;
   box-shadow: 0 4px 0 rgba(0, 0, 0, 0.15);
 }
 .call-mic:disabled { background: var(--muted-2); cursor: default; box-shadow: none; }
@@ -1213,19 +1245,19 @@ html.kb-chat body.is-thread .composer-dock #research-results { display: none; }
 .research-row { display: flex; gap: 8px; margin-top: 8px; }
 .research-row input {
   flex: 1; min-width: 0; padding: 10px 12px; border: 1px solid var(--field-line);
-  border-radius: 12px; background: var(--field); font: inherit; font-size: 14px;
+  border-radius: var(--r-field); background: var(--field); font: inherit; font-size: var(--t-secondary);
 }
 .research-results { text-align: left; margin-top: 10px; background: var(--card); border: 1px solid var(--card-line); border-radius: var(--radius); padding: 12px; }
 .research-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
 .research-item { border-top: 1px solid var(--line); padding: 8px 0; }
 .research-item:first-of-type { border-top: none; }
 .research-item a { font-weight: 800; color: var(--teal); }
-.research-item p { margin: 4px 0; font-size: 14px; }
+.research-item p { margin: 4px 0; font-size: var(--t-secondary); }
 
 /* Proactive checks and reminders. */
-.check-result { background: var(--teal-soft); border-radius: 12px; padding: 10px 12px; margin: 10px 0; }
+.check-result { background: var(--teal-soft); border-radius: var(--r-field); padding: 10px 12px; margin: 10px 0; }
 .check-result ul { margin: 6px 0 0; padding-left: 18px; }
-.check-result li { margin-bottom: 4px; font-size: 14px; }
+.check-result li { margin-bottom: 4px; font-size: var(--t-secondary); }
 .reminder-form { flex-wrap: wrap; }
 .reminder-form input { flex: 1 1 160px; min-width: 0; }
 
@@ -1234,7 +1266,7 @@ html.kb-chat body.is-thread .composer-dock #research-results { display: none; }
 .day-item:first-of-type { border-top: none; }
 .day-item h3 { margin: 4px 0; }
 .day-item p { margin: 4px 0; }
-.day-when { font-weight: 800; font-size: 15px; }
+.day-when { font-weight: 800; font-size: var(--t-body); }
 .day-move { background: var(--teal-soft); margin: 12px 0; }
 .day-move .row { margin: 8px 0; }
 .day-add-form { flex-wrap: wrap; }
@@ -1246,7 +1278,7 @@ html.kb-chat body.is-thread .composer-dock #research-results { display: none; }
   border-top: 1px solid var(--line); padding: 10px 0; cursor: pointer; font: inherit; color: inherit;
 }
 .msg-thread span { display: block; }
-.msg-thread.open { background: var(--teal-soft); border-radius: 10px; padding: 10px; }
+.msg-thread.open { background: var(--teal-soft); border-radius: var(--r-field); padding: 10px; }
 .msg-send-form { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
 .msg-send-form textarea { width: 100%; }
 
@@ -1267,7 +1299,7 @@ html.kb-chat body.is-thread .composer-dock #research-results { display: none; }
   background: rgba(46, 38, 32, 0.55);
   padding: 16px 16px calc(16px + env(safe-area-inset-bottom));
   opacity: 0;
-  transition: opacity 0.35s ease;
+  transition: opacity var(--t-panel) var(--ease);
 }
 .card-modal.open { opacity: 1; }
 .card-modal[hidden] { display: none; }
@@ -1276,7 +1308,7 @@ html.kb-chat body.is-thread .composer-dock #research-results { display: none; }
   background: var(--card);
   color: var(--ink);
   border: 1px solid var(--card-line);
-  border-radius: var(--phone-radius-sm);
+  border-radius: var(--r-sheet);
   box-shadow: 0 18px 48px rgba(46, 38, 32, 0.35);
   width: 100%;
   max-width: 520px;
@@ -1288,9 +1320,9 @@ html.kb-chat body.is-thread .composer-dock #research-results { display: none; }
      and cuts that failure mode off at the root; the wrapping rules
      below are the real fix, this is the guard. */
   overflow-x: clip;
-  padding: 18px;
-  transform: translateY(12px);
-  transition: transform 0.35s ease;
+  padding: 20px;
+  transform: translateY(8px);
+  transition: transform var(--t-panel) var(--ease);
 }
 .card-modal.open .card-sheet { transform: none; }
 .card-x {
@@ -1303,20 +1335,20 @@ html.kb-chat body.is-thread .composer-dock #research-results { display: none; }
   border: 1.5px solid var(--line);
   background: var(--card);
   color: var(--ink);
-  font-size: 16px;
+  font-size: var(--t-body);
   line-height: 1;
   cursor: pointer;
   flex: none;
 }
 .card-hero { text-align: center; margin-bottom: 8px; }
-.card-hero .portrait { border-radius: 20px; }
-.card-poster { width: 100%; max-width: 320px; border-radius: 12px; display: block; margin: 0 auto; }
-.card-title { font-family: "Patua One", Georgia, serif; font-size: 1.5rem; color: var(--ink); margin: 4px 0 2px; text-align: center; overflow-wrap: anywhere; }
-.card-kind { text-align: center; font-size: 12px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; color: var(--ink-soft); margin: 0 0 10px; overflow-wrap: anywhere; }
-.card-tagline { font-size: 15px; }
+.card-hero .portrait { border-radius: var(--r-card); }
+.card-poster { width: 100%; max-width: 320px; border-radius: var(--r-field); display: block; margin: 0 auto; }
+.card-title { font-family: "Patua One", Georgia, serif; font-size: var(--t-card); color: var(--ink); margin: 4px 0 2px; text-align: center; overflow-wrap: anywhere; }
+.card-kind { text-align: center; font-size: var(--t-label); font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-soft); margin: 0 0 10px; overflow-wrap: anywhere; }
+.card-tagline { font-size: var(--t-secondary); line-height: 1.5; }
 .card-intro { font-style: italic; color: var(--ink-soft); }
 .card-stats { margin: 12px 0; }
-.card-stats div { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-top: 1px solid var(--line); font-size: 14px; }
+.card-stats div { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-top: 1px solid var(--line); font-size: var(--t-secondary); }
 .card-stats div:first-child { border-top: none; }
 .card-stats dt { font-weight: 800; color: var(--ink); flex: none; }
 .card-stats dd { margin: 0; text-align: right; color: var(--ink-soft); }
@@ -1349,40 +1381,12 @@ html.kb-chat body.is-thread .composer-dock #research-results { display: none; }
    reads harder against the same cream ground. A chosen Photon look
    keeps its own skin inside its thread; everywhere else, contrast
    rules. */
-html.read-large { font-size: 18px; --read-scale: 1.16; }
-html.read-xl { font-size: 20px; --read-scale: 1.32; }
-html.read-large body, html.read-xl body { font-size: calc(16px * var(--read-scale)); }
-html.read-large h1, html.read-xl h1 { font-size: calc(30px * var(--read-scale)); }
-html.read-large h2, html.read-xl h2 { font-size: calc(22px * var(--read-scale)); }
-html.read-large h3, html.read-xl h3 { font-size: calc(18px * var(--read-scale)); }
-html.read-large h4, html.read-xl h4 { font-size: calc(15px * var(--read-scale)); }
-html.read-large .page-lede, html.read-xl .page-lede { font-size: calc(15px * var(--read-scale)); }
-html.read-large .fine, html.read-xl .fine { font-size: calc(13px * var(--read-scale)); }
-html.read-large .btn.small, html.read-xl .btn.small { font-size: calc(13px * var(--read-scale)); }
-html.read-large .photon-tag, html.read-xl .photon-tag { font-size: calc(12px * var(--read-scale)); }
-html.read-large input, html.read-large textarea, html.read-xl input, html.read-xl textarea { font-size: calc(16px * var(--read-scale)); }
-html.read-large .inbox-meta, html.read-xl .inbox-meta { font-size: calc(12px * var(--read-scale)); }
-html.read-large .inbox-snippet, html.read-xl .inbox-snippet { font-size: calc(14px * var(--read-scale)); }
-html.read-large .drive-content, html.read-xl .drive-content { font-size: calc(13px * var(--read-scale)); }
-html.read-large .call-heard, html.read-xl .call-heard { font-size: calc(14px * var(--read-scale)); }
-html.read-large .card-kind, html.read-xl .card-kind { font-size: calc(12px * var(--read-scale)); }
-html.read-large .card-tagline, html.read-xl .card-tagline { font-size: calc(15px * var(--read-scale)); }
-html.read-large .card-stats div, html.read-xl .card-stats div { font-size: calc(14px * var(--read-scale)); }
-html.read-large .landing-lede, html.read-xl .chooser-lede { font-size: calc(17px * var(--read-scale)); }
-html.read-large .landing-signin, html.read-xl .chooser-signin { font-size: calc(16px * var(--read-scale)); }
-html.read-large .landing-skip, html.read-xl .chooser-skip { font-size: calc(14px * var(--read-scale)); }
-html.read-large .toast, html.read-xl .toast { font-size: calc(14px * var(--read-scale)); }
-html.read-large .research-item p, html.read-large .check-result li, html.read-xl .research-item p, html.read-xl .check-result li { font-size: calc(14px * var(--read-scale)); }
-html.read-large .day-when, html.read-xl .day-when { font-size: calc(15px * var(--read-scale)); }
-html.read-large .price, html.read-xl .price { font-size: calc(17px * var(--read-scale)); }
-/* Chat text gets a roomier line-height at larger sizes. */
-html.read-large .msg, html.read-xl .msg { line-height: 1.55; }
-
+html.read-large { font-size: var(--t-card); }
+html.read-xl { font-size: 20px; }
 html.read-contrast {
   --ink: #171208;
   --ink-soft: #3A3122;
   --muted: #453A28;
-  --muted-2: #453A28;
   --teal: #083638;
   --teal-deep: #062A2C;
   --cherry: #A81F1F;
@@ -1455,33 +1459,15 @@ html.read-contrast .btn.store-outline:hover { background: #FADFDF; }
 /* Butter highlights: the active tab wears a butter underline, the
    counter's edge. */
 .nav-btn.active { box-shadow: inset 0 -3px 0 var(--butter); }
-/* One slow breathe on the brand mark alone — six seconds, glow only.
-   Fully disabled under prefers-reduced-motion (no animation rule
-   exists there, so the static glow above is all that shows). */
-@keyframes neon-breathe {
-  0%, 100% {
-    text-shadow:
-      0 0 6px rgba(255, 107, 94, 0.85),
-      0 0 18px rgba(255, 80, 70, 0.55),
-      0 0 34px rgba(214, 40, 40, 0.45);
-  }
-  50% {
-    text-shadow:
-      0 0 8px rgba(255, 107, 94, 1),
-      0 0 26px rgba(255, 80, 70, 0.75),
-      0 0 48px rgba(214, 40, 40, 0.6);
-  }
-}
-@media (prefers-reduced-motion: no-preference) {
-  .app-header-name { animation: neon-breathe 6s ease-in-out infinite; }
-}
+/* The neon breathe is retired (readability spec §2.5): the glow
+   above is paint, not motion, and paint is all that remains. */
 
 /* ---------- Smoothness: one coherent app, not pieces stuck together --
    Nov 18, 2026 second pass; slow fades Nov 19, 2026 (the fade rule:
    every transition fades in and out slowly — no chop, nothing that
-   feels like a video popping up). View switches fade out over 350ms
-   (see fadeTo in client/main.ts, .view-leaving below) and fade in over
-   700ms, the landing fades in over 700ms, the card modal fades out as
+   feels like a video popping up). View switches cross-fade at
+   --t-view, 600ms out and in (see fadeTo in client/main.ts,
+   .view-leaving below), the landing fades in over --t-view, the card modal fades out as
    well as in (the close used to hide at once — see closeCard in
    client/main.ts), the nav active state eases, and an OAuth return
    skips the opening film (the splash stays as a static cover until
@@ -1496,19 +1482,19 @@ html.read-contrast .btn.store-outline:hover { background: #FADFDF; }
    (caught by the fade probe, Nov 19, 2026). Without fill, the view
    rests at its natural opacity once the animation ends, and the
    fade-out transition can take over. */
-.view.view-enter { animation: view-in 700ms ease; }
+.view.view-enter { animation: view-in var(--t-view) var(--ease); }
 @keyframes view-in {
   from { opacity: 0; transform: translateY(4px); }
   to { opacity: 1; transform: none; }
 }
-.view.view-leaving { opacity: 0; transition: opacity 0.35s ease; }
-.chooser { animation: landing-in 700ms ease both; }
+.view.view-leaving { opacity: 0; transition: opacity var(--t-view) var(--ease); }
+.chooser { animation: landing-in var(--t-view) var(--ease) both; }
 @keyframes landing-in {
   from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: none; }
 }
-.opening-splash.is-fading-fast { transition: opacity 0.6s ease; }
-.nav-btn { transition: color 0.2s ease, box-shadow 0.2s ease; }
+.opening-splash.is-fading-fast { transition: opacity var(--t-view) var(--ease); }
+.nav-btn { transition: color var(--t-panel) var(--ease), box-shadow var(--t-panel) var(--ease); }
 @media (prefers-reduced-motion: reduce) {
   .view.view-enter, .chooser { animation: none; }
   .view.view-leaving { transition: none; }
@@ -1526,7 +1512,7 @@ html.read-contrast .btn.store-outline:hover { background: #FADFDF; }
   border: 1px solid var(--teal);
   border-radius: var(--radius);
   padding: 10px 14px;
-  font-size: 14px;
+  font-size: var(--t-secondary);
   font-weight: 700;
   color: var(--ink);
   margin: 0 0 12px;
@@ -1566,13 +1552,23 @@ html.read-contrast .btn.store-outline:hover { background: #FADFDF; }
   white-space: pre-wrap;
   word-break: break-word;
   overflow-wrap: anywhere;
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 12px;
-  font-size: 14px;
-  line-height: 1.55;
-  max-height: 55vh;
-  overflow: auto;
-  margin: 8px 0;
+  font-size: var(--t-read);
+  line-height: var(--lh-read);
+  max-width: var(--measure-prose);
+  margin: 0 auto;
 }
+/* Document head for the readers (§3A.3): caption sender line over a
+   card-title subject, left-aligned like a page, not a poster. */
+.doc-head { max-width: var(--measure-prose); margin: 0 auto var(--space-4); }
+.doc-meta { font-size: var(--t-caption); line-height: 1.45; font-weight: 700; color: var(--ink-soft); margin: 0 0 4px; overflow-wrap: anywhere; }
+.doc-head .card-title { text-align: left; margin: 0; }
+
+/* Running links in body copy take --teal underlined (§2.6); cherry is
+   reserved for >=14px bold or large text. */
+p a, .fine a, .pricing-body a { color: var(--teal); text-decoration: underline; }
+
+/* Reading prose gains air at the larger roots, per §2.1. (Kept after
+   the reader rules themselves so the base rules stay the first word
+   on each surface.) */
+html.read-large .msg, html.read-large .email-body, html.read-large .drive-content { line-height: 1.7; }
+html.read-xl .msg, html.read-xl .email-body, html.read-xl .drive-content { line-height: 1.75; }

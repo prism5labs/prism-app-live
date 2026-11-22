@@ -1,0 +1,369 @@
+{
+  "phase": "after",
+  "base": "http://127.0.0.1:10102/",
+  "viewports": {
+    "390x844": {
+      "thread": {
+        "msgFontPx": 16.96,
+        "msgLineHeightPx": 27.984,
+        "msgWidthPx": 319,
+        "approxCharsPerLine": 39,
+        "messagesWidthPx": 390
+      },
+      "email": {
+        "fontPx": 16.96,
+        "lineHeightPx": 27.984,
+        "widthPx": 316,
+        "approxCharsPerLine": 39,
+        "maxHeight": "none",
+        "overflowY": "visible",
+        "borderRadius": "0px"
+      },
+      "drive": {
+        "fontPx": 16.96,
+        "lineHeightPx": 27.984,
+        "widthPx": 316,
+        "approxCharsPerLine": 39,
+        "maxHeight": "none",
+        "overflowY": "visible"
+      },
+      "smallestText": [
+        {
+          "sel": "span.summary-title",
+          "fontPx": 12,
+          "text": "Understand our pricing"
+        },
+        {
+          "sel": "h2.section-title",
+          "fontPx": 12,
+          "text": "Launches"
+        },
+        {
+          "sel": "h3.cat-title",
+          "fontPx": 12,
+          "text": "Everyday Life"
+        },
+        {
+          "sel": "p.kind",
+          "fontPx": 12,
+          "text": "Spark"
+        },
+        {
+          "sel": "button.nav-btn.",
+          "fontPx": 12,
+          "text": "Chat"
+        },
+        {
+          "sel": "button.nav-btn.active",
+          "fontPx": 12,
+          "text": "Store"
+        },
+        {
+          "sel": "span.google-state",
+          "fontPx": 12.48,
+          "text": "Google connected"
+        },
+        {
+          "sel": "p.fine.stripe-line",
+          "fontPx": 12.48,
+          "text": "Automatic unlocks are on — a p"
+        },
+        {
+          "sel": "span.fine",
+          "fontPx": 12.48,
+          "text": "tap to read, in plain words"
+        },
+        {
+          "sel": "a",
+          "fontPx": 12.48,
+          "text": "Supernova"
+        },
+        {
+          "sel": "span.at",
+          "fontPx": 12.48,
+          "text": "$514.00 at checkout"
+        },
+        {
+          "sel": "p.fine",
+          "fontPx": 12.48,
+          "text": "Or pay monthly:"
+        }
+      ],
+      "below12_5": [
+        {
+          "sel": "span.summary-title",
+          "fontPx": 12,
+          "text": "Understand our pricing"
+        },
+        {
+          "sel": "h2.section-title",
+          "fontPx": 12,
+          "text": "Launches"
+        },
+        {
+          "sel": "h3.cat-title",
+          "fontPx": 12,
+          "text": "Everyday Life"
+        },
+        {
+          "sel": "p.kind",
+          "fontPx": 12,
+          "text": "Spark"
+        },
+        {
+          "sel": "button.nav-btn.",
+          "fontPx": 12,
+          "text": "Chat"
+        },
+        {
+          "sel": "button.nav-btn.active",
+          "fontPx": 12,
+          "text": "Store"
+        },
+        {
+          "sel": "span.google-state",
+          "fontPx": 12.48,
+          "text": "Google connected"
+        },
+        {
+          "sel": "p.fine.stripe-line",
+          "fontPx": 12.48,
+          "text": "Automatic unlocks are on — a p"
+        },
+        {
+          "sel": "span.fine",
+          "fontPx": 12.48,
+          "text": "tap to read, in plain words"
+        },
+        {
+          "sel": "a",
+          "fontPx": 12.48,
+          "text": "Supernova"
+        },
+        {
+          "sel": "span.at",
+          "fontPx": 12.48,
+          "text": "$514.00 at checkout"
+        },
+        {
+          "sel": "p.fine",
+          "fontPx": 12.48,
+          "text": "Or pay monthly:"
+        },
+        {
+          "sel": "a.btn.small",
+          "fontPx": 12.48,
+          "text": "$49/mo"
+        },
+        {
+          "sel": "span.owned-badge",
+          "fontPx": 12.48,
+          "text": "Owned — yours already"
+        },
+        {
+          "sel": "button.btn.small.more-info",
+          "fontPx": 12.48,
+          "text": "More info"
+        },
+        {
+          "sel": "span",
+          "fontPx": 12.48,
+          "text": "Spark · one button, one job"
+        },
+        {
+          "sel": "span.pb-desc",
+          "fontPx": 12.48,
+          "text": "The extra attribute that build"
+        },
+        {
+          "sel": "div.store-foot",
+          "fontPx": 12.48,
+          "text": "Questions about any price? Ema"
+        }
+      ],
+      "below12": []
+    },
+    "360x800": {
+      "thread": {
+        "msgFontPx": 16.96,
+        "msgLineHeightPx": 27.984,
+        "msgWidthPx": 289,
+        "approxCharsPerLine": 36,
+        "messagesWidthPx": 360
+      },
+      "email": {
+        "fontPx": 16.96,
+        "lineHeightPx": 27.984,
+        "widthPx": 286,
+        "approxCharsPerLine": 35,
+        "maxHeight": "none",
+        "overflowY": "visible",
+        "borderRadius": "0px"
+      },
+      "drive": {
+        "fontPx": 16.96,
+        "lineHeightPx": 27.984,
+        "widthPx": 286,
+        "approxCharsPerLine": 35,
+        "maxHeight": "none",
+        "overflowY": "visible"
+      },
+      "smallestText": [
+        {
+          "sel": "span.summary-title",
+          "fontPx": 12,
+          "text": "Understand our pricing"
+        },
+        {
+          "sel": "h2.section-title",
+          "fontPx": 12,
+          "text": "Launches"
+        },
+        {
+          "sel": "h3.cat-title",
+          "fontPx": 12,
+          "text": "Everyday Life"
+        },
+        {
+          "sel": "p.kind",
+          "fontPx": 12,
+          "text": "Spark"
+        },
+        {
+          "sel": "button.nav-btn.",
+          "fontPx": 12,
+          "text": "Chat"
+        },
+        {
+          "sel": "button.nav-btn.active",
+          "fontPx": 12,
+          "text": "Store"
+        },
+        {
+          "sel": "span.google-state",
+          "fontPx": 12.48,
+          "text": "Google connected"
+        },
+        {
+          "sel": "p.fine.stripe-line",
+          "fontPx": 12.48,
+          "text": "Automatic unlocks are on — a p"
+        },
+        {
+          "sel": "span.fine",
+          "fontPx": 12.48,
+          "text": "tap to read, in plain words"
+        },
+        {
+          "sel": "a",
+          "fontPx": 12.48,
+          "text": "Supernova"
+        },
+        {
+          "sel": "span.at",
+          "fontPx": 12.48,
+          "text": "$514.00 at checkout"
+        },
+        {
+          "sel": "p.fine",
+          "fontPx": 12.48,
+          "text": "Or pay monthly:"
+        }
+      ],
+      "below12_5": [
+        {
+          "sel": "span.summary-title",
+          "fontPx": 12,
+          "text": "Understand our pricing"
+        },
+        {
+          "sel": "h2.section-title",
+          "fontPx": 12,
+          "text": "Launches"
+        },
+        {
+          "sel": "h3.cat-title",
+          "fontPx": 12,
+          "text": "Everyday Life"
+        },
+        {
+          "sel": "p.kind",
+          "fontPx": 12,
+          "text": "Spark"
+        },
+        {
+          "sel": "button.nav-btn.",
+          "fontPx": 12,
+          "text": "Chat"
+        },
+        {
+          "sel": "button.nav-btn.active",
+          "fontPx": 12,
+          "text": "Store"
+        },
+        {
+          "sel": "span.google-state",
+          "fontPx": 12.48,
+          "text": "Google connected"
+        },
+        {
+          "sel": "p.fine.stripe-line",
+          "fontPx": 12.48,
+          "text": "Automatic unlocks are on — a p"
+        },
+        {
+          "sel": "span.fine",
+          "fontPx": 12.48,
+          "text": "tap to read, in plain words"
+        },
+        {
+          "sel": "a",
+          "fontPx": 12.48,
+          "text": "Supernova"
+        },
+        {
+          "sel": "span.at",
+          "fontPx": 12.48,
+          "text": "$514.00 at checkout"
+        },
+        {
+          "sel": "p.fine",
+          "fontPx": 12.48,
+          "text": "Or pay monthly:"
+        },
+        {
+          "sel": "a.btn.small",
+          "fontPx": 12.48,
+          "text": "$49/mo"
+        },
+        {
+          "sel": "span.owned-badge",
+          "fontPx": 12.48,
+          "text": "Owned — yours already"
+        },
+        {
+          "sel": "button.btn.small.more-info",
+          "fontPx": 12.48,
+          "text": "More info"
+        },
+        {
+          "sel": "span",
+          "fontPx": 12.48,
+          "text": "Spark · one button, one job"
+        },
+        {
+          "sel": "span.pb-desc",
+          "fontPx": 12.48,
+          "text": "The extra attribute that build"
+        },
+        {
+          "sel": "div.store-foot",
+          "fontPx": 12.48,
+          "text": "Questions about any price? Ema"
+        }
+      ],
+      "below12": []
+    }
+  },
+  "consoleErrors": []
+}

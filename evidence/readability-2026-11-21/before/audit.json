@@ -1,0 +1,355 @@
+{
+  "phase": "before",
+  "base": "http://127.0.0.1:10102/",
+  "viewports": {
+    "390x844": {
+      "thread": {
+        "msgFontPx": 14.4,
+        "msgLineHeightPx": 20.88,
+        "msgWidthPx": 280,
+        "approxCharsPerLine": 40,
+        "messagesWidthPx": 390
+      },
+      "email": {
+        "fontPx": 14,
+        "lineHeightPx": 21.7,
+        "widthPx": 320,
+        "approxCharsPerLine": 48,
+        "maxHeight": "464.2px",
+        "overflowY": "auto",
+        "borderRadius": "8px"
+      },
+      "smallestText": [
+        {
+          "sel": "span.at",
+          "fontPx": 10.56,
+          "text": "$514.00 at checkout"
+        },
+        {
+          "sel": "span.google-state",
+          "fontPx": 10.88,
+          "text": "Google connected"
+        },
+        {
+          "sel": "button.nav-btn.",
+          "fontPx": 10.88,
+          "text": "Chat"
+        },
+        {
+          "sel": "button.nav-btn.active",
+          "fontPx": 10.88,
+          "text": "Store"
+        },
+        {
+          "sel": "span",
+          "fontPx": 11.52,
+          "text": "Spark · one button, one job"
+        },
+        {
+          "sel": "span.pb-desc",
+          "fontPx": 11.52,
+          "text": "The extra attribute that build"
+        },
+        {
+          "sel": "div.store-foot",
+          "fontPx": 11.52,
+          "text": "Questions about any price? Ema"
+        },
+        {
+          "sel": "a",
+          "fontPx": 11.52,
+          "text": "prism5labscontact@gmail.com"
+        },
+        {
+          "sel": "p.kind",
+          "fontPx": 12,
+          "text": "Spark"
+        },
+        {
+          "sel": "span.desc",
+          "fontPx": 12.16,
+          "text": "A Supernova is roughly 90,000 "
+        },
+        {
+          "sel": "h2.section-title",
+          "fontPx": 12.8,
+          "text": "Launches"
+        },
+        {
+          "sel": "p.fine.stripe-line",
+          "fontPx": 13,
+          "text": "Automatic unlocks are on — a p"
+        }
+      ],
+      "below12_5": [
+        {
+          "sel": "span.at",
+          "fontPx": 10.56,
+          "text": "$514.00 at checkout"
+        },
+        {
+          "sel": "span.google-state",
+          "fontPx": 10.88,
+          "text": "Google connected"
+        },
+        {
+          "sel": "button.nav-btn.",
+          "fontPx": 10.88,
+          "text": "Chat"
+        },
+        {
+          "sel": "button.nav-btn.active",
+          "fontPx": 10.88,
+          "text": "Store"
+        },
+        {
+          "sel": "span",
+          "fontPx": 11.52,
+          "text": "Spark · one button, one job"
+        },
+        {
+          "sel": "span.pb-desc",
+          "fontPx": 11.52,
+          "text": "The extra attribute that build"
+        },
+        {
+          "sel": "div.store-foot",
+          "fontPx": 11.52,
+          "text": "Questions about any price? Ema"
+        },
+        {
+          "sel": "a",
+          "fontPx": 11.52,
+          "text": "prism5labscontact@gmail.com"
+        },
+        {
+          "sel": "p.kind",
+          "fontPx": 12,
+          "text": "Spark"
+        },
+        {
+          "sel": "span.desc",
+          "fontPx": 12.16,
+          "text": "A Supernova is roughly 90,000 "
+        }
+      ],
+      "below12": [
+        {
+          "sel": "span.at",
+          "fontPx": 10.56,
+          "text": "$514.00 at checkout"
+        },
+        {
+          "sel": "span.google-state",
+          "fontPx": 10.88,
+          "text": "Google connected"
+        },
+        {
+          "sel": "button.nav-btn.",
+          "fontPx": 10.88,
+          "text": "Chat"
+        },
+        {
+          "sel": "button.nav-btn.active",
+          "fontPx": 10.88,
+          "text": "Store"
+        },
+        {
+          "sel": "span",
+          "fontPx": 11.52,
+          "text": "Spark · one button, one job"
+        },
+        {
+          "sel": "span.pb-desc",
+          "fontPx": 11.52,
+          "text": "The extra attribute that build"
+        },
+        {
+          "sel": "div.store-foot",
+          "fontPx": 11.52,
+          "text": "Questions about any price? Ema"
+        },
+        {
+          "sel": "a",
+          "fontPx": 11.52,
+          "text": "prism5labscontact@gmail.com"
+        }
+      ]
+    },
+    "360x800": {
+      "thread": {
+        "msgFontPx": 14.4,
+        "msgLineHeightPx": 20.88,
+        "msgWidthPx": 253,
+        "approxCharsPerLine": 37,
+        "messagesWidthPx": 360
+      },
+      "email": {
+        "fontPx": 14,
+        "lineHeightPx": 21.7,
+        "widthPx": 290,
+        "approxCharsPerLine": 43,
+        "maxHeight": "440px",
+        "overflowY": "auto",
+        "borderRadius": "8px"
+      },
+      "smallestText": [
+        {
+          "sel": "span.at",
+          "fontPx": 10.56,
+          "text": "$514.00 at checkout"
+        },
+        {
+          "sel": "span.google-state",
+          "fontPx": 10.88,
+          "text": "Google connected"
+        },
+        {
+          "sel": "button.nav-btn.",
+          "fontPx": 10.88,
+          "text": "Chat"
+        },
+        {
+          "sel": "button.nav-btn.active",
+          "fontPx": 10.88,
+          "text": "Store"
+        },
+        {
+          "sel": "span",
+          "fontPx": 11.52,
+          "text": "Spark · one button, one job"
+        },
+        {
+          "sel": "span.pb-desc",
+          "fontPx": 11.52,
+          "text": "The extra attribute that build"
+        },
+        {
+          "sel": "div.store-foot",
+          "fontPx": 11.52,
+          "text": "Questions about any price? Ema"
+        },
+        {
+          "sel": "a",
+          "fontPx": 11.52,
+          "text": "prism5labscontact@gmail.com"
+        },
+        {
+          "sel": "p.kind",
+          "fontPx": 12,
+          "text": "Spark"
+        },
+        {
+          "sel": "span.desc",
+          "fontPx": 12.16,
+          "text": "A Supernova is roughly 90,000 "
+        },
+        {
+          "sel": "h2.section-title",
+          "fontPx": 12.8,
+          "text": "Launches"
+        },
+        {
+          "sel": "p.fine.stripe-line",
+          "fontPx": 13,
+          "text": "Automatic unlocks are on — a p"
+        }
+      ],
+      "below12_5": [
+        {
+          "sel": "span.at",
+          "fontPx": 10.56,
+          "text": "$514.00 at checkout"
+        },
+        {
+          "sel": "span.google-state",
+          "fontPx": 10.88,
+          "text": "Google connected"
+        },
+        {
+          "sel": "button.nav-btn.",
+          "fontPx": 10.88,
+          "text": "Chat"
+        },
+        {
+          "sel": "button.nav-btn.active",
+          "fontPx": 10.88,
+          "text": "Store"
+        },
+        {
+          "sel": "span",
+          "fontPx": 11.52,
+          "text": "Spark · one button, one job"
+        },
+        {
+          "sel": "span.pb-desc",
+          "fontPx": 11.52,
+          "text": "The extra attribute that build"
+        },
+        {
+          "sel": "div.store-foot",
+          "fontPx": 11.52,
+          "text": "Questions about any price? Ema"
+        },
+        {
+          "sel": "a",
+          "fontPx": 11.52,
+          "text": "prism5labscontact@gmail.com"
+        },
+        {
+          "sel": "p.kind",
+          "fontPx": 12,
+          "text": "Spark"
+        },
+        {
+          "sel": "span.desc",
+          "fontPx": 12.16,
+          "text": "A Supernova is roughly 90,000 "
+        }
+      ],
+      "below12": [
+        {
+          "sel": "span.at",
+          "fontPx": 10.56,
+          "text": "$514.00 at checkout"
+        },
+        {
+          "sel": "span.google-state",
+          "fontPx": 10.88,
+          "text": "Google connected"
+        },
+        {
+          "sel": "button.nav-btn.",
+          "fontPx": 10.88,
+          "text": "Chat"
+        },
+        {
+          "sel": "button.nav-btn.active",
+          "fontPx": 10.88,
+          "text": "Store"
+        },
+        {
+          "sel": "span",
+          "fontPx": 11.52,
+          "text": "Spark · one button, one job"
+        },
+        {
+          "sel": "span.pb-desc",
+          "fontPx": 11.52,
+          "text": "The extra attribute that build"
+        },
+        {
+          "sel": "div.store-foot",
+          "fontPx": 11.52,
+          "text": "Questions about any price? Ema"
+        },
+        {
+          "sel": "a",
+          "fontPx": 11.52,
+          "text": "prism5labscontact@gmail.com"
+        }
+      ]
+    }
+  },
+  "consoleErrors": []
+}

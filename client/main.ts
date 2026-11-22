@@ -342,7 +342,7 @@ function closeCard() {
     if (cardOpener && document.contains(cardOpener)) cardOpener.focus();
     cardOpener = null;
     cardCloseTimer = null;
-  }, 350);
+  }, 400);
 }
 
 function cardShell(title: string, bodyHtml: string): string {
@@ -849,7 +849,7 @@ function meterBar(): string {
 
 function photonCard(p: any, size = 220): string {
   const owned = p.owned;
-  // The owner's chosen look set reskins this Photon's card, so the
+  // The owner's chosen look set tints this Photon's card, so the
   // choice is visible before the chat is even opened.
   const look = lookSetById(customFor(p.name).lookSet || "");
   return `<button class="photon-card${look ? ` look-${look.id}` : ""}" data-action="open-photon" data-photon="${esc(p.name)}" ${
@@ -1186,10 +1186,9 @@ function renderChatThread(): string {
   const portraitImg = (size: number) =>
     isAtom ? atomPortraitHtml(portrait, size) : portraitHtml(portrait, size);
   const customized = !isAtom && !!(state as any)?.customizations?.[p.name];
-  // The owner's chosen look set reskins this Photon's whole chat.
-  // The class lives on this section, and syncBodyLook() puts it on
-  // <body> too, so the whole app follows; leaving the thread clears
-  // the body class and restores the default look with no cleanup.
+  // The owner's chosen look set tints this Photon's chat surfaces.
+  // The class lives on this section only — the brand bar and bottom
+  // nav keep the house palette (readability spec §3A.6).
   const look = isAtom ? null : lookSetById(customFor(p.name).lookSet || "");
   // A streaming reply shows three dots until the first words land.
   const botMsg = (text: string, streaming = false) =>
@@ -1979,14 +1978,10 @@ function renderDriveSection(): string {
         )
         .join("")
     : `<p class="fine">No files found${driveQuery ? ` for “${esc(driveQuery)}”` : ""}.</p>`;
-  const read = state?.driveFileRead;
-  const readBox = read
-    ? read.ok && read.readable
-      ? `<div class="drive-read"><h4>${esc(read.file?.name || "File")}</h4><pre class="drive-content">${esc(read.content || "")}</pre>${read.truncated ? `<p class="fine">Showing the first 100,000 characters — the file is longer than that.</p>` : ""}<button class="btn small" data-action="drive-close">Close file</button></div>`
-      : read.ok && !read.readable
-        ? `<div class="drive-read"><h4>${esc(read.file?.name || "File")}</h4><p>${esc(read.message || "This file type cannot be read as text.")}</p><button class="btn small" data-action="drive-close">Close</button></div>`
-        : `<p class="chat-error">${esc(read.message || "That file didn't load. Try again.")}</p>`
-    : "";
+  // A read file no longer renders inline as a boxed pane: it opens as
+  // a document page in the Level-2 sheet (see openDriveDocument,
+  // called from the drive-open action), so this section is list only.
+  const readBox = "";
   return `<div class="card" id="drive"><h3>Drive</h3>
     <p class="fine">${esc(st.email || "")}</p>
     <form id="drive-search-form" class="row">
@@ -2074,6 +2069,37 @@ function renderMessenger(): string {
     ${openHtml}
     ${connectForm}
     ${personal}</div>`;
+}
+
+// The Drive document page: the Level-2 sheet, a caption + card-title
+// head, and the file's text at reading size on the page's own scroll —
+// no inner scrollbar, no boxed pane (readability spec §3A.3).
+function openDriveDocument(opener: HTMLElement | null) {
+  const read: any = state?.driveFileRead;
+  if (!read) return;
+  const name = read.file?.name || "File";
+  if (read.ok && read.readable) {
+    openCard(
+      cardShell(
+        name,
+        `<div class="doc-head"><p class="doc-meta">${esc(read.file?.mimeType || "Document")}</p><h2 class="card-title">${esc(name)}</h2></div><pre class="drive-content">${esc(read.content || "")}</pre>${read.truncated ? `<p class="fine">Showing the first 100,000 characters — the file is longer than that.</p>` : ""}`,
+      ),
+      opener,
+    );
+  } else if (read.ok && !read.readable) {
+    openCard(
+      cardShell(
+        name,
+        `<div class="doc-head"><h2 class="card-title">${esc(name)}</h2></div><p>${esc(read.message || "This file type cannot be read as text.")}</p>`,
+      ),
+      opener,
+    );
+  } else {
+    openCard(
+      cardShell(name, `<p class="chat-error">${esc(read.message || "That file didn't load. Try again.")}</p>`),
+      opener,
+    );
+  }
 }
 
 async function reloadMessengerThreads() {
@@ -2223,8 +2249,7 @@ async function openEmailMessage(
     openCard(
       cardShell(
         r.subject || "Message",
-        `<h2 class="card-title">${esc(r.subject || "(no subject)")}</h2>
-        <p class="card-kind">${esc(r.from || "")} · ${esc(r.date || "")}</p>
+        `<div class="doc-head"><p class="doc-meta">${esc(r.from || "")} · ${esc(r.date || "")}</p><h2 class="card-title">${esc(r.subject || "(no subject)")}</h2></div>
         <div class="email-body">${esc(r.body || "Nothing in the body.")}</div>`,
       ),
       opener,
@@ -3186,20 +3211,14 @@ function renderNav() {
   if (headerName) headerName.textContent = state?.displayName || "Prism 5";
 }
 
-// The active Photon's look reskins the whole app, not just the thread:
-// the look class rides on <body> so the header, nav, composer dock and
-// every page follow the same skin, and picking a look matters like a
-// reskin, not a few colors. Leaving the thread (or picking no look)
-// clears the class, so the default gallery look returns. The thread
-// section and the Photon card keep their own look classes too.
+// A Photon's look tints its thread's surfaces only (readability spec
+// §3A.6, Nov 21, 2026): the brand bar and the bottom nav keep the
+// house palette, so moving between Photons changes the room's light,
+// not the building. The look class therefore rides on the thread
+// section and the Photon card (set in their own markup), never on
+// <body>; this only clears any body class an older build left behind.
 function syncBodyLook() {
-  const p =
-    tab === "chat" && activePhoton && !customizePhoton && !callPhotonName
-      ? PHOTONS.find((x) => x.name === activePhoton)
-      : null;
-  const look = p ? lookSetById(customFor(p.name).lookSet || "") : null;
   for (const s of LOOK_SETS) document.body.classList.remove(`look-${s.id}`);
-  if (look) document.body.classList.add(`look-${look.id}`);
 }
 
 // ---------- Chat backgrounds: the room you talk in ----------
@@ -3288,8 +3307,10 @@ function syncAppBackground(): void {
 // not pieces stuck together. Same-view re-renders — data arriving, chat
 // streaming — swap instantly, so nothing flickers while it works. The
 // animation lives in styles.css (.view-enter) and is off under
-// prefers-reduced-motion. The fade is slow (700ms) by the fade rule
-// (Nov 19, 2026): nothing may feel like a video popping up.
+// prefers-reduced-motion. The fade is slow and symmetric — 600ms out
+// and 600ms in (--t-view) by the fade rule (Nov 19, 2026) and the
+// readability spec §2.5 (Nov 21, 2026): nothing may feel like a video
+// popping up.
 
 // A tab switch fades the old view out slowly first (fadeTo, below),
 // then the new view fades in — the fade rule, both directions. A
@@ -3309,7 +3330,7 @@ function fadeTo(fn: () => void, after?: () => void): void {
     v.classList.remove("view-leaving");
     fn();
     if (after) after();
-  }, 350);
+  }, 600);
 }
 let lastViewKey = "";
 function viewKey(): string {
@@ -4104,11 +4125,10 @@ document.addEventListener("click", async (e) => {
     const id = t.dataset.id || "";
     const r = await api.driveFile(id);
     state.driveFileRead = r || { ok: false, message: "That file didn't load." };
-    render();
-    const box = document.querySelector(".drive-read");
-    if (box) box.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    openDriveDocument(t);
   } else if (action === "drive-close") {
     state.driveFileRead = null;
+    closeCard();
     render();
   } else if (action === "drive-clear") {
     driveQuery = "";
