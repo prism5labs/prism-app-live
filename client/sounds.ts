@@ -27,9 +27,9 @@ export const OPENING_LINE =
 // Quiet: these sit under the voice and the film, never over them.
 // Raised Nov 21, 2026, on Neil's order: every sound, all apps. The
 // v1 palette stood at 0.09-0.1, a whisper on a phone speaker.
-const CLICK_GAIN = 0.25;
-const TOGGLE_GAIN = 0.25;
-const SWOOSH_GAIN = 0.28;
+const CLICK_GAIN = 0.42;
+const TOGGLE_GAIN = 0.42;
+const SWOOSH_GAIN = 0.45;
 
 let enabled = true;
 let ctx: AudioContext | null = null;
