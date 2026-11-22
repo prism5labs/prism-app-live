@@ -1218,6 +1218,7 @@ function renderChatThread(): string {
         <span class="thread-tag">${esc(p.tagline)}</span>
         ${customized ? `<span class="thread-voice">Voice: ${esc(voiceNameOf(p.name))}</span>` : ""}
       </div>
+      <a class="btn small" href="${esc(api.threadExportUrl(p.name))}" download>Export</a>
       ${isAtom ? "" : `<details class="thread-menu">
         <summary aria-label="More options">···</summary>
         <div class="thread-menu-list">

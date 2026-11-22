@@ -107,6 +107,7 @@ import { handleProactiveApi, startProactiveScheduler } from "./server/proactive"
 import { handleDayApi } from "./server/startmyday";
 import { handleResearch } from "./server/research";
 import { handleStripeWebhook, handleStripeStatus } from "./server/stripe";
+import { buildThreadExport, threadExportFilename } from "./server/threadExport";
 // Google sign-in for the app itself: a person, not a device. Same OAuth
 // client as Gmail; the account follows the owner across devices.
 import {
@@ -694,6 +695,30 @@ async function handleApi(req: Request, path: string): Promise<Response> {
       photon,
       owned: ownsChatName(accountId, photon),
       messages: getThread(accountId, photon),
+    });
+  }
+
+  // GET /api/threads/:name/export — the same thread as a downloadable
+  // Markdown transcript, so the owner can take their own conversation
+  // back out. Same account and name checks as GET /api/threads/:name.
+  // An empty thread has nothing to export: a clean 404 in the same
+  // { ok: false, error } shape as every other error here.
+  const threadExportMatch = path.match(/^\/api\/threads\/([A-Za-z]+)\/export$/);
+  if (threadExportMatch && method === "GET") {
+    const photon = threadExportMatch[1];
+    const accountId = accountIdFrom(req, {});
+    if (!isValidAccountId(accountId)) return bad("accountId required", 400);
+    if (!isChatName(photon)) return bad("unknown photon", 400);
+    const messages = getThread(accountId, photon);
+    if (messages.length === 0) return bad("no messages to export", 404);
+    const exportedAt = new Date();
+    const filename = threadExportFilename(photon, exportedAt);
+    return new Response(buildThreadExport(photon, messages, exportedAt), {
+      status: 200,
+      headers: {
+        "content-type": "text/markdown; charset=utf-8",
+        "content-disposition": `attachment; filename="${filename}"`,
+      },
     });
   }
 

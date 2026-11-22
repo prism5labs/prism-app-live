@@ -113,6 +113,11 @@ export const api = {
     }),
   thread: (photon: string) =>
     req(`/api/threads/${encodeURIComponent(photon)}?accountId=${encodeURIComponent(getAccountId())}`),
+  // Conversation export: a direct download URL (not a req() call — the
+  // answer is a Markdown file, not JSON), carrying the current account id
+  // exactly as the thread read does.
+  threadExportUrl: (photon: string) =>
+    `/api/threads/${encodeURIComponent(photon)}/export?accountId=${encodeURIComponent(getAccountId())}`,
   chat: (photon: string, message: string) =>
     req(
       "/api/chat",
