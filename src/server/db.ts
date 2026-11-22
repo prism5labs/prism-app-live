@@ -205,6 +205,32 @@ try {
   console.error("profile migration failed:", err);
 }
 
+// --- Atom renames, Nov 22, 2026 (June -> Jude, Cleo -> Clive, Pearl -> Pierce) ---
+// Three of the twelve Atoms were renamed at Neil's ruling: the portraits
+// are men and the old names were women's. Threads, messages and
+// customizations are keyed by persona name, and Atom ownership lives in
+// owned rows with kind 'atom', so existing rows under the old names are
+// carried to the new ones here. Idempotent: after the first run no rows
+// carry the old names, so the updates match nothing. The new names never
+// existed as personas before this deploy, so no row can collide. Any
+// failure is caught and logged; it must never stop the server starting.
+try {
+  const ATOM_RENAMES: [string, string][] = [
+    ["June", "Jude"],
+    ["Cleo", "Clive"],
+    ["Pearl", "Pierce"],
+  ];
+  for (const [oldName, newName] of ATOM_RENAMES) {
+    db.query(`UPDATE threads SET photon = ? WHERE photon = ?`).run(newName, oldName);
+    db.query(`UPDATE messages SET photon = ? WHERE photon = ?`).run(newName, oldName);
+    db.query(`UPDATE customizations SET photon = ? WHERE photon = ?`).run(newName, oldName);
+    db.query(`UPDATE contacts SET photon = ? WHERE photon = ?`).run(newName, oldName);
+    db.query(`UPDATE owned SET ref = ? WHERE kind = 'atom' AND ref = ?`).run(newName, oldName);
+  }
+} catch (err) {
+  console.error("atom rename migration failed:", err);
+}
+
 // --- Side column added Nov 19, 2026 (Business or Personal) ---
 // The first-open chooser's choice lives on the ACCOUNT, in the profile
 // row, so the app and the website follow it together for a signed-in

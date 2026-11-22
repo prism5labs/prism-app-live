@@ -599,7 +599,7 @@ function deliverBriefingToPhotonThread(accountId: string, items: NewItem[]): voi
   }
 }
 
-// --- Nova check-ins (Ruby) and getting-started nudges (June) ---
+// --- Nova check-ins (Ruby) and getting-started nudges (Jude) ---
 // Template lines, written here — NOT brain-generated. Two-three variants
 // each, rotated by calendar date. Delivery is gated by seen_state with a
 // dated id, so a restart can never double-send a day's message.
@@ -608,10 +608,10 @@ const RUBY_CHECK_INS = [
   "Hello, Ruby here. A quick check-in: how are you doing today? If a note, a birthday, or a catch-up has been sitting on your mind, I can help you get it drafted.",
   "Hi, it's Ruby, checking in. How's the day treating you? Say the word if you'd like a hand staying in touch with anyone who matters.",
 ];
-const JUNE_NUDGES = [
-  "Hello, I'm June. One small first step is enough for today — pick the tiniest piece of the thing you've been putting off, and let's just do that piece together.",
-  "Hi, June here. You don't need the whole staircase today, just the first step: what's one small thing we could start, right now, in the next few minutes?",
-  "Hello, it's June. A gentle nudge: choose one thing that's been waiting, shrink it to its smallest first step, and tell me what it is — we'll begin there.",
+const JUDE_NUDGES = [
+  "Hello, I'm Jude. One small first step is enough for today — pick the tiniest piece of the thing you've been putting off, and let's just do that piece together.",
+  "Hi, Jude here. You don't need the whole staircase today, just the first step: what's one small thing we could start, right now, in the next few minutes?",
+  "Hello, it's Jude. A gentle nudge: choose one thing that's been waiting, shrink it to its smallest first step, and tell me what it is — we'll begin there.",
 ];
 
 function chicagoDate(now = new Date()): string {
@@ -656,7 +656,7 @@ function seenCount(accountId: string, channel: string): number {
   return row?.n ?? 0;
 }
 
-// Deliver today's Ruby check-in and/or June nudge for one account.
+// Deliver today's Ruby check-in and/or Jude nudge for one account.
 // Returns what was delivered. Never throws: a sender failure must not
 // break the check cycle.
 export async function runNovaSenders(
@@ -680,14 +680,14 @@ export async function runNovaSenders(
       }
     }
 
-    if (settings.gettingStartedNudges && ownsAtomOrNovaProduct(accountId, "June")) {
+    if (settings.gettingStartedNudges && ownsAtomOrNovaProduct(accountId, "Jude")) {
       // At most once per day, and only on the first 3 distinct days.
       if (!alreadySeen(accountId, "nova-nudge", date) && seenCount(accountId, "nova-nudge") < 3) {
-        const text = variantFor(JUNE_NUDGES, date);
-        addMessage(accountId, "June", "assistant", text);
+        const text = variantFor(JUDE_NUDGES, date);
+        addMessage(accountId, "Jude", "assistant", text);
         markSeen(accountId, "nova-nudge", date);
         out.nudge = true;
-        await sendPush(accountId, "June", "June has a small first step for you.");
+        await sendPush(accountId, "Jude", "Jude has a small first step for you.");
       }
     }
   } catch (e) {

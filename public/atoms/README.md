@@ -2,9 +2,9 @@
 
 Drop a real portrait PNG here, one per Atom, named exactly:
 
-- `Mabel.png`, `Hazel.png`, `Willa.png`, `Ruby.png`, `June.png`,
-  `Sadie.png`, `Bea.png`, `Flora.png`, `Pearl.png`, `Iris.png`,
-  `Cleo.png`, `Nora.png`
+- `Mabel.png`, `Hazel.png`, `Willa.png`, `Ruby.png`, `Jude.png`,
+  `Sadie.png`, `Bea.png`, `Flora.png`, `Pierce.png`, `Iris.png`,
+  `Clive.png`, `Nora.png`
 
 Square, at least 256x256. The app uses the PNG when it exists and falls
 back to a generated placeholder tile (initial + triangle) when it does not.
@@ -14,9 +14,9 @@ the same family as the Photon portraits — faceted deep-teal armor with
 chrome trim and red piping, young faces with fifties hair, each keeping
 its role's costume, emblem, and prop, with gold rank bars and serial
 N-01..N-12 — Mabel (letters and red pencil), Hazel (pocket diary),
-Willa (morning paper and mug), Ruby (telephone handset), June (lantern),
+Willa (morning paper and mug), Ruby (telephone handset), Jude (lantern),
 Sadie (hourglass), Bea (journal and lamp), Flora (apron and house key),
-Pearl (ledger book), Iris (card catalog box), Cleo (clipboard), Nora
+Pierce (ledger book), Iris (card catalog box), Clive (clipboard), Nora
 (compass). Known inconsistency (Nov 19, 2026): the corps line varies —
 Hazel reads "SPACE POSTAL CORPS", Mabel reads "SPACE MAIL CORPS" —
 slated for a later polish pass. If a portrait is ever replaced, drop

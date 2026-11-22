@@ -148,7 +148,7 @@
 // cached one.
 // CACHE v44: bumped Nov 21, 2026 for the proactive loop — texts and
 // calendar channel checks, check findings delivered into the owner's
-// Photon thread, and the Nova (Ruby/June) check-in and nudge sender.
+// Photon thread, and the Nova (Ruby/Jude) check-in and nudge sender.
 // The cache bump makes existing installs fetch the new main.js
 // instead of serving the cached one.
 // CACHE v45: bumped Nov 21, 2026 for the readability & elegance pass —
@@ -166,7 +166,15 @@
 // paragraphs cut. The cache bump makes existing installs fetch the
 // new main.js, index.html and styles.css instead of serving the
 // cached ones, and clears any older shell cache entries on activate.
-const CACHE = "prism5-v53";
+// CACHE v54: bumped Nov 22, 2026 for the Atom renames — June is now
+// Jude, Cleo is now Clive, Pearl is now Pierce (the portraits are men;
+// the names were the mismatch). The roster, backstories, nudge sender,
+// portrait filenames and thumbnails all carry the new names, and a
+// server migration carries existing threads and ownership rows over,
+// so no customer's conversation is orphaned. The cache bump makes
+// existing installs fetch the new main.js instead of serving the
+// cached one.
+const CACHE = "prism5-v54";
 // Images (portraits, thumbnails, brand art, chat backgrounds, icons)
 // live in their own cache whose name does NOT change with the shell
 // version. Before v52 every shell bump deleted the one cache on
