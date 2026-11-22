@@ -216,7 +216,7 @@ const mock = net.createServer((socket) => {
       send(`${tag} BAD Unknown command\r\n`);
     }
   };
-  socket.on("data", (d) => {
+  socket.on("data", (d: Buffer) => {
     buf = Buffer.concat([buf, d]);
     for (;;) {
       if (pendingAppend) {

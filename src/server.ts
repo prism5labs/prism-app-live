@@ -39,7 +39,13 @@ import {
   personaSeed,
   type Contact,
 } from "./server/db";
-import { chatWithTools } from "./server/anthropic";
+import {
+  chatWithTools,
+  WEB_SEARCH_TOOL,
+  RESEARCH_SYSTEM_NOTE,
+  MAX_SEARCHES_PER_CALL,
+  formatSearchResults,
+} from "./server/anthropic";
 import { TOOL_DEFINITIONS, executeTool, getToolConnectionState } from "./server/tools";
 import { chat as geminiChat, chatStream as geminiChatStream } from "./server/gemini";
 import { systemPromptFor, type OwnerContext } from "./server/personas";
@@ -122,7 +128,12 @@ import {
 } from "./server/telephony";
 import { handleProactiveApi, startProactiveScheduler } from "./server/proactive";
 import { handleDayApi } from "./server/startmyday";
-import { handleResearch } from "./server/research";
+import {
+  handleResearch,
+  researchConfigured,
+  searchWeb,
+  MAX_QUERY_LENGTH,
+} from "./server/research";
 import { handleStripeWebhook, handleStripeStatus } from "./server/stripe";
 import { buildThreadExport, threadExportFilename } from "./server/threadExport";
 // Google sign-in for the app itself: a person, not a device. Same OAuth
@@ -484,6 +495,45 @@ async function prepareChat(
   return { accountId, photon, message, system, history };
 }
 
+// Web search rides along with the Photon tools whenever a Brave key is
+// configured: offered first, capped per message, and a failed search
+// reaches the brain as plain words, never an upstream error. Without a
+// key the definitions, executor, and prompt are exactly as before.
+function chatToolSetup(accountId: string, system: string) {
+  if (!researchConfigured()) {
+    return {
+      system,
+      definitions: TOOL_DEFINITIONS,
+      execute: (name: string, input: any) => executeTool(accountId, name, input),
+    };
+  }
+  let searches = 0;
+  const execute = async (name: string, input: any): Promise<string> => {
+    if (name !== WEB_SEARCH_TOOL.name) return executeTool(accountId, name, input);
+    if (searches >= MAX_SEARCHES_PER_CALL) {
+      return "The search limit for this message was reached.";
+    }
+    searches++;
+    const query =
+      typeof input?.query === "string"
+        ? input.query.trim().slice(0, MAX_QUERY_LENGTH)
+        : "";
+    if (!query) return "That search had no query to run.";
+    try {
+      const results = await searchWeb(query);
+      return formatSearchResults(query, results);
+    } catch (e) {
+      console.error("Brain web search failed:", e);
+      return `The search for "${query}" did not come back.`;
+    }
+  };
+  return {
+    system: `${system}\n\n${RESEARCH_SYSTEM_NOTE}`,
+    definitions: [WEB_SEARCH_TOOL, ...TOOL_DEFINITIONS],
+    execute,
+  };
+}
+
 // --- State ---
 function stateFor(accountId: string) {
   const a = getOrCreateAccount(accountId);
@@ -748,10 +798,15 @@ async function handleApi(req: Request, path: string): Promise<Response> {
     // Anthropic takes precedence; Gemini is only the free bridge when no
     // Anthropic key is set. Gating and the meter already ran above and wrap
     // this call either way.
+    const toolSetup = chatToolSetup(accountId, system);
     const result =
       brainProvider() === "anthropic"
-        ? await chatWithTools(system, history, message, TOOL_DEFINITIONS, (name, input) =>
-            executeTool(accountId, name, input),
+        ? await chatWithTools(
+            toolSetup.system,
+            history,
+            message,
+            toolSetup.definitions,
+            toolSetup.execute,
           )
         : await geminiChat(system, history, message);
     if (!result.ok) {
@@ -801,12 +856,13 @@ async function handleApi(req: Request, path: string): Promise<Response> {
             // Anthropic has no streaming client here, so the tool loop
             // runs to completion and the whole reply goes out as one
             // delta, exactly the shape this handler already used.
+            const toolSetup = chatToolSetup(accountId, system);
             const result = await chatWithTools(
-              system,
+              toolSetup.system,
               history,
               message,
-              TOOL_DEFINITIONS,
-              (name, input) => executeTool(accountId, name, input),
+              toolSetup.definitions,
+              toolSetup.execute,
             );
             if (!result.ok) {
               send({ error: result.error, message: brainErrorMessage(result.error) });

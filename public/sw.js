@@ -188,7 +188,7 @@
 // third rename) is carried to Clive with the current template text, or
 // removed when the account already holds a Clive row. Server-only
 // change; the cache bump keeps the shell version honest.
-const CACHE = "prism5-v57";
+const CACHE = "prism5-v58";
 // Images (portraits, thumbnails, brand art, chat backgrounds, icons)
 // live in their own cache whose name does NOT change with the shell
 // version. Before v52 every shell bump deleted the one cache on

@@ -50,7 +50,7 @@ export const WEB_SEARCH_TOOL = {
 
 /** How many tool rounds a single chat call may take before the brain must
  *  answer in words. Two rounds of searching, then a final text-only call. */
-export const MAX_TOOL_ROUNDS = 2;
+export const MAX_RESEARCH_TOOL_ROUNDS = 2;
 /** Cap on searches per chat call, so one message cannot burn the quota. */
 export const MAX_SEARCHES_PER_CALL = 2;
 
@@ -107,7 +107,7 @@ function parseResponse(data: any): ParsedResponse {
   };
 }
 
-function formatResults(query: string, results: SearchResult[]): string {
+export function formatSearchResults(query: string, results: SearchResult[]): string {
   if (results.length === 0) return `No results came back for "${query}".`;
   return results
     .map((r) => `- ${r.title} (${r.source}): ${r.snippet} ${r.url}`)
@@ -170,8 +170,8 @@ export async function chat(
     { role: "user", content: userMessage },
   ];
   let searchesUsed = 0;
-  for (let round = 0; round <= MAX_TOOL_ROUNDS; round++) {
-    const attachTools = toolsOn && round < MAX_TOOL_ROUNDS;
+  for (let round = 0; round <= MAX_RESEARCH_TOOL_ROUNDS; round++) {
+    const attachTools = toolsOn && round < MAX_RESEARCH_TOOL_ROUNDS;
     const result = await callAnthropic(
       system,
       messages,
@@ -210,7 +210,7 @@ export async function chat(
       let content: string;
       try {
         const results = await searchWeb(query, opts.searchProvider);
-        content = formatResults(query, results);
+        content = formatSearchResults(query, results);
       } catch (e) {
         console.error("Brain web search failed:", e);
         content = `The search for "${query}" did not come back.`;
