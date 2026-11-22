@@ -9,6 +9,7 @@ import { join } from "node:path";
 import { config } from "./config";
 import { PHOTON_NAMES } from "../shared/photons";
 import { ATOM_NAMES } from "../shared/atoms";
+import { ATOM_BACKSTORIES } from "../shared/backstories";
 import { VOICES, LOOK_SETS } from "../shared/voices";
 
 const VOICE_IDS = new Set(VOICES.map((v) => v.id));
@@ -229,6 +230,48 @@ try {
   }
 } catch (err) {
   console.error("atom rename migration failed:", err);
+}
+
+// --- Atom backstory pronoun correction, Nov 22, 2026 ---
+// The v55 pronoun pass fixed the Jude and Pierce templates in
+// src/shared/backstories.ts (Jude they/them, Pierce he/him, matching the
+// declared pronouns in src/shared/atoms.ts), but atom_backstories rows
+// are seeded once, at account linking, and never rewritten — so accounts
+// linked earlier still hold the old she/her wording in their stored
+// rows. This migration brings the stored Jude and Pierce rows up to the
+// current corrected template text. The rename migration above does not
+// touch this table, so rows may also still be keyed by the old names
+// June and Pearl: those are carried to Jude and Pierce with the
+// corrected text, unless the account already has a row under the new
+// name (corrected by the first two updates), in which case the stale
+// old-name row is removed. Only Jude/Pierce (and June/Pearl) rows are
+// touched; every other Atom's stored text is left exactly as it stands.
+// Idempotent: after the first run the templates already match and no
+// old-name rows remain, so the updates match nothing that differs. Any
+// failure is caught and logged; it must never stop the server starting.
+// The table itself is created in auth.ts, which loads after this file,
+// so on a brand-new database it may not exist yet — then there are no
+// stored rows to correct, and the guard simply skips.
+try {
+  const _hasAtomBackstories = db
+    .query(`SELECT COUNT(*) AS n FROM sqlite_master WHERE type = 'table' AND name = 'atom_backstories'`)
+    .get() as { n: number };
+  if (_hasAtomBackstories.n === 1) {
+    const _judeText = ATOM_BACKSTORIES["Jude"];
+    const _pierceText = ATOM_BACKSTORIES["Pierce"];
+    if (_judeText) {
+      db.query(`UPDATE atom_backstories SET template = ? WHERE atom = 'Jude'`).run(_judeText);
+      db.query(`UPDATE OR IGNORE atom_backstories SET atom = 'Jude', template = ? WHERE atom = 'June'`).run(_judeText);
+      db.query(`DELETE FROM atom_backstories WHERE atom = 'June'`).run();
+    }
+    if (_pierceText) {
+      db.query(`UPDATE atom_backstories SET template = ? WHERE atom = 'Pierce'`).run(_pierceText);
+      db.query(`UPDATE OR IGNORE atom_backstories SET atom = 'Pierce', template = ? WHERE atom = 'Pearl'`).run(_pierceText);
+      db.query(`DELETE FROM atom_backstories WHERE atom = 'Pearl'`).run();
+    }
+  }
+} catch (err) {
+  console.error("atom backstory pronoun migration failed:", err);
 }
 
 // --- Side column added Nov 19, 2026 (Business or Personal) ---

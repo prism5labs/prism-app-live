@@ -178,7 +178,12 @@
 // they/them and Pierce's he/him throughout, matching the declared
 // pronouns in src/shared/atoms.ts. Text-only change; the cache bump
 // makes existing installs fetch the corrected bundle.
-const CACHE = "prism5-v55";
+// v56: stored-row companion to v55 — a boot migration rewrites the
+// Jude and Pierce rows already sitting in accounts' atom_backstories
+// tables (seeded at linking with the old wording), and carries any
+// rows still keyed June/Pearl over with the corrected text. Server-only
+// change; the cache bump keeps the shell version honest.
+const CACHE = "prism5-v56";
 // Images (portraits, thumbnails, brand art, chat backgrounds, icons)
 // live in their own cache whose name does NOT change with the shell
 // version. Before v52 every shell bump deleted the one cache on
