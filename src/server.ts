@@ -1628,6 +1628,14 @@ async function serveStatic(req: Request, path: string): Promise<Response> {
     headers["service-worker-allowed"] = "/";
     headers["cache-control"] = "no-cache";
   }
+  if (ext === ".mp4") {
+    // Films are version-named and never change under a name, so let
+    // the CDN edge cache them for a year (Nov 21, 2026): a reader's
+    // phone then pulls the film from a nearby edge instead of
+    // streaming every byte from this origin on a possibly thin
+    // residential path, which froze the films mid-play.
+    headers["cache-control"] = "public, max-age=31536000, immutable";
+  }
   return new Response(file, { headers });
 }
 
