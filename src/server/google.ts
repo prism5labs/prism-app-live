@@ -439,6 +439,27 @@ export async function listCalendarEvents(
   };
 }
 
+// --- Proactive channel check (contract: see proactive.ts) ---
+// Calendar events starting within the next 24 hours, for the scheduler
+// to diff against seen_state. An unconnected Calendar returns [] — the
+// channel exists and is available, it is simply quiet. Any Google error
+// also returns [] here (never throws into the scheduler); the detail is
+// logged by listCalendarEvents/googleFetch already.
+export async function checkChannelItems(
+  accountId: string,
+): Promise<Array<{ id: string; summary: string; detail?: string }>> {
+  if (!getGoogleToken(accountId)) return [];
+  const now = new Date();
+  const max = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+  const r = await listCalendarEvents(accountId, now.toISOString(), max.toISOString());
+  if (!r.ok) return [];
+  return r.events.map((e) => ({
+    id: `${e.id}:${e.start}`,
+    summary: e.summary,
+    detail: e.location ? `${e.start} — ${e.location}` : e.start,
+  }));
+}
+
 export async function bookCalendarEvent(
   accountId: string,
   input: { title?: string; start?: string; end?: string; description?: string; location?: string; attendees?: string[] },

@@ -18,16 +18,19 @@
 // startProactiveScheduler() once the server is up.
 //
 // Honest limits, stated here so no Photon ever claims otherwise:
-//   - Texts and calendar are not built yet (steps 1 and 4). The scheduler
-//     checks for those modules lazily and reports them as unavailable until
-//     they exist; it never invents a check it did not run.
+//   - Texts (telephony.ts) and calendar (google.ts) checks are built: each
+//     module exports checkChannelItems and this scheduler diffs the results
+//     against seen_state. Texts only contain anything when Twilio is
+//     configured on the server; calendar only when the owner has connected
+//     Google Calendar. Unconfigured/unconnected channels return no items —
+//     available, but quiet.
 //   - On the free tier the process sleeps, so the scheduler only runs while
 //     the server is awake, and seen-state lives on the ephemeral disk until
 //     step 2's paid disk lands (see WIRING.md).
 //   - Push needs VAPID keys in the environment. Without them, checks and
 //     reminders still run and list; only the tap on the phone is missing.
 
-import { db } from "./db";
+import { addMessage, db, getNovaSettings, getOrCreateAccount, getOwned, ownsAtom } from "./db";
 import { config } from "./config";
 import { listInbox, connectedLabels, type GmailLabel } from "./gmail";
 
@@ -540,11 +543,12 @@ async function checkGmail(accountId: string): Promise<{ checked: boolean; newIte
   }
 }
 
-// Texts (step 1) and calendar (step 4) are not built yet. The contract for
-// those modules, when they land, is to export:
+// Texts (telephony.ts) and calendar (google.ts) implement the channel
+// contract: each exports
 //   checkChannelItems(accountId: string): Promise<Array<{ id, summary, detail? }>>
 // returning recent items for that channel; this scheduler diffs them against
-// seen_state itself. Until then the check reports unavailable, honestly.
+// seen_state itself. A module that is missing or does not export the
+// function is reported unavailable, honestly.
 // The dynamic import uses a plain string specifier on purpose: TypeScript
 // does not try to resolve it at typecheck time, and the try/catch below
 // turns a missing module into "not built" instead of a crash.
@@ -574,6 +578,124 @@ async function checkOptionalChannel(
   }
 }
 
+// --- Findings into the owner's Photon thread ---
+// When a cycle finds something new, the same findings are also written
+// into the owner's first owned Photon's thread as ONE assistant message,
+// so they are waiting in the conversation the owner actually reads — not
+// only as a phone tap. This is a factual briefing composed here by the
+// scheduler, not a brain-generated reply, so the wording stays plain.
+// No owned Photon means no thread delivery (push behaviour unchanged),
+// and a delivery failure never breaks the cycle.
+function deliverBriefingToPhotonThread(accountId: string, items: NewItem[]): void {
+  try {
+    const photon = getOwned(accountId).photons[0];
+    if (!photon) return;
+    const lines = items
+      .slice(0, 10)
+      .map((i) => (i.detail ? `• ${i.summary} — ${i.detail}` : `• ${i.summary}`));
+    addMessage(accountId, photon, "assistant", `While you were away:\n${lines.join("\n")}`);
+  } catch (e) {
+    console.error(`proactive thread briefing failed for ${accountId}:`, e);
+  }
+}
+
+// --- Nova check-ins (Ruby) and getting-started nudges (June) ---
+// Template lines, written here — NOT brain-generated. Two-three variants
+// each, rotated by calendar date. Delivery is gated by seen_state with a
+// dated id, so a restart can never double-send a day's message.
+const RUBY_CHECK_INS = [
+  "Hi, it's Ruby. Just checking in — how is your day going? If there's someone you've been meaning to reach out to, or anything I can help you line up, tell me and we'll take it from there.",
+  "Hello, Ruby here. A quick check-in: how are you doing today? If a note, a birthday, or a catch-up has been sitting on your mind, I can help you get it drafted.",
+  "Hi, it's Ruby, checking in. How's the day treating you? Say the word if you'd like a hand staying in touch with anyone who matters.",
+];
+const JUNE_NUDGES = [
+  "Hello, I'm June. One small first step is enough for today — pick the tiniest piece of the thing you've been putting off, and let's just do that piece together.",
+  "Hi, June here. You don't need the whole staircase today, just the first step: what's one small thing we could start, right now, in the next few minutes?",
+  "Hello, it's June. A gentle nudge: choose one thing that's been waiting, shrink it to its smallest first step, and tell me what it is — we'll begin there.",
+];
+
+function chicagoDate(now = new Date()): string {
+  // en-CA formats as YYYY-MM-DD.
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Chicago",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(now);
+}
+
+function variantFor<T>(variants: T[], date: string): T {
+  const day = Math.floor(Date.parse(`${date}T12:00:00Z`) / 86_400_000);
+  return variants[Math.abs(day) % variants.length];
+}
+
+// The same ownership test getNovaSettings' defaults rely on: free code,
+// any Atom, or a Nova / Supernova / Satellite product.
+function hasNovaAccess(accountId: string): boolean {
+  const owned = getOwned(accountId);
+  const a = getOrCreateAccount(accountId);
+  return (
+    a.free_code ||
+    owned.atoms.length > 0 ||
+    owned.products.includes("nova") ||
+    owned.products.includes("supernova") ||
+    owned.products.includes("satellite")
+  );
+}
+
+function ownsAtomOrNovaProduct(accountId: string, atom: string): boolean {
+  if (ownsAtom(accountId, atom)) return true;
+  const products = getOwned(accountId).products;
+  return products.includes("nova") || products.includes("supernova") || products.includes("satellite");
+}
+
+function seenCount(accountId: string, channel: string): number {
+  const row = db
+    .query(`SELECT COUNT(*) AS n FROM seen_state WHERE account_id = ? AND channel = ?`)
+    .get(accountId, channel) as { n: number } | null;
+  return row?.n ?? 0;
+}
+
+// Deliver today's Ruby check-in and/or June nudge for one account.
+// Returns what was delivered. Never throws: a sender failure must not
+// break the check cycle.
+export async function runNovaSenders(
+  accountId: string,
+): Promise<{ checkIn: boolean; nudge: boolean }> {
+  const out = { checkIn: false, nudge: false };
+  try {
+    if (!hasNovaAccess(accountId)) return out;
+    const settings = getNovaSettings(accountId);
+    const date = chicagoDate();
+
+    if (settings.checkIns && ownsAtomOrNovaProduct(accountId, "Ruby")) {
+      if (!alreadySeen(accountId, "nova-checkin", date)) {
+        const text = variantFor(RUBY_CHECK_INS, date);
+        addMessage(accountId, "Ruby", "assistant", text);
+        markSeen(accountId, "nova-checkin", date);
+        out.checkIn = true;
+        // A phone tap only when push is configured and the owner has a
+        // subscribed device; sendPush handles both checks itself.
+        await sendPush(accountId, "Ruby", "Ruby checked in with you.");
+      }
+    }
+
+    if (settings.gettingStartedNudges && ownsAtomOrNovaProduct(accountId, "June")) {
+      // At most once per day, and only on the first 3 distinct days.
+      if (!alreadySeen(accountId, "nova-nudge", date) && seenCount(accountId, "nova-nudge") < 3) {
+        const text = variantFor(JUNE_NUDGES, date);
+        addMessage(accountId, "June", "assistant", text);
+        markSeen(accountId, "nova-nudge", date);
+        out.nudge = true;
+        await sendPush(accountId, "June", "June has a small first step for you.");
+      }
+    }
+  } catch (e) {
+    console.error(`proactive nova senders failed for ${accountId}:`, e);
+  }
+  return out;
+}
+
 // --- One check cycle for one account ---
 export type CheckResult = {
   accountId: string;
@@ -589,8 +711,8 @@ export type CheckResult = {
 export async function runCheckCycle(accountId: string): Promise<CheckResult> {
   const checkedAt = new Date().toISOString();
   const gmail = await checkGmail(accountId);
-  const texts = await checkOptionalChannel(accountId, "texts", "./texts");
-  const calendar = await checkOptionalChannel(accountId, "calendar", "./calendar");
+  const texts = await checkOptionalChannel(accountId, "texts", "./telephony");
+  const calendar = await checkOptionalChannel(accountId, "calendar", "./google");
 
   // Reminders that came due: surfaced once (recorded in seen_state), still
   // undone until the owner marks them done.
@@ -613,7 +735,19 @@ export async function runCheckCycle(accountId: string): Promise<CheckResult> {
         ? gmail.newItems[0]?.summary || texts.newItems[0]?.summary || calendar.newItems[0]?.summary || remindersDue[0]?.summary || "Something needs you."
         : `${newTotal} things need your attention.`;
     push = await sendPush(accountId, "Prism 5", summary, pushImageUrl(PRISM_PUSH_IMAGE_PATH));
+    // The same findings, waiting in the owner's Photon thread.
+    deliverBriefingToPhotonThread(accountId, [
+      ...gmail.newItems,
+      ...texts.newItems,
+      ...calendar.newItems,
+      ...remindersDue,
+    ]);
   }
+
+  // Nova check-in / getting-started nudges for this account (gated
+  // internally on Nova access and the owner's Nova settings; a failure
+  // there never breaks this cycle — runNovaSenders catches its own).
+  await runNovaSenders(accountId);
 
   return { accountId, checkedAt, gmail, texts, calendar, remindersDue, newTotal, push };
 }
@@ -630,7 +764,9 @@ function schedulerAccountIds(): string[] {
     .query(
       `SELECT account_id FROM gmail_accounts
        UNION SELECT account_id FROM reminders WHERE done = 0
-       UNION SELECT account_id FROM push_subscriptions`,
+       UNION SELECT account_id FROM push_subscriptions
+       UNION SELECT account_id FROM owned WHERE kind IN ('atom', 'product')
+       UNION SELECT account_id FROM nova_settings`,
     )
     .all() as { account_id: string }[];
   return rows.map((r) => r.account_id);
@@ -703,9 +839,9 @@ export async function handleProactiveApi(req: Request, path: string): Promise<Re
       push: { configured: pushConfigured(), subscribed, publicKey: pushConfigured() ? vapidConfig().publicKey : null },
       channels: {
         gmail: true,
-        texts: false,
-        calendar: false,
-        note: "Texts and calendar checks are not built yet (steps 1 and 4); the scheduler reports them as unavailable until they land.",
+        texts: true,
+        calendar: true,
+        note: "Texts and calendar checks are built. Texts only contain anything when Twilio is configured on the server, and calendar only when the owner has connected Google Calendar; otherwise those channels are available but quiet.",
       },
     });
   }

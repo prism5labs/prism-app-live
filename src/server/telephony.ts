@@ -440,6 +440,26 @@ function storeCall(
   ).run(accountId, direction, fromNumber, toNumber, status, providerSid, now);
 }
 
+// --- Proactive channel check (contract: see proactive.ts) ---
+// Recent INBOUND texts for the scheduler to diff against seen_state.
+// Unconfigured Twilio (or no texts) returns [] — the channel exists and
+// is available, it is simply quiet.
+export async function checkChannelItems(
+  accountId: string,
+): Promise<Array<{ id: string; summary: string; detail?: string }>> {
+  if (!twilioConfigured()) return [];
+  const rows = db
+    .query(
+      `SELECT * FROM texts WHERE account_id = ? AND direction = 'inbound' ORDER BY id DESC LIMIT 10`,
+    )
+    .all(accountId) as any[];
+  return rows.map((r) => ({
+    id: r.provider_sid ? String(r.provider_sid) : String(r.id),
+    summary: `Text from ${r.from_number}`,
+    detail: String(r.body || "").slice(0, 140),
+  }));
+}
+
 // --- Handlers (mounted by server.ts; see WIRING.md) ---
 
 // GET /api/texts/status — configured or not, and the number (masked).

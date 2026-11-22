@@ -139,7 +139,12 @@
 // draft only) on the Anthropic chat path. The cache bump makes
 // existing installs fetch the new main.js instead of serving the
 // cached one.
-const CACHE = "prism5-v43";
+// CACHE v44: bumped Nov 21, 2026 for the proactive loop — texts and
+// calendar channel checks, check findings delivered into the owner's
+// Photon thread, and the Nova (Ruby/June) check-in and nudge sender.
+// The cache bump makes existing installs fetch the new main.js
+// instead of serving the cached one.
+const CACHE = "prism5-v44";
 const SHELL = ["/", "/index.html", "/styles.css", "/main.js", "/manifest.json", "/opening-animation-v3.mp4", "/opening-v5-poster.jpg", "/chat-bg/bg-rocket.jpg", "/chat-bg/bg-helmets.jpg", "/chat-bg/bg-starburst.jpg", "/chat-bg/bg-robot.jpg", "/chat-bg/bg-saucer.jpg", "/chat-bg/bg-raygun.jpg", "/chat-bg/bg-car.jpg", "/chat-bg/bg-pilot.jpg", "/chat-bg/bg-moonbase.jpg", "/chat-bg/bg-diner.jpg", "/chat-bg/bg-launchpad.jpg", "/chat-bg/bg-spacestation.jpg"];
 
 self.addEventListener("install", (event) => {
