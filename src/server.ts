@@ -1636,6 +1636,15 @@ async function serveStatic(req: Request, path: string): Promise<Response> {
     // residential path, which froze the films mid-play.
     headers["cache-control"] = "public, max-age=31536000, immutable";
   }
+  if ([".png", ".jpg", ".jpeg", ".webp", ".svg", ".gif", ".ico"].includes(ext)) {
+    // Images carried no Cache-Control at all before the Nov 22, 2026
+    // speed pass, so every load outside the service worker paid full
+    // price again (a single portrait is ~3.5 MB). A month is long
+    // enough to make repeat loads free and short enough that a swapped
+    // portrait still lands within a reasonable window; inside the app
+    // the service worker's asset cache serves them first anyway.
+    headers["cache-control"] = "public, max-age=2592000";
+  }
   return new Response(file, { headers });
 }
 

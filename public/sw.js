@@ -157,8 +157,30 @@
 // Drive as document pages, calmer look sets, and the motion sweep.
 // The cache bump makes existing installs fetch the new styles.css and
 // main.js instead of serving the cached ones.
-const CACHE = "prism5-v51";
-const SHELL = ["/", "/index.html", "/styles.css", "/main.js", "/manifest.json", "/opening-animation-v3.mp4", "/opening-v5-poster.jpg", "/chat-bg/bg-rocket.jpg", "/chat-bg/bg-helmets.jpg", "/chat-bg/bg-starburst.jpg", "/chat-bg/bg-robot.jpg", "/chat-bg/bg-saucer.jpg", "/chat-bg/bg-raygun.jpg", "/chat-bg/bg-car.jpg", "/chat-bg/bg-pilot.jpg", "/chat-bg/bg-moonbase.jpg", "/chat-bg/bg-diner.jpg", "/chat-bg/bg-launchpad.jpg", "/chat-bg/bg-spacestation.jpg"];
+// CACHE v52: bumped Nov 22, 2026 for the speed + declutter pass —
+// portrait thumbnails (480px WebP, ~50 KB) replace the full 1600px
+// PNGs (~3.5 MB) everywhere in the client, the chat backgrounds are
+// recompressed (~5 MB total instead of ~11 MB), images live in a
+// separate asset cache that survives shell bumps (below), and the
+// Chat front and first-run chooser are picture-led with the wordy
+// paragraphs cut. The cache bump makes existing installs fetch the
+// new main.js, index.html and styles.css instead of serving the
+// cached ones, and clears any older shell cache entries on activate.
+const CACHE = "prism5-v52";
+// Images (portraits, thumbnails, brand art, chat backgrounds, icons)
+// live in their own cache whose name does NOT change with the shell
+// version. Before v52 every shell bump deleted the one cache on
+// activate, so each deploy made every install re-download every
+// portrait it touched. This cache survives bumps; its entries are
+// refreshed in the background by the fetch handler below, and the
+// name is only ever changed if the asset strategy itself changes.
+const ASSETS = "prism5-assets-v1";
+// The shell is the app itself plus the opening films (the splash is
+// untouchable, and its films must be local or it stalls). The twelve
+// chat backgrounds are NOT precached any more (v52): they were ~11 MB
+// of the ~12 MB install, and the fetch handler now caches each one in
+// the asset cache the first time the rotation reaches it.
+const SHELL = ["/", "/index.html", "/styles.css", "/main.js", "/manifest.json", "/opening-animation-v3.mp4", "/opening-v5-poster.jpg"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -180,7 +202,7 @@ self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches
       .keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
+      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE && k !== ASSETS).map((k) => caches.delete(k))))
       .then(() => self.clients.claim()),
   );
 });
@@ -233,6 +255,30 @@ self.addEventListener("fetch", (event) => {
           }
         }
         return fetch(event.request);
+      }),
+    );
+    return;
+  }
+  // Images go to the asset cache (see ASSETS above): cache-first with
+  // a background refresh, in the cache that survives shell bumps, so a
+  // deploy never makes an install re-download its portraits.
+  if (
+    url.pathname.startsWith("/photons/") ||
+    url.pathname.startsWith("/atoms/") ||
+    url.pathname.startsWith("/brand/") ||
+    url.pathname.startsWith("/chat-bg/") ||
+    url.pathname.startsWith("/icons/")
+  ) {
+    event.respondWith(
+      caches.open(ASSETS).then(async (cache) => {
+        const cached = await cache.match(event.request);
+        const network = fetch(event.request)
+          .then((res) => {
+            if (res.ok) cache.put(event.request, res.clone()).catch(() => {});
+            return res;
+          })
+          .catch(() => cached);
+        return cached || network;
       }),
     );
     return;

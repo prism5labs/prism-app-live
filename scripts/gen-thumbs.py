@@ -1,0 +1,44 @@
+#!/usr/bin/env python3
+"""Regenerate the portrait thumbnails the client actually loads.
+
+The full portraits in public/photons/ and public/atoms/ are 1600px
+PNGs of ~3.5 MB each, but no surface in the app displays one larger
+than 220 CSS px. Since the Nov 22, 2026 speed pass the client loads
+480px WebP thumbnails from public/<kind>/thumbs/ (~50 KB each) and
+only falls back to the full PNG when a thumbnail is missing.
+
+Run this after adding or replacing a portrait:
+
+    python3 scripts/gen-thumbs.py
+
+Requires Pillow (pip install pillow). The original PNGs are never
+modified; thumbnails are derived files and can be deleted and
+regenerated at any time.
+"""
+import os
+import sys
+
+from PIL import Image
+
+ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "public")
+
+
+def main() -> int:
+    for kind in ("photons", "atoms"):
+        src_dir = os.path.join(ROOT, kind)
+        out_dir = os.path.join(src_dir, "thumbs")
+        os.makedirs(out_dir, exist_ok=True)
+        made = 0
+        for f in sorted(os.listdir(src_dir)):
+            if not f.endswith(".png"):
+                continue
+            im = Image.open(os.path.join(src_dir, f)).convert("RGB")
+            im.thumbnail((480, 480), Image.LANCZOS)
+            im.save(os.path.join(out_dir, f[:-4] + ".webp"), "WEBP", quality=82, method=6)
+            made += 1
+        print(f"{kind}: {made} thumbnails in {out_dir}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

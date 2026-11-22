@@ -414,7 +414,7 @@ function tierCardHtml(tier: "supernova" | "satellite" | "upkeep"): string {
     const owned = state?.freeCode === true || (state?.ownedProducts || []).includes("supernova");
     return cardShell(
       "Supernova",
-      `<div class="card-hero"><img class="card-poster" src="/brand/poster-supernova.jpg" alt="Supernova poster, the whole front office"></div>
+      `<div class="card-hero"><img class="card-poster" src="/brand/poster-supernova.jpg" loading="lazy" decoding="async" alt="Supernova poster, the whole front office"></div>
       <h2 class="card-title">Supernova</h2>
       <p class="card-kind">The full helper · one Brain, one Face, every job duty</p>
       <p>${esc(TIER_COPY.supernova.body)}</p>
@@ -434,7 +434,7 @@ function tierCardHtml(tier: "supernova" | "satellite" | "upkeep"): string {
     const owned = state?.freeCode === true || (state?.ownedProducts || []).includes("satellite");
     return cardShell(
       "Satellite",
-      `<div class="card-hero"><img class="card-poster" src="/brand/poster-satellite.jpg" alt="Satellite poster, one Brain, one Face, one job duty"></div>
+      `<div class="card-hero"><img class="card-poster" src="/brand/poster-satellite.jpg" loading="lazy" decoding="async" alt="Satellite poster, one Brain, one Face, one job duty"></div>
       <h2 class="card-title">Satellite</h2>
       <p class="card-kind">The smaller build · one Brain, one Face, one job duty</p>
       <p>${esc(TIER_COPY.satellite.body)}</p>
@@ -451,7 +451,7 @@ function tierCardHtml(tier: "supernova" | "satellite" | "upkeep"): string {
   const owned = state?.upkeep === true;
   return cardShell(
     "Upkeep",
-    `<div class="card-hero"><img class="card-poster" src="/brand/starburst.jpg" alt="Upkeep starburst"></div>
+    `<div class="card-hero"><img class="card-poster" src="/brand/starburst.jpg" loading="lazy" decoding="async" alt="Upkeep starburst"></div>
     <h2 class="card-title">Upkeep</h2>
     <p class="card-kind">The care that keeps your Launch alive · $29.00/month</p>
     <p>${esc(UPKEEP_COPY.body)}</p>
@@ -847,28 +847,38 @@ function meterBar(): string {
   return `<div class="meter-bar"><div class="meter-fill" style="width:${pct}%"></div></div>`;
 }
 
-function photonCard(p: any, size = 220): string {
+function photonCard(p: any, size = 150): string {
   const owned = p.owned;
   // The owner's chosen look set tints this Photon's card, so the
   // choice is visible before the chat is even opened.
   const look = lookSetById(customFor(p.name).lookSet || "");
+  // Picture-led (Nov 22, 2026 declutter): the portrait and the name
+  // carry the card; the tagline lives on the character card in the
+  // Store, not on the front.
   return `<button class="photon-card${look ? ` look-${look.id}` : ""}" data-action="open-photon" data-photon="${esc(p.name)}" ${
     owned ? "" : "disabled"
   }>
     ${portraitHtml(portraitNameOf(p), size)}
     <span class="photon-name">${esc(faceNameOf(p))}</span>
-    <span class="photon-tag">${esc(p.tagline)}</span>
   </button>`;
 }
 
-// An Atom's slide on the Chat front, mirroring a Photon's: tap opens
+// An Atom's card on the Chat front, mirroring a Photon's: tap opens
 // the Atom's thread through the same openThread path.
-function atomCard(a: (typeof ATOMS)[number], size = 220): string {
+function atomCard(a: (typeof ATOMS)[number], size = 150): string {
   return `<button class="photon-card" data-action="open-atom" data-atom="${esc(a.name)}">
     ${atomPortraitHtml(a.name, size)}
     <span class="photon-name">${esc(a.name)}</span>
-    <span class="photon-tag">${esc(a.tagline)}</span>
   </button>`;
+}
+
+// A swipeable strip of Faces on the Chat front (Nov 22, 2026
+// declutter): the pictures sit in a row and the thumb does the
+// navigating — no Prev/Next buttons and no dot row, which on the old
+// carousel cost fourteen buttons per row of Faces. A short label
+// names the row; nothing else needs saying.
+function frontStrip(label: string, cards: string[]): string {
+  return `<h2 class="front-strip-label">${esc(label)}</h2><div class="front-strip">${cards.join("")}</div>`;
 }
 
 // ---------- Start My Day — the morning briefing Plug ----------
@@ -1126,30 +1136,23 @@ function renderChatFront(): string {
     owned.length > 0 || ownedAtoms.length > 0
       ? [
           owned.length > 0
-            ? carouselHtml("chat-photons", "Your Photons", owned.map((p: any) => photonCard(p)), owned.map((p: any) => p.name))
+            ? frontStrip("Your Photons", owned.map((p: any) => photonCard(p)))
             : "",
           ownedAtoms.length > 0
-            ? carouselHtml("chat-atoms", "Your Atoms", ownedAtoms.map((a) => atomCard(a)), ownedAtoms.map((a) => a.name))
+            ? frontStrip("Your Atoms", ownedAtoms.map((a) => atomCard(a)))
             : "",
         ].join("")
       : `<div class="card empty-panel">
           <div class="card-head"><img class="mark" src="/brand/gem.jpg" alt=""><h2>Nothing to talk to yet.</h2></div>
-          <p>There is no one to talk to here yet. A Launch is what gives this app a personality. Grab a Spark and run it, or pick up a Photon, and you will have someone on the line.</p>
           <button class="btn store-outline store-btn" data-action="goto" data-tab="store">Browse the Store</button>
         </div>`;
   return `
   <section class="front">
     <div class="front-body">
       <h3 class="greeting">Howdy, <span class="greeting-accent">neighbor!</span></h3>
-      <p class="tagline">Truly Atomic AI Assistants</p>
-      <p class="front-lede">One assistant that does it all, and becomes a second you. Pick a Photon and start talking.</p>
     </div>
     ${ownsStartMyDay()
-      ? `<div class="card day-card">
-          <h2>Start My Day</h2>
-          <p>Your morning briefing, like a project manager for your day. It walks today top to bottom, one item at a time, and edits each item once you confirm it.</p>
-          <button class="btn primary" data-action="day-start">Start My Day</button>
-        </div>`
+      ? `<button class="day-strip" data-action="day-start"><img src="/brand/gem.jpg" alt=""><span>Start My Day</span></button>`
       : ""}
     ${ownedHtml}
   </section>`;
@@ -2400,9 +2403,9 @@ function renderConnected(): string {
   return `
   <section>
     <h1 class="page-title">Connected</h1>
-    <p class="page-lede">Every account Prism watches, and whether it's connected — plus the messages, contacts, calendar, and Drive themselves. Drafts you save here land in that account's drafts.</p>
+    <p class="page-lede">Your email, messages, calendar, and Drive.</p>
     ${renderConnections()}
-    <div class="switchboard-strip"><img src="/brand/switchboard.jpg" alt=""><p><b>On Switchboard.</b> Connected is where Switchboard lives — every Launch in the Lab, one board.</p></div>
+    <div class="switchboard-strip"><img src="/brand/switchboard.jpg" alt="" loading="lazy" decoding="async"><p><b>On Switchboard</b> — every Launch in the Lab, one board.</p></div>
     <div class="inbox-jump" aria-label="Jump to a section">
       <a href="#messages">Messages</a>
       <a href="#contacts">Contacts</a>
@@ -2645,20 +2648,20 @@ function renderStore(): string {
       ${buyButton(buyUrl(NOVA.url, "Atom-" + a.name), "$81.37", owned)}
     </div>`;
   });
-  const supernovaRow = `    <div class="poster-row" id="store-supernova"><button class="poster-btn" data-action="tier-info" data-tier="supernova" aria-label="More about Supernova"><img src="/brand/poster-supernova.jpg" alt="Supernova poster, the whole front office"></button><div class="pr-txt"><b>Supernova</b><span class="desc">${esc(TIER_COPY.supernova.body)}</span><span class="desc">${esc(TIER_COPY.supernova.hours)}</span><span class="price">$499.00</span><span class="at">$514.00 at checkout</span>${buyButton(buyUrl(SUPERNOVA.url, "supernova"), "$514.00", allOwned || ownedProducts.includes("supernova"))}<p class="fine">Or pay monthly:</p><div class="row monthly-row">
+  const supernovaRow = `    <div class="poster-row" id="store-supernova"><button class="poster-btn" data-action="tier-info" data-tier="supernova" aria-label="More about Supernova"><img src="/brand/poster-supernova.jpg" alt="Supernova poster loading="lazy" decoding="async", the whole front office"></button><div class="pr-txt"><b>Supernova</b><span class="desc">${esc(TIER_COPY.supernova.body)}</span><span class="desc">${esc(TIER_COPY.supernova.hours)}</span><span class="price">$499.00</span><span class="at">$514.00 at checkout</span>${buyButton(buyUrl(SUPERNOVA.url, "supernova"), "$514.00", allOwned || ownedProducts.includes("supernova"))}<p class="fine">Or pay monthly:</p><div class="row monthly-row">
         <a class="btn small" href="${esc(buyUrl(SUPERNOVA.monthly.url, "supernova-monthly"))}" target="_blank" rel="noopener">$49/mo</a>
         <a class="btn small" href="${esc(buyUrl(SUPERNOVA.twoYear.url, "supernova-two-year"))}" target="_blank" rel="noopener">$39/mo · 2-year</a>
         <a class="btn small" href="${esc(buyUrl(SUPERNOVA.annual.url, "supernova-annual"))}" target="_blank" rel="noopener">$539/yr</a>
       </div></div></div>`;
-  const satelliteRow = `    <div class="poster-row" id="store-satellite"><button class="poster-btn" data-action="tier-info" data-tier="satellite" aria-label="More about Satellite"><img src="/brand/poster-satellite.jpg" alt="Satellite poster, one Brain, one Face, one job duty"></button><div class="pr-txt"><b>Satellite</b><span class="desc">${esc(TIER_COPY.satellite.body)}</span><span class="desc">${esc(TIER_COPY.satellite.hours)}</span><span class="price">$99.00</span><span class="at">$101.97 at checkout</span>${buyButton(buyUrl(SATELLITE.url, "satellite"), "$101.97", allOwned || ownedProducts.includes("satellite"))}<p class="fine">Or pay monthly:</p><div class="row monthly-row">
+  const satelliteRow = `    <div class="poster-row" id="store-satellite"><button class="poster-btn" data-action="tier-info" data-tier="satellite" aria-label="More about Satellite"><img src="/brand/poster-satellite.jpg" alt="Satellite poster loading="lazy" decoding="async", one Brain, one Face, one job duty"></button><div class="pr-txt"><b>Satellite</b><span class="desc">${esc(TIER_COPY.satellite.body)}</span><span class="desc">${esc(TIER_COPY.satellite.hours)}</span><span class="price">$99.00</span><span class="at">$101.97 at checkout</span>${buyButton(buyUrl(SATELLITE.url, "satellite"), "$101.97", allOwned || ownedProducts.includes("satellite"))}<p class="fine">Or pay monthly:</p><div class="row monthly-row">
         <a class="btn small" href="${esc(buyUrl(SATELLITE.monthly.url, "satellite-monthly"))}" target="_blank" rel="noopener">$33/mo</a>
         <a class="btn small" href="${esc(buyUrl(SATELLITE.twoYear.url, "satellite-two-year"))}" target="_blank" rel="noopener">$26/mo · 2-year</a>
         <a class="btn small" href="${esc(buyUrl(SATELLITE.annual.url, "satellite-annual"))}" target="_blank" rel="noopener">$363/yr</a>
       </div></div></div>`;
-  const novaRow = `    <div class="poster-row" id="store-nova"><img src="/brand/starburst.jpg" alt="Nova, the helper for your own day"><div class="pr-txt"><b>Nova</b><span class="desc">Nova is the helper for your own day, not a business. One inbox, triaged, with replies drafted in your words. Your calendar and reminders, a morning briefing and an end-of-day wrap, and gentle check-ins that nudge you to get started — never a nag.</span><span class="desc">What Nova opens:</span><ul class="included-list">${PERSONAL_FEATURES.map((f) => `<li>${esc(f.label)}</li>`).join("")}</ul><span class="price">$79.00</span><span class="at">$81.37 at checkout</span>${buyButton(buyUrl(NOVA.url, "nova-personal"), "$81.37", allOwned || ownedProducts.includes("nova"))}<p class="fine">Or pay monthly:</p><div class="row monthly-row">
+  const novaRow = `    <div class="poster-row" id="store-nova"><img src="/brand/starburst.jpg" alt="Nova, the helper loading="lazy" decoding="async" for your own day"><div class="pr-txt"><b>Nova</b><span class="desc">Nova is the helper for your own day, not a business. One inbox, triaged, with replies drafted in your words. Your calendar and reminders, a morning briefing and an end-of-day wrap, and gentle check-ins that nudge you to get started — never a nag.</span><span class="desc">What Nova opens:</span><ul class="included-list">${PERSONAL_FEATURES.map((f) => `<li>${esc(f.label)}</li>`).join("")}</ul><span class="price">$79.00</span><span class="at">$81.37 at checkout</span>${buyButton(buyUrl(NOVA.url, "nova-personal"), "$81.37", allOwned || ownedProducts.includes("nova"))}<p class="fine">Or pay monthly:</p><div class="row monthly-row">
         <a class="btn small" href="${esc(buyUrl(NOVA.monthly.url, "nova-monthly"))}" target="_blank" rel="noopener">$10/mo</a><span class="fine">$10.00/month ($10.30 at checkout)</span>
       </div><p class="fine">The business set stays locked on Nova alone — front-desk answering, quotes and invoices, client handling, more than one account, team features. Those open with a business Launch — Supernova or Satellite — on the Business side.</p></div></div>`;
-  const personalUpkeepCard = `    <div class="card upkeep-card" id="store-personal-upkeep"><img src="/brand/starburst.jpg" alt=""><div><h2>Personal Upkeep</h2><p>The care that keeps your personal helper working well: updates as they come out, and help first when you need it. It sits beside Nova. Your first three months come with Nova; after that it is $9 a month, only if you want it. Upkeep itself is the care plan for a business Launch.</p><p class="price">$9.00/month <span class="fine">($9.27 at checkout)</span></p><div class="row">${buyButton(buyUrl(PERSONAL_UPKEEP.url, "personal-upkeep"), "$9.27", allOwned || ownedProducts.includes("personal-upkeep"))}</div></div></div>`;
+  const personalUpkeepCard = `    <div class="card upkeep-card" id="store-personal-upkeep"><img src="/brand/starburst.jpg" alt="" loading="lazy" decoding="async"><div><h2>Personal Upkeep</h2><p>The care that keeps your personal helper working well: updates as they come out, and help first when you need it. It sits beside Nova. Your first three months come with Nova; after that it is $9 a month, only if you want it. Upkeep itself is the care plan for a business Launch.</p><p class="price">$9.00/month <span class="fine">($9.27 at checkout)</span></p><div class="row">${buyButton(buyUrl(PERSONAL_UPKEEP.url, "personal-upkeep"), "$9.27", allOwned || ownedProducts.includes("personal-upkeep"))}</div></div></div>`;
   const photonsGroup = `    <details class="store-group" id="store-photons" ${storeOpen.photons ? "open" : ""}>
       <summary><span class="summary-title">Meet the Photons</span><span class="fine">12 Supernovas · tap to hide</span></summary>
       <p class="page-lede">Each Photon is a Supernova on its own. Buy one and it drops into your app, ready to talk. One hero at a time below — the arrows and dots move between them.</p>
@@ -2669,14 +2672,14 @@ function renderStore(): string {
       <p class="page-lede">Each Atom is a Nova on its own. Buy one and it drops into your app, ready to help with your own day. One hero at a time below — the arrows and dots move between them.</p>
       ${carouselHtml("store-atoms", "Meet the Atoms", atomCards, ATOMS.map((a) => a.name))}
     </details>`;
-  const upkeepCard = `    <div class="card upkeep-card" id="store-upkeep"><button class="poster-btn upkeep-poster-btn" data-action="tier-info" data-tier="upkeep" aria-label="More about Upkeep"><img src="/brand/starburst.jpg" alt=""></button><div><h2>Upkeep</h2><p>${esc(UPKEEP_COPY.body)}</p><p class="price">$29.00/month <span class="fine">($29.87 at checkout)</span></p><div class="row">${buyButton(buyUrl(UPKEEP.url, "upkeep"), "$29.87", state?.upkeep === true)}<button class="btn small more-info" data-action="tier-info" data-tier="upkeep">More info</button></div></div></div>`;
+  const upkeepCard = `    <div class="card upkeep-card" id="store-upkeep"><button class="poster-btn upkeep-poster-btn" data-action="tier-info" data-tier="upkeep" aria-label="More about Upkeep"><img src="/brand/starburst.jpg" alt="" loading="lazy" decoding="async"></button><div><h2>Upkeep</h2><p>${esc(UPKEEP_COPY.body)}</p><p class="price">$29.00/month <span class="fine">($29.87 at checkout)</span></p><div class="row">${buyButton(buyUrl(UPKEEP.url, "upkeep"), "$29.87", state?.upkeep === true)}<button class="btn small more-info" data-action="tier-info" data-tier="upkeep">More info</button></div></div></div>`;
   return `
   <section>
     <div class="store-side-switch" role="group" aria-label="Business or Personal">
       <button class="btn${isPersonal ? "" : " primary"}" data-action="side-pick" data-side="business" aria-pressed="${isPersonal ? "false" : "true"}">Business</button>
       <button class="btn${isPersonal ? " primary" : ""}" data-action="side-pick" data-side="personal" aria-pressed="${isPersonal ? "true" : "false"}">Personal</button>
     </div>
-    <div class="store-head"><img src="/brand/starburst.jpg" alt=""><div><h1 class="page-title">Store</h1><p>${isPersonal ? "A Nova is the helper for your own day." : "A Launch is the helper you talk with in this app."} Pick the helper that fits your day, then pick how you want to pay. The prices are further down, after a plain explanation of how it all works.</p></div></div>
+    <div class="store-head"><img src="/brand/starburst.jpg" alt="" loading="lazy" decoding="async"><div><h1 class="page-title">Store</h1><p>${isPersonal ? "A Nova is the helper for your own day." : "A Launch is the helper you talk with in this app."} Pick the helper that fits your day, then pick how you want to pay. The prices are further down, after a plain explanation of how it all works.</p></div></div>
     ${perkBanner()}
     ${stripeStatusData
       ? `<p class="fine stripe-line">${stripeStatusData.configured ? "Automatic unlocks are on — a purchase unlocks as soon as Stripe confirms the payment." : "Automatic unlocks are off — the Stripe webhook isn't set up yet. Purchases still unlock by code (redeem one below) until it is."}</p>`
@@ -4787,13 +4790,11 @@ function maybeShowChooser(): void {
     <img class="chooser-mark" src="/brand/gem.jpg" alt="">
     <h1>Prism 5</h1>
     <p class="chooser-lede">One assistant that does it all, and becomes a second you.</p>
-    <p class="fine">Two doors — pick the one that fits your day. You can switch sides any time, in You.</p>
-    <button class="btn primary chooser-door" data-action="side-pick" data-side="business">For my business</button>
-    <p class="fine">The front desk, the shop, the clients — Prism at work.</p>
-    <button class="btn primary chooser-door" data-action="side-pick" data-side="personal">For me, personally</button>
-    <p class="fine">Your inbox, your calendar, your day — Prism for you.</p>
+    <div class="chooser-doors">
+      <button class="chooser-door" data-action="side-pick" data-side="business"><img src="/brand/poster-supernova.jpg" alt=""><span>For my business</span></button>
+      <button class="chooser-door" data-action="side-pick" data-side="personal"><img src="/brand/starburst.jpg" alt="" loading="lazy" decoding="async"><span>For me, personally</span></button>
+    </div>
     <button class="btn primary chooser-signin" data-action="signin">Sign in or create account with Google</button>
-    <p class="fine">Signing in with Google creates your account. No password, no form — we see only your name and email. Your Photons, Atoms, chats, and purchases follow you to any device.</p>
     <button class="chooser-skip" data-action="chooser-skip">Continue without signing in</button>
   </div>`;
   document.body.appendChild(el);

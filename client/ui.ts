@@ -30,43 +30,43 @@ function tileSvg(name: string): string {
   return `<svg viewBox="0 0 100 100" role="img" aria-label="${name} portrait"><rect width="100" height="100" rx="24" fill="${bg}"/><circle cx="50" cy="50" r="34" fill="none" stroke="${fg}" stroke-width="2" opacity="0.35"/><text x="50" y="66" text-anchor="middle" font-family="Georgia, serif" font-size="44" font-weight="bold" fill="${fg}">${initial}</text><g transform="translate(79,75) scale(0.28) translate(-50,-50)" color="#2E2620">${TRIANGLE_SVG}</g><g transform="translate(79,75) scale(0.22) translate(-50,-50)" color="#F4C95D">${TRIANGLE_SVG}</g></svg>`;
 }
 
-// Returns an element: the real portrait PNG if it exists, else the tile.
-export function portraitEl(name: string, size: number): HTMLElement {
-  const wrap = document.createElement("span");
-  wrap.className = "portrait";
-  wrap.style.width = size + "px";
-  wrap.style.height = size + "px";
-  const img = document.createElement("img");
-  img.src = `/photons/${encodeURIComponent(name)}.png`;
-  img.alt = `${name} portrait`;
-  img.width = size;
-  img.height = size;
-  img.addEventListener("error", () => {
-    wrap.innerHTML = tileSvg(name);
-  });
-  wrap.appendChild(img);
-  return wrap;
-}
-
+// Portraits are served as small WebP thumbnails (public/<kind>/thumbs/,
+// 480px, ~50 KB) instead of the full 1600px PNGs (~3.5 MB each): every
+// display size in the app is 220 CSS px or less, so the thumbnails are
+// indistinguishable on screen and the Store and Chat fronts load in a
+// fraction of the time (speed pass, Nov 22, 2026). The full PNGs stay on
+// the server untouched; if a thumbnail is missing (a portrait added
+// without regenerating thumbs) the img falls back to the full PNG, and
+// if that is missing too, to the tile — see window.__photonImgErr.
 export function portraitHtml(name: string, size: number): string {
-  // Inline version for template strings; the img falls back to the tile via
-  // a global handler defined in main.ts (window.__photonTile).
-  return `<span class="portrait" style="width:${size}px;height:${size}px"><img src="/photons/${encodeURIComponent(
-    name,
-  )}.png" alt="${name} portrait" width="${size}" height="${size}" onerror="this.outerHTML=window.__photonTile('${name}')"></span>`;
+  // Inline version for template strings; the img falls back via the
+  // global handler below (window.__photonImgErr).
+  const enc = encodeURIComponent(name);
+  return `<span class="portrait" style="width:${size}px;height:${size}px"><img src="/photons/thumbs/${enc}.webp" data-full="/photons/${enc}.png" alt="${name} portrait" width="${size}" height="${size}" loading="lazy" decoding="async" onerror="window.__photonImgErr(this,'${name}')"></span>`;
 }
 
 // Atoms live at public/atoms/<Name>.png (the twelve 1950s pulp-poster
-// portraits, Nov 19, 2026). Same tile fallback as the Photons.
+// portraits, Nov 19, 2026), with thumbnails alongside like the Photons.
+// Same fallback chain as the Photons.
 export function atomPortraitHtml(name: string, size: number): string {
-  return `<span class="portrait" style="width:${size}px;height:${size}px"><img src="/atoms/${encodeURIComponent(
-    name,
-  )}.png" alt="${name} portrait" width="${size}" height="${size}" onerror="this.outerHTML=window.__photonTile('${name}')"></span>`;
+  const enc = encodeURIComponent(name);
+  return `<span class="portrait" style="width:${size}px;height:${size}px"><img src="/atoms/thumbs/${enc}.webp" data-full="/atoms/${enc}.png" alt="${name} portrait" width="${size}" height="${size}" loading="lazy" decoding="async" onerror="window.__photonImgErr(this,'${name}')"></span>`;
 }
 
 declare global {
   interface Window {
     __photonTile: (name: string) => string;
+    __photonImgErr: (img: HTMLImageElement, name: string) => void;
   }
 }
 window.__photonTile = (name: string) => tileSvg(name);
+// First error: the thumbnail is missing — try the full-size PNG.
+// Second error: no portrait at all — the tile takes its place.
+window.__photonImgErr = (img: HTMLImageElement, name: string) => {
+  if (!img.dataset.fb) {
+    img.dataset.fb = "1";
+    img.src = img.dataset.full || "";
+  } else {
+    img.outerHTML = tileSvg(name);
+  }
+};
