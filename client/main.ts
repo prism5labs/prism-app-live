@@ -6,7 +6,7 @@
 // No provider or model names appear anywhere in the visible copy.
 
 import { api, getAccountId, setAccountId, clearAccountId } from "./api";
-import { portraitHtml, atomPortraitHtml } from "./ui";
+import { portraitHtml, atomPortraitHtml, logoHtml } from "./ui";
 import { soundsEnabled, setSoundsEnabled, playClick, playToggle, playSwoosh } from "./sounds";
 import { SUPERNOVA, SATELLITE, UPKEEP, NOVA, PERSONAL_UPKEEP, PRODUCTS, CATEGORIES } from "../src/shared/catalog";
 import { TIER_COPY, UPKEEP_COPY, FREE_CHATS_COPY } from "../src/shared/tiers";
@@ -872,15 +872,6 @@ function atomCard(a: (typeof ATOMS)[number], size = 150): string {
   </button>`;
 }
 
-// A swipeable strip of Faces on the Chat front (Nov 22, 2026
-// declutter): the pictures sit in a row and the thumb does the
-// navigating — no Prev/Next buttons and no dot row, which on the old
-// carousel cost fourteen buttons per row of Faces. A short label
-// names the row; nothing else needs saying.
-function frontStrip(label: string, cards: string[]): string {
-  return `<h2 class="front-strip-label">${esc(label)}</h2><div class="front-strip">${cards.join("")}</div>`;
-}
-
 // ---------- Start My Day — the morning briefing Plug ----------
 // The briefing walks the day top to bottom, one item at a time. The
 // server is the source of truth: every confirm re-fetches, so the next
@@ -1059,67 +1050,174 @@ function renderDayBriefing(): string {
 // all left this screen — the name and the meter live under You now,
 // and buying lives in the Store. The empty state has one way forward:
 // the Store tab, which is the one place to get a Face.
-// ---------- Character carousels ----------
-// The rosters — twelve Photons, twelve Atoms — show one hero at a time
-// instead of twelve cards at once (Nov 19, 2026): twelve plus twelve
-// cards take a lot of space, and one hero at a time is the diner
-// poster on the wall. Every slide stays in the DOM (a screen reader
-// and the tests still see all twelve); only the hero is visible,
-// focusable, and announced. Prev/next arrows and a dot per hero move
-// between them; the move is a simple fade, and an instant swap under
-// reduced motion. There is NO auto-advance: the carousel moves only
-// when the visitor taps a control, so there is nothing to pause and
-// nothing that moves under prefers-reduced-motion. The current slide
-// is remembered per carousel across re-renders, the same way storeOpen
-// is.
-const carouselIndex: Record<string, number> = {};
-function carouselHtml(id: string, label: string, slides: string[], names: string[]): string {
-  const idx = Math.min(carouselIndex[id] || 0, slides.length - 1);
-  const slideHtml = slides
+// ---------- Vending machines ----------
+// The rosters live in two rotating-drum merchandisers now (Nov 22,
+// 2026), modelled on the classic rotating-drum cabinet Neil picked
+// from his reference photo: a lit Prism 5 Labs marquee, a curved
+// glass-fronted drum whose compartments carry one Face each like a
+// packaged good on a shelf, a side panel with a backlit display, a
+// code keypad, a coin slot and a cherry DISPENSE button, a brass
+// maker's plate, and a pickup bay underneath. The full roster also
+// sits in a dropdown list under each machine, closed by default.
+// The drum steps one compartment at a time — Prev/Next, the keypad,
+// the list, or a horizontal drag on the glass — and the front
+// compartment is the selection, lit behind the glass while the rest
+// curve away and dim. There is NO auto-advance: the drum moves only
+// when the visitor works it, and the turn is instant under reduced
+// motion. In the Store, DISPENSE drops the selected Face's ordinary
+// store card into the bay — the buy flow itself is unchanged, and
+// the Store stays the only place to buy or redeem. On the Chat
+// front, DISPENSE opens the selected Face's thread, exactly what
+// tapping its card has always done, and the cards in the drum keep
+// that same tap. The current selection is remembered per machine
+// across re-renders, the same way storeOpen is.
+const machineIndex: Record<string, number> = {};
+
+interface MachineItem {
+  code: string;
+  name: string;
+  // The name the open actions use (a Photon's base name; the display
+  // name can differ once the owner renames a Face).
+  openName: string;
+  role: string;
+  price: string;
+  pack: string;
+  bay?: string;
+}
+
+function machineCode(i: number): string {
+  return `${i < 6 ? "A" : "B"}${(i % 6) + 1}`;
+}
+
+// Signed distance of compartment i from the front, in steps.
+function machineOffset(i: number, idx: number, n: number): number {
+  let off = (i - idx) % n;
+  if (off > n / 2) off -= n;
+  if (off < -n / 2) off += n;
+  return off;
+}
+
+function machineHtml(
+  id: string,
+  opts: {
+    title: string;
+    priceLine: string;
+    listLabel: string;
+    dispenseAction: string;
+    kind: "photon" | "atom";
+    items: MachineItem[];
+  },
+): string {
+  const items = opts.items;
+  const n = items.length;
+  const idx = Math.min(machineIndex[id] || 0, n - 1);
+  const step = 360 / n;
+  const radius = n <= 1 ? 0 : n === 2 ? 70 : Math.round(52 / Math.tan(Math.PI / n));
+  const panels = items
+    .map((it, i) => {
+      const dist = Math.abs(machineOffset(i, idx, n));
+      const style = `transform: rotateY(${i * step}deg) translateZ(${radius}px); opacity: ${dist === 0 ? 1 : dist === 1 ? 0.72 : dist === 2 ? 0.45 : 0}; visibility: ${dist <= 2 ? "visible" : "hidden"}`;
+      return `<div class="machine-panel${dist === 0 ? " front" : ""}" data-index="${i}" data-code="${esc(it.code)}" data-name="${esc(it.name)}" data-open-name="${esc(it.openName)}" data-role="${esc(it.role)}" data-price="${esc(it.price)}" style="${style}">
+        <div class="machine-pack">
+          <div class="pack-top">${logoHtml(10)}<span>PRISM 5 LABS</span></div>
+          ${it.pack}
+          <div class="pack-code">${esc(it.code)}</div>
+        </div>
+      </div>`;
+    })
+    .join("");
+  const sel = items[idx];
+  const keys = items
     .map(
-      (s, i) =>
-        `<div class="carousel-slide${i === idx ? " active" : ""}" data-slide="${i}"${i === idx ? "" : ' inert aria-hidden="true"'}>${s}</div>`,
+      (it, i) =>
+        `<button class="machine-key${i === idx ? " active" : ""}" data-action="machine-key" data-machine="${id}" data-index="${i}" aria-label="Show ${esc(it.name)}">${esc(it.code)}</button>`,
     )
     .join("");
-  const dots = names
+  const list = items
     .map(
-      (n, i) =>
-        `<button class="carousel-dot${i === idx ? " active" : ""}" data-action="carousel-dot" data-carousel="${id}" data-index="${i}" aria-label="Show ${esc(n)}"${i === idx ? ' aria-current="true"' : ""}></button>`,
+      (it, i) =>
+        `<button class="machine-list-item${i === idx ? " active" : ""}" data-action="machine-key" data-machine="${id}" data-index="${i}"><span class="list-code">${esc(it.code)}</span>${esc(it.name)}</button>`,
     )
     .join("");
-  return `<div class="carousel" data-carousel="${id}" role="region" aria-roledescription="carousel" aria-label="${esc(label)}">
-    <div class="carousel-viewport">${slideHtml}</div>
-    <div class="carousel-controls">
-      <button class="btn carousel-btn" data-action="carousel-prev" data-carousel="${id}" aria-label="Previous in ${esc(label)}">← Prev</button>
-      <div class="carousel-dots">${dots}</div>
-      <button class="btn carousel-btn" data-action="carousel-next" data-carousel="${id}" aria-label="Next in ${esc(label)}">Next →</button>
+  const bay = items.some((it) => it.bay)
+    ? `<div class="machine-bay">
+        <div class="machine-bay-flap" aria-hidden="true">PUSH</div>
+        ${items.map((it, i) => `<div class="machine-bay-card${i === idx ? " active" : ""}">${it.bay || ""}</div>`).join("")}
+      </div>`
+    : "";
+  return `<div class="machine" data-machine="${id}" data-kind="${opts.kind}" role="region" aria-label="${esc(opts.title)} vending machine">
+    <div class="machine-marquee">
+      <span class="machine-marquee-mark">${logoHtml(22)}</span>
+      <span class="machine-marquee-brand">PRISM 5 LABS</span>
+      <span class="machine-marquee-title">${esc(opts.title)}</span>
+      ${opts.priceLine ? `<span class="machine-marquee-price">${esc(opts.priceLine)}</span>` : ""}
     </div>
+    <div class="machine-body">
+      <div class="machine-window">
+        <div class="machine-drum" style="transform: rotateY(${-idx * step}deg)">${panels}</div>
+        <div class="machine-glass" aria-hidden="true"></div>
+      </div>
+      <div class="machine-side">
+        <div class="machine-lcd" aria-live="polite">
+          <span class="lcd-code">${esc(sel.code)}</span>
+          <span class="lcd-name">${esc(sel.name)}</span>
+          <span class="lcd-role">${esc(sel.role)}</span>
+          ${sel.price ? `<span class="lcd-price">${esc(sel.price)}</span>` : ""}
+        </div>
+        <div class="machine-keypad" role="group" aria-label="Pick a compartment by code">${keys}</div>
+        <div class="machine-controls">
+          <button class="btn machine-step-btn" data-action="machine-prev" data-machine="${id}" aria-label="Previous in ${esc(opts.title)}">← Prev</button>
+          <span class="machine-coin" aria-hidden="true"></span>
+          <button class="btn machine-step-btn" data-action="machine-next" data-machine="${id}" aria-label="Next in ${esc(opts.title)}">Next →</button>
+        </div>
+        <button class="machine-dispense-btn" data-action="${opts.dispenseAction}" data-machine="${id}">DISPENSE</button>
+        <div class="machine-plate">${logoHtml(12)}<span>Prism 5 Labs</span></div>
+      </div>
+    </div>
+    ${bay}
+    <details class="machine-list">
+      <summary>${esc(opts.listLabel)}</summary>
+      <div class="machine-list-items">${list}</div>
+    </details>
   </div>`;
 }
-// Move a carousel without a full re-render: the slides swap in place,
+
+// Step a machine without a full re-render: the drum turns in place,
 // so the page does not jump and the Store's open sections stay open.
-function carouselGo(id: string, next: number): void {
-  const root = document.querySelector(`.carousel[data-carousel="${id}"]`);
+function machineGo(id: string, next: number): void {
+  const root = document.querySelector(`.machine[data-machine="${id}"]`);
   if (!root) return;
-  const slides = [...root.querySelectorAll(".carousel-slide")] as HTMLElement[];
-  if (!slides.length) return;
-  const idx = ((next % slides.length) + slides.length) % slides.length;
-  carouselIndex[id] = idx;
-  slides.forEach((s, i) => {
-    const on = i === idx;
-    s.classList.toggle("active", on);
-    if (on) {
-      s.removeAttribute("inert");
-      s.removeAttribute("aria-hidden");
-    } else {
-      s.setAttribute("inert", "");
-      s.setAttribute("aria-hidden", "true");
-    }
+  const panels = [...root.querySelectorAll(".machine-panel")] as HTMLElement[];
+  if (!panels.length) return;
+  const n = panels.length;
+  const idx = ((next % n) + n) % n;
+  machineIndex[id] = idx;
+  const step = 360 / n;
+  const drum = root.querySelector(".machine-drum") as HTMLElement | null;
+  if (drum) drum.style.transform = `rotateY(${-idx * step}deg)`;
+  panels.forEach((pn, i) => {
+    const dist = Math.abs(machineOffset(i, idx, n));
+    pn.classList.toggle("front", dist === 0);
+    pn.style.opacity = dist === 0 ? "1" : dist === 1 ? "0.72" : dist === 2 ? "0.45" : "0";
+    pn.style.visibility = dist <= 2 ? "visible" : "hidden";
   });
-  root.querySelectorAll(".carousel-dot").forEach((d, i) => {
-    d.classList.toggle("active", i === idx);
-    if (i === idx) d.setAttribute("aria-current", "true");
-    else d.removeAttribute("aria-current");
+  const sel = panels[idx].dataset;
+  const setText = (cls: string, v: string) => {
+    const el = root.querySelector(`.${cls}`) as HTMLElement | null;
+    if (el) el.textContent = v;
+  };
+  setText("lcd-code", sel.code || "");
+  setText("lcd-name", sel.name || "");
+  setText("lcd-role", sel.role || "");
+  setText("lcd-price", sel.price || "");
+  root.querySelectorAll(".machine-key, .machine-list-item").forEach((k) => {
+    k.classList.toggle(
+      "active",
+      Number((k as HTMLElement).dataset.index || -1) === idx,
+    );
+  });
+  root.querySelectorAll(".machine-bay-card").forEach((c, i) => {
+    c.classList.toggle("active", i === idx);
   });
 }
 
@@ -1136,10 +1234,40 @@ function renderChatFront(): string {
     owned.length > 0 || ownedAtoms.length > 0
       ? [
           owned.length > 0
-            ? frontStrip("Your Photons", owned.map((p: any) => photonCard(p)))
+            ? `<h2 class="front-strip-label">Your Photons</h2>` +
+              machineHtml("front-photons", {
+                title: "SUPERNOVAS",
+                priceLine: "",
+                listLabel: `See all ${owned.length} of your Photons`,
+                dispenseAction: "machine-dispense-chat",
+                kind: "photon",
+                items: owned.map((p: any, i: number) => ({
+                  code: machineCode(i),
+                  name: faceNameOf(p),
+                  openName: p.name,
+                  role: PHOTONS.find((x) => x.name === p.name)?.tagline || "",
+                  price: "",
+                  pack: photonCard(p, 84),
+                })),
+              })
             : "",
           ownedAtoms.length > 0
-            ? frontStrip("Your Atoms", ownedAtoms.map((a) => atomCard(a)))
+            ? `<h2 class="front-strip-label">Your Atoms</h2>` +
+              machineHtml("front-atoms", {
+                title: "NOVAS",
+                priceLine: "",
+                listLabel: `See all ${ownedAtoms.length} of your Atoms`,
+                dispenseAction: "machine-dispense-chat",
+                kind: "atom",
+                items: ownedAtoms.map((a, i: number) => ({
+                  code: machineCode(i),
+                  name: a.name,
+                  openName: a.name,
+                  role: a.tagline,
+                  price: "",
+                  pack: atomCard(a, 84),
+                })),
+              })
             : "",
         ].join("")
       : `<div class="card empty-panel">
@@ -2745,15 +2873,33 @@ function renderStore(): string {
         <a class="btn small" href="${esc(buyUrl(NOVA.monthly.url, "nova-monthly"))}" target="_blank" rel="noopener">$10/mo</a><span class="fine">$10.00/month ($10.30 at checkout)</span>
       </div><p class="fine">The business set stays locked on Nova alone — front-desk answering, quotes and invoices, client handling, more than one account, team features. Those open with a business Launch — Supernova or Satellite — on the Business side.</p></div></div>`;
   const personalUpkeepCard = `    <div class="card upkeep-card" id="store-personal-upkeep"><img src="/brand/starburst.jpg" alt="" loading="lazy" decoding="async"><div><h2>Personal Upkeep</h2><p>The care that keeps your personal helper working well: updates as they come out, and help first when you need it. It sits beside Nova. Your first three months come with Nova; after that it is $9 a month, only if you want it. Upkeep itself is the care plan for a business Launch.</p><p class="price">$9.00/month <span class="fine">($9.27 at checkout)</span></p><div class="row">${buyButton(buyUrl(PERSONAL_UPKEEP.url, "personal-upkeep"), "$9.27", allOwned || ownedProducts.includes("personal-upkeep"))}</div></div></div>`;
+  const photonItems = PHOTONS.map((p, i) => ({
+    code: machineCode(i),
+    name: p.name,
+    openName: p.name,
+    role: p.tagline,
+    price: "$499 one-time",
+    pack: `<button class="machine-pack-btn" data-action="machine-goto" data-machine="store-photons" data-index="${i}" aria-label="Show ${esc(p.name)}">${portraitHtml(p.name, 84)}<span class="pack-name">${esc(p.name)}</span></button>`,
+    bay: photonCards[i],
+  }));
+  const atomItems = ATOMS.map((a, i) => ({
+    code: machineCode(i),
+    name: a.name,
+    openName: a.name,
+    role: a.tagline,
+    price: "$79 · or $10/mo",
+    pack: `<button class="machine-pack-btn" data-action="machine-goto" data-machine="store-atoms" data-index="${i}" aria-label="Show ${esc(a.name)}">${atomPortraitHtml(a.name, 84)}<span class="pack-name">${esc(a.name)}</span></button>`,
+    bay: atomCards[i],
+  }));
   const photonsGroup = `    <details class="store-group" id="store-photons" ${storeOpen.photons ? "open" : ""}>
       <summary><span class="summary-title">Meet the Photons</span><span class="fine">12 Supernovas · tap to hide</span></summary>
-      <p class="page-lede">Each Photon is a Supernova on its own. Buy one and it drops into your app, ready to talk. One hero at a time below — the arrows and dots move between them.</p>
-      ${carouselHtml("store-photons", "Meet the Photons", photonCards, PHOTONS.map((p) => p.name))}
+      <p class="page-lede">Each Photon is a Supernova on its own. Buy one and it drops into your app, ready to talk. Spin the drum to the one you want, then press DISPENSE — it drops into the tray below, ready to buy.</p>
+      ${machineHtml("store-photons", { title: "SUPERNOVAS", priceLine: "$499 one-time", listLabel: "See all 12 Photons", dispenseAction: "machine-dispense", kind: "photon", items: photonItems })}
     </details>`;
   const atomsGroup = `<details class="store-group" id="store-atoms" ${storeOpen.atoms ? "open" : ""}>
       <summary><span class="summary-title">Meet the Atoms</span><span class="fine">12 Novas · tap to hide</span></summary>
-      <p class="page-lede">Each Atom is a Nova on its own. Buy one and it drops into your app, ready to help with your own day. One hero at a time below — the arrows and dots move between them.</p>
-      ${carouselHtml("store-atoms", "Meet the Atoms", atomCards, ATOMS.map((a) => a.name))}
+      <p class="page-lede">Each Atom is a Nova on its own. Buy one and it drops into your app, ready to help with your own day. Spin the drum to the one you want, then press DISPENSE — it drops into the tray below, ready to buy.</p>
+      ${machineHtml("store-atoms", { title: "NOVAS", priceLine: "$79 outright · or $10/month", listLabel: "See all 12 Novas", dispenseAction: "machine-dispense", kind: "atom", items: atomItems })}
     </details>`;
   const upkeepCard = `    <div class="card upkeep-card" id="store-upkeep"><button class="poster-btn upkeep-poster-btn" data-action="tier-info" data-tier="upkeep" aria-label="More about Upkeep"><img src="/brand/starburst.jpg" alt="" loading="lazy" decoding="async"></button><div><h2>Upkeep</h2><p>${esc(UPKEEP_COPY.body)}</p><p class="price">$29.00/month <span class="fine">($29.87 at checkout)</span></p><div class="row">${buyButton(buyUrl(UPKEEP.url, "upkeep"), "$29.87", state?.upkeep === true)}<button class="btn small more-info" data-action="tier-info" data-tier="upkeep">More info</button></div></div></div>`;
   return `
@@ -3654,6 +3800,49 @@ document.addEventListener(
   true,
 );
 
+// ---------- Vending machine drum drag ----------
+// A horizontal drag across a machine's glass steps the drum, one
+// compartment per stride, the way a thumb would turn the real drum.
+// Vertical page scrolling is untouched (the window is pan-y), and a
+// drag that actually turned the drum swallows the click it ends
+// with, so a Face is never opened by accident mid-spin.
+let machineDrag: { id: string; x: number } | null = null;
+let machineDragMoved = false;
+document.addEventListener("pointerdown", (e) => {
+  machineDragMoved = false;
+  const w = (e.target as HTMLElement).closest(".machine-window");
+  const root = w?.closest(".machine") as HTMLElement | null;
+  if (!root) return;
+  machineDrag = { id: root.dataset.machine || "", x: e.clientX };
+});
+document.addEventListener("pointermove", (e) => {
+  if (!machineDrag) return;
+  const dx = e.clientX - machineDrag.x;
+  if (Math.abs(dx) < 42) return;
+  machineGo(
+    machineDrag.id,
+    (machineIndex[machineDrag.id] || 0) + (dx < 0 ? 1 : -1),
+  );
+  machineDrag.x = e.clientX;
+  machineDragMoved = true;
+});
+document.addEventListener("pointerup", () => {
+  machineDrag = null;
+});
+document.addEventListener("pointercancel", () => {
+  machineDrag = null;
+});
+document.addEventListener(
+  "click",
+  (e) => {
+    if (!machineDragMoved) return;
+    machineDragMoved = false;
+    e.stopPropagation();
+    e.preventDefault();
+  },
+  true,
+);
+
 // ---------- Interface sounds: which tap makes which sound ----------
 // Every tap answers with its tiny sound, before anything else runs,
 // so a slow network or a redirect never leaves the tap silent.
@@ -3667,6 +3856,7 @@ const SWOOSH_ACTIONS = new Set([
   "back-to-front",
   "open-photon",
   "open-atom",
+  "machine-dispense-chat",
   "card-chat",
   "card-chat-atom",
   "chooser-skip",
@@ -3954,14 +4144,40 @@ document.addEventListener("click", async (e) => {
     const name = t.dataset.atom || "";
     dayOpen = false;
     if (name) openThread(name);
-  } else if (action === "carousel-prev") {
-    // A roster carousel moves in place — no full re-render, so the
-    // page does not jump and open Store sections stay open.
-    carouselGo(t.dataset.carousel || "", (carouselIndex[t.dataset.carousel || ""] || 0) - 1);
-  } else if (action === "carousel-next") {
-    carouselGo(t.dataset.carousel || "", (carouselIndex[t.dataset.carousel || ""] || 0) + 1);
-  } else if (action === "carousel-dot") {
-    carouselGo(t.dataset.carousel || "", Number(t.dataset.index || 0));
+  } else if (action === "machine-prev") {
+    // A machine steps in place — no full re-render, so the page does
+    // not jump and open Store sections stay open.
+    machineGo(t.dataset.machine || "", (machineIndex[t.dataset.machine || ""] || 0) - 1);
+  } else if (action === "machine-next") {
+    machineGo(t.dataset.machine || "", (machineIndex[t.dataset.machine || ""] || 0) + 1);
+  } else if (action === "machine-key" || action === "machine-goto") {
+    machineGo(t.dataset.machine || "", Number(t.dataset.index || 0));
+  } else if (action === "machine-dispense") {
+    // Store: the selected Face's card drops into the pickup bay. The
+    // card itself (and its Buy button) is already the bay's active
+    // card — the drop is the machine answering the press.
+    const root = t.closest(".machine") as HTMLElement | null;
+    if (root) {
+      root.classList.remove("dispensing");
+      void root.offsetWidth;
+      root.classList.add("dispensing");
+      window.setTimeout(() => root.classList.remove("dispensing"), 950);
+    }
+  } else if (action === "machine-dispense-chat") {
+    // Chat front: dispensing a Face opens its thread — the same
+    // destinations the cards themselves have always opened.
+    const root = t.closest(".machine") as HTMLElement | null;
+    const id = t.dataset.machine || "";
+    const panels = root
+      ? ([...root.querySelectorAll(".machine-panel")] as HTMLElement[])
+      : [];
+    const sel = panels[machineIndex[id] || 0];
+    const name = sel?.dataset.openName || "";
+    if (name) {
+      dayOpen = false;
+      if (root?.dataset.kind === "atom") openThread(name);
+      else openPhoton(name);
+    }
   } else if (action === "product-info") {
     openProductCard(t.dataset.slug || "", t);
   } else if (action === "tier-info") {

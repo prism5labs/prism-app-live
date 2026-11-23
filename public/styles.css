@@ -291,13 +291,10 @@ textarea { width: 100%; resize: vertical; }
 .front-body { padding: 20px 24px 0; text-align: center; }
 .greeting { font-family: "Patua One", Georgia, serif; font-size: var(--t-display); color: var(--ink); margin: 0 0 2px; }
 .greeting-accent { color: var(--ink); }
-/* Picture-led front (Nov 22, 2026 declutter): the Faces sit in
-   swipeable strips — portrait and name only, no paragraphs, no
-   carousel controls. The thumb does the navigating. */
+/* Picture-led front: your Faces live in the vending machines now
+   (below) — the label names whose machine follows. */
 .front-strip-label { text-align: left; font-size: var(--t-body); margin: 18px 20px 8px; }
-.front-strip { display: flex; gap: 12px; overflow-x: auto; padding: 2px 20px 14px; scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
-.front-strip::-webkit-scrollbar { display: none; }
-.front-strip .photon-card { flex: 0 0 auto; width: 168px; scroll-snap-align: start; }
+.front .machine { margin-left: 20px; margin-right: 20px; }
 .day-strip { display: flex; align-items: center; gap: 12px; width: calc(100% - 40px); margin: 16px 20px 0; padding: 12px 16px; background: var(--card); border: 1px solid var(--line); border-radius: var(--r-card); cursor: pointer; font: inherit; font-weight: 800; font-size: var(--t-body); color: var(--ink); text-align: left; }
 .day-strip img { width: 34px; height: 38px; object-fit: cover; border-radius: var(--r-field); flex: none; }
 .day-strip:hover { border-color: var(--teal); }
@@ -317,26 +314,255 @@ textarea { width: 100%; resize: vertical; }
   margin: 0 0 16px;
 }
 
-/* Character carousels: one hero at a time (Nov 19, 2026). The viewport
-   stacks the slides — only the hero is in flow, the rest sit absolute
-   and invisible — so the height follows the hero. The move is a simple
-   300ms fade; under reduced motion there is no transition at all, and
-   there is no auto-advance anywhere, so nothing moves unless the
-   visitor taps a control. Dots and arrows are real buttons with the
-   same visible focus ring as the portrait buttons. */
-.carousel { margin: 0 0 16px; }
-.carousel-viewport { position: relative; }
-.carousel-slide { transition: opacity var(--t-panel) var(--ease); }
-.carousel-slide:not(.active) { opacity: 0; visibility: hidden; position: absolute; inset: 0; pointer-events: none; }
-.carousel-slide .photon-card { width: 100%; }
-.carousel-controls { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 12px; }
-.carousel-dots { display: flex; gap: 7px; flex-wrap: wrap; justify-content: center; flex: 1; }
-.carousel-dot { width: 12px; height: 12px; border-radius: 50%; border: 1px solid var(--muted); background: transparent; padding: 0; cursor: pointer; }
-.carousel-dot.active { background: var(--cherry); border-color: var(--cherry); }
-.carousel-btn { flex: none; }
-.carousel-btn:focus-visible, .carousel-dot:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+/* Vending machines (Nov 22, 2026): the rosters in two rotating-drum
+   merchandisers, 1950s diner dress — deep teal cabinet, chrome trim,
+   a lit cream marquee with the Prism 5 Labs lockup, and the Faces
+   riding the drum as packaged goods behind curved glass. The drum
+   turns on a single transform (GPU-friendly, thumbnails only), one
+   compartment per step; the front compartment is lit, its neighbours
+   dim as they curve away, and the rest are hidden around the back.
+   Nothing auto-advances: the drum moves only when the visitor works
+   it, and under reduced motion the turn is instant. */
+.machine {
+  background: linear-gradient(180deg, #14666d, var(--teal-deep));
+  border: 1px solid var(--teal-deep);
+  border-radius: var(--r-sheet);
+  padding: 12px;
+  margin: 0 0 16px;
+  box-shadow: inset 0 1px 0 rgba(255, 243, 220, 0.25), 0 6px 18px rgba(46, 38, 32, 0.18);
+  color: var(--cream);
+  text-align: left;
+}
+.machine .logo-mark { display: inline-block; flex: none; }
+.machine .logo-mark svg { width: 100%; height: 100%; display: block; }
+.machine-marquee {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  background: linear-gradient(180deg, #fff8e6, var(--cream));
+  color: var(--teal-deep);
+  border-radius: var(--r-field);
+  padding: 8px 12px;
+  box-shadow: 0 0 14px rgba(244, 201, 93, 0.45), inset 0 0 0 1px rgba(176, 30, 30, 0.25);
+}
+.machine-marquee-brand { font-family: "Patua One", Georgia, serif; letter-spacing: 0.04em; }
+.machine-marquee-title { font-family: "Patua One", Georgia, serif; color: var(--cherry); margin-left: auto; letter-spacing: 0.05em; }
+.machine-marquee-price { flex-basis: 100%; font-size: var(--t-caption); font-weight: 800; color: var(--teal); }
+.machine-body { display: flex; gap: 10px; margin-top: 10px; }
+.machine-window {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 198px;
+  border-radius: var(--r-field);
+  background: radial-gradient(120% 100% at 50% 0%, #123b3e 0%, #081f21 70%);
+  overflow: hidden;
+  perspective: 720px;
+  touch-action: pan-y;
+  box-shadow: inset 0 0 0 2px rgba(203, 209, 213, 0.5), inset 0 -18px 24px rgba(0, 0, 0, 0.45);
+}
+.machine-drum {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+  transition: transform 550ms var(--ease);
+}
+.machine-panel {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 104px;
+  height: 160px;
+  margin: -80px 0 0 -52px;
+  backface-visibility: hidden;
+  transition: opacity var(--t-panel) var(--ease);
+}
+.machine-pack {
+  height: 100%;
+  background: var(--card);
+  border: 1px solid var(--card-line);
+  border-radius: 10px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.machine-panel.front .machine-pack {
+  border-color: var(--butter);
+  box-shadow: 0 0 0 2px var(--butter), 0 0 22px rgba(244, 201, 93, 0.5);
+}
+.pack-top {
+  background: var(--teal);
+  color: var(--butter);
+  font-size: 0.58rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 6px;
+}
+.pack-code { margin-top: auto; text-align: center; font-weight: 800; font-size: var(--t-caption); color: var(--muted); padding: 2px 0 4px; }
+.machine-pack-btn {
+  flex: 1;
+  background: none;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 6px 4px;
+  font: inherit;
+}
+.pack-name { font-weight: 800; font-size: var(--t-secondary); color: var(--ink); }
+.machine-panel .photon-card {
+  flex: 1;
+  width: 100%;
+  border: none;
+  background: none;
+  padding: 6px 4px;
+}
+.machine-panel .photon-card:hover { transform: none; border-color: transparent; }
+.machine-panel .photon-name { font-size: var(--t-secondary); }
+.machine-glass {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(115deg, rgba(255, 255, 255, 0.2) 0%, rgba(255, 255, 255, 0.04) 34%, rgba(255, 255, 255, 0) 55%, rgba(255, 255, 255, 0.1) 100%);
+}
+.machine-side { flex: 0 0 128px; display: flex; flex-direction: column; gap: 8px; }
+.machine-lcd {
+  background: #0b2422;
+  border: 1px solid rgba(244, 201, 93, 0.35);
+  border-radius: 8px;
+  padding: 7px 8px;
+  box-shadow: inset 0 0 12px rgba(0, 0, 0, 0.6);
+  min-height: 88px;
+}
+.lcd-code { display: block; font-weight: 800; font-size: var(--t-caption); letter-spacing: 0.1em; color: var(--butter); }
+.lcd-name { display: block; font-family: "Patua One", Georgia, serif; font-size: 1rem; line-height: 1.15; color: #fff6d8; }
+.lcd-role {
+  display: block;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 0.68rem;
+  line-height: 1.3;
+  color: #d8cba0;
+}
+.lcd-price { display: block; font-size: 0.68rem; font-weight: 800; color: #ffd98a; margin-top: 2px; }
+.machine-keypad { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+.machine-key {
+  background: rgba(255, 243, 220, 0.12);
+  color: var(--cream);
+  border: 1px solid rgba(255, 243, 220, 0.35);
+  border-radius: 6px;
+  font-size: 0.66rem;
+  font-weight: 800;
+  padding: 5px 0;
+  cursor: pointer;
+}
+.machine-key.active { background: var(--butter); color: var(--teal-deep); border-color: var(--butter); }
+.machine-controls { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.machine-step-btn {
+  background: rgba(255, 243, 220, 0.12);
+  color: var(--cream);
+  border: 1px solid rgba(255, 243, 220, 0.35);
+  padding: 6px 8px;
+  font-size: var(--t-caption);
+}
+.machine-coin {
+  width: 10px;
+  height: 22px;
+  border-radius: 3px;
+  background: linear-gradient(90deg, #8f979c, #e8ecee, #8f979c);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.35);
+}
+.machine-dispense-btn {
+  background: var(--cherry-btn);
+  color: #fff;
+  border: none;
+  border-radius: var(--r-pill);
+  font-family: "Patua One", Georgia, serif;
+  letter-spacing: 0.06em;
+  padding: 10px 0;
+  cursor: pointer;
+  box-shadow: 0 3px 0 var(--cherry-dark);
+}
+.machine-dispense-btn:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--cherry-dark); }
+.machine-plate {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  background: linear-gradient(180deg, #d9b45c, #b98f2e);
+  color: #3a2c07;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border-radius: 5px;
+  padding: 4px 6px;
+}
+.machine-bay {
+  margin-top: 10px;
+  background: rgba(8, 31, 33, 0.55);
+  border-radius: var(--r-field);
+  padding: 8px;
+  box-shadow: inset 0 0 0 1px rgba(255, 243, 220, 0.18);
+}
+.machine-bay-flap {
+  text-align: center;
+  font-family: "Patua One", Georgia, serif;
+  letter-spacing: 0.3em;
+  font-size: var(--t-caption);
+  color: var(--cream);
+  background: rgba(255, 243, 220, 0.1);
+  border-radius: 6px;
+  padding: 4px 0;
+  margin-bottom: 8px;
+  transition: background var(--t-panel) var(--ease), box-shadow var(--t-panel) var(--ease);
+}
+.machine-bay-card { display: none; }
+.machine-bay-card.active { display: block; }
+.machine-bay-card .card { margin: 0; }
+.machine.dispensing .machine-bay-flap {
+  background: var(--cherry);
+  color: #fff;
+  box-shadow: 0 0 18px rgba(214, 40, 40, 0.55);
+}
+.machine.dispensing .machine-bay-card.active { animation: machine-drop 700ms var(--ease); }
+@keyframes machine-drop {
+  0% { transform: translateY(-14px); opacity: 0.2; }
+  60% { transform: translateY(2px); opacity: 1; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+.machine-list { margin-top: 10px; }
+.machine-list summary { cursor: pointer; font-weight: 800; font-size: var(--t-secondary); color: var(--butter); padding: 4px 2px; }
+.machine-list-items { display: flex; flex-wrap: wrap; gap: 6px; padding: 6px 0 2px; }
+.machine-list-item {
+  background: rgba(255, 243, 220, 0.1);
+  color: var(--cream);
+  border: 1px solid rgba(255, 243, 220, 0.3);
+  border-radius: var(--r-pill);
+  padding: 5px 10px;
+  font-size: var(--t-caption);
+  font-weight: 700;
+  cursor: pointer;
+}
+.machine-list-item.active { background: var(--butter); color: var(--teal-deep); border-color: var(--butter); }
+.machine-list-item .list-code { opacity: 0.75; font-weight: 800; margin-right: 4px; }
+.machine-key:focus-visible, .machine-step-btn:focus-visible, .machine-list-item:focus-visible, .machine-pack-btn:focus-visible, .machine-dispense-btn:focus-visible {
+  outline: 2px solid var(--butter);
+  outline-offset: 2px;
+}
 @media (prefers-reduced-motion: reduce) {
-  .carousel-slide { transition: none; }
+  .machine-drum { transition: none; }
+  .machine-panel { transition: none; }
+  .machine.dispensing .machine-bay-card.active { animation: none; }
 }
 .photon-card {
   background: var(--card);
