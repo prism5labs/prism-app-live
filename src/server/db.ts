@@ -662,6 +662,50 @@ export function getThread(accountId: string, photon: string): ChatMessage[] {
   return rows.map((r) => ({ id: r.id, role: r.role, content: r.content, created_at: r.created_at }));
 }
 
+export type MessageSearchResult = {
+  photon: string;
+  role: string;
+  snippet: string;
+  created_at: string;
+};
+
+// A short window of context around the first match: about 160
+// characters, with ellipses where the message was trimmed. The full
+// message body never leaves the server through search.
+export function searchSnippet(content: string, query: string): string {
+  const text = String(content || "");
+  const idx = text.toLowerCase().indexOf(String(query || "").toLowerCase());
+  if (idx < 0) return text.slice(0, 160) + (text.length > 160 ? "…" : "");
+  const start = Math.max(0, idx - 60);
+  const slice = text.slice(start, start + 160);
+  return (start > 0 ? "…" : "") + slice + (start + 160 < text.length ? "…" : "");
+}
+
+function escapeLike(value: string): string {
+  return value.replace(/[\\%_]/g, (c) => `\\${c}`);
+}
+
+// Account-scoped message search: a case-insensitive substring match
+// on content, strictly for the requesting account, newest first,
+// capped at 50. Parameterised only; LIKE wildcards in the query are
+// escaped so % and _ match literally.
+export function searchMessages(accountId: string, query: string): MessageSearchResult[] {
+  const pattern = `%${escapeLike(query)}%`;
+  const rows = db
+    .query(
+      `SELECT photon, role, content, created_at FROM messages
+       WHERE account_id = ? AND content COLLATE NOCASE LIKE ? ESCAPE '\\'
+       ORDER BY id DESC LIMIT 50`,
+    )
+    .all(accountId, pattern) as any[];
+  return rows.map((r) => ({
+    photon: r.photon,
+    role: r.role,
+    snippet: searchSnippet(r.content, query),
+    created_at: r.created_at,
+  }));
+}
+
 export function addMessage(
   accountId: string,
   photon: string,

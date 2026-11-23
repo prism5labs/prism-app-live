@@ -129,6 +129,12 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ accountId: getAccountId() }),
     }),
+  // Conversation search: find where something was said across all of
+  // this account's Photon and Atom threads. Snippets only.
+  searchThreads: (q: string) =>
+    req(
+      `/api/threads/search?accountId=${encodeURIComponent(getAccountId())}&q=${encodeURIComponent(q)}`,
+    ),
   chat: (photon: string, message: string) =>
     req(
       "/api/chat",

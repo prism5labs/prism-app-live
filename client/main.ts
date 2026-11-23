@@ -115,6 +115,11 @@ async function loadPinnedFaces(): Promise<void> {
   const r = await api.pinned();
   if (r && r.ok && Array.isArray(r.pinned)) pinnedFaces = r.pinned;
 }
+// Conversation search on the Chat front: the last query and its
+// results. Results are null until a search has run, so the front can
+// tell "not searched yet" apart from "searched, nothing found".
+let conversationSearchQuery = "";
+let conversationSearchResults: any[] | null = null;
 let toastTimer: number | null = null;
 // Customization wizard: which Photon is being customized, which step,
 // and the design-your-own tuning draft (answered yes/no, saved on Save).
@@ -1302,6 +1307,26 @@ function renderChatFront(): string {
         .join("") +
       `</div>`
     : "";
+  const searchResultsHtml =
+    conversationSearchResults === null
+      ? ""
+      : conversationSearchResults.length === 0
+        ? `<p class="fine">No conversations found for &ldquo;${esc(conversationSearchQuery)}&rdquo;.</p>`
+        : conversationSearchResults
+            .map(
+              (r: any) => `<button class="inbox-msg" data-action="search-open-thread" data-photon="${esc(String(r.photon || ""))}"><span class="inbox-subject">${esc(String(r.photon || ""))}</span><span class="inbox-snippet">${esc(String(r.snippet || ""))}</span><span class="inbox-meta">${esc(r.role === "user" ? "You" : String(r.photon || ""))} · ${esc(fmtWhen(String(r.created_at || "")))}</span></button>`,
+            )
+            .join("");
+  const searchHtml = `
+    <div class="card" id="conversation-search">
+      <h3>Search your conversations</h3>
+      <form id="conversation-search-form" class="row">
+        <input id="conversation-search-input" type="search" placeholder="Search your conversations…" value="${esc(conversationSearchQuery)}" aria-label="Search your conversations">
+        <button class="btn primary" type="submit">Search</button>
+        ${conversationSearchQuery ? `<button class="btn" type="button" data-action="search-clear">Clear</button>` : ""}
+      </form>
+      ${searchResultsHtml}
+    </div>`;
   return `
   <section class="front">
     <div class="front-body">
@@ -1311,6 +1336,7 @@ function renderChatFront(): string {
       ? `<button class="day-strip" data-action="day-start"><img src="/brand/gem.jpg" alt=""><span>Start My Day</span></button>`
       : ""}
     ${pinnedHtml}
+    ${searchHtml}
     ${ownedHtml}
   </section>`;
 }
@@ -4526,6 +4552,14 @@ document.addEventListener("click", async (e) => {
     const r = await api.driveSearch();
     if (r && r.ok) state.driveFiles = r.files || [];
     render();
+  } else if (action === "search-open-thread") {
+    const name = t.dataset.photon || "";
+    dayOpen = false;
+    if (name) openThread(name);
+  } else if (action === "search-clear") {
+    conversationSearchQuery = "";
+    conversationSearchResults = null;
+    render();
   } else if (action === "import-add") {
     // One tap per person: files the friend-request email for that
     // contact. The import itself sent nothing.
@@ -4636,6 +4670,21 @@ document.addEventListener("submit", async (e) => {
     }
     bookDraft = { title, start, end, description, attendees };
     render();
+  } else if (form.id === "conversation-search-form") {
+    e.preventDefault();
+    const input = document.getElementById("conversation-search-input") as HTMLInputElement | null;
+    conversationSearchQuery = (input?.value || "").trim();
+    if (conversationSearchQuery.length < 2) {
+      toast("Type at least 2 characters to search.", "err");
+      return;
+    }
+    const r = await api.searchThreads(conversationSearchQuery);
+    if (r && r.ok) {
+      conversationSearchResults = r.results || [];
+      render();
+    } else {
+      toast(r?.error || r?.message || "That search didn't run. Try again.", "err");
+    }
   } else if (form.id === "drive-search-form") {
     e.preventDefault();
     const input = document.getElementById("drive-search-input") as HTMLInputElement | null;

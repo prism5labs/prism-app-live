@@ -11,6 +11,7 @@ import {
   ownsPhoton,
   ownsAtom,
   getThread,
+  searchMessages,
   addMessage,
   pinFace,
   unpinFace,
@@ -828,6 +829,20 @@ async function handleApi(req: Request, path: string): Promise<Response> {
     const name = String(body.name || "").trim().slice(0, 40);
     setCustomName(accountId, name ? name : null);
     return json({ ok: true, displayName: name || "Prism 5", customName: name || null });
+  }
+
+  // GET /api/threads/search?q= — search across all of this account's
+  // conversations. Mounted BEFORE /api/threads/:name, whose pattern
+  // would otherwise swallow "search" as a Photon name. Same account
+  // resolution as the thread export route. The query is required and
+  // must be at least 2 characters; results are account-scoped
+  // snippets only, never full message bodies.
+  if (path === "/api/threads/search" && method === "GET") {
+    const accountId = accountIdFrom(req, {});
+    if (!isValidAccountId(accountId)) return bad("accountId required", 400);
+    const query = (url.searchParams.get("q") || "").trim();
+    if (query.length < 2) return bad("search query must be at least 2 characters", 400);
+    return json({ ok: true, query, results: searchMessages(accountId, query) });
   }
 
   // GET /api/threads/:name — a Photon or an Atom name; the thread store
