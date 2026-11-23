@@ -202,7 +202,13 @@
 // are untouched; the v3 fallback keeps its own ending. The cache
 // bump makes existing installs fetch the new main.js and styles.css
 // instead of serving the cached ones.
-const CACHE = "prism5-v60";
+// CACHE v61: bumped Nov 23, 2026 for the hero opening — the Atomic
+// poster finale is replaced by the 23 Novas and Supernovas as
+// full-figure heroes (painted full-body art in public/heroes/),
+// assembling asymmetrically and flashing out as light. Prism is
+// out of the opening entirely. The bump makes installs fetch the
+// new main.js and styles.css instead of serving the v60 copies.
+const CACHE = "prism5-v61";
 // Images (portraits, thumbnails, brand art, chat backgrounds, icons)
 // live in their own cache whose name does NOT change with the shell
 // version. Before v52 every shell bump deleted the one cache on

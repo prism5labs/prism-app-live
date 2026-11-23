@@ -1,0 +1,237 @@
+{
+  "note": "Full-figure hero art for the Prism app opening (SW v61, Nov 23, 2026). One painted full-body hero per Face, generated from the Face's portrait as identity reference, black background keyed to alpha. Prism is deliberately absent: she is out of the opening at Neil's order. Raw generations live in ~/workspace/business/prism-hero-art-raw/ (outside the repo).",
+  "heroes": [
+    {
+      "name": "Juniper",
+      "kind": "Supernova",
+      "file": "/heroes/Juniper.webp",
+      "width": 560,
+      "height": 1153,
+      "bytes": 106940,
+      "sourcePortrait": "/photons/Juniper.png",
+      "rawGeneration": "media-generation-hero-juniper-raw-0-22d77de7-2a49-4c94-8731-14c87ccb7c68.webp"
+    },
+    {
+      "name": "Encore",
+      "kind": "Supernova",
+      "file": "/heroes/Encore.webp",
+      "width": 560,
+      "height": 1092,
+      "bytes": 109684,
+      "sourcePortrait": "/photons/Encore.png",
+      "rawGeneration": "media-generation-hero-encore-raw-0-68abd5ba-f2ab-4b9a-9516-b1e845e3a7fb.webp"
+    },
+    {
+      "name": "Zero",
+      "kind": "Supernova",
+      "file": "/heroes/Zero.webp",
+      "width": 560,
+      "height": 1092,
+      "bytes": 95908,
+      "sourcePortrait": "/photons/Zero.png",
+      "rawGeneration": "media-generation-hero-zero-raw-0-986fdb52-04ac-4039-bdf0-ef48f48b9f10.webp"
+    },
+    {
+      "name": "Proof",
+      "kind": "Supernova",
+      "file": "/heroes/Proof.webp",
+      "width": 560,
+      "height": 1193,
+      "bytes": 108766,
+      "sourcePortrait": "/photons/Proof.png",
+      "rawGeneration": "media-generation-hero-proof-raw-0-56058180-1b12-4710-b74a-1edc604677e0.webp"
+    },
+    {
+      "name": "Barnstormer",
+      "kind": "Supernova",
+      "file": "/heroes/Barnstormer.webp",
+      "width": 560,
+      "height": 1103,
+      "bytes": 105706,
+      "sourcePortrait": "/photons/Barnstormer.png",
+      "rawGeneration": "media-generation-hero-barnstormer-raw-0-d40e10d0-fc04-483a-b730-67da33ed0f17.webp"
+    },
+    {
+      "name": "Blueprint",
+      "kind": "Supernova",
+      "file": "/heroes/Blueprint.webp",
+      "width": 560,
+      "height": 1176,
+      "bytes": 130218,
+      "sourcePortrait": "/photons/Blueprint.png",
+      "rawGeneration": "media-generation-hero-blueprint-raw-0-00f2a99d-018b-4114-a3ed-c4a07d129fdc.webp"
+    },
+    {
+      "name": "Calendra",
+      "kind": "Supernova",
+      "file": "/heroes/Calendra.webp",
+      "width": 560,
+      "height": 1056,
+      "bytes": 138114,
+      "sourcePortrait": "/photons/Calendra.png",
+      "rawGeneration": "media-generation-hero-calendra-raw-0-7e6c281b-e10f-4df1-9b16-e324e32b11d8.webp"
+    },
+    {
+      "name": "Shopbell",
+      "kind": "Supernova",
+      "file": "/heroes/Shopbell.webp",
+      "width": 560,
+      "height": 1127,
+      "bytes": 114224,
+      "sourcePortrait": "/photons/Shopbell.png",
+      "rawGeneration": "media-generation-hero-shopbell-raw-0-05b7ecd8-24eb-4962-a3f0-df356cab142b.webp"
+    },
+    {
+      "name": "Keystone",
+      "kind": "Supernova",
+      "file": "/heroes/Keystone.webp",
+      "width": 560,
+      "height": 1054,
+      "bytes": 127712,
+      "sourcePortrait": "/photons/Keystone.png",
+      "rawGeneration": "media-generation-hero-keystone-raw-0-db2ee239-cabe-4447-804a-6e75f3de1494.webp"
+    },
+    {
+      "name": "Vesper",
+      "kind": "Supernova",
+      "file": "/heroes/Vesper.webp",
+      "width": 560,
+      "height": 1144,
+      "bytes": 161934,
+      "sourcePortrait": "/photons/Vesper.png",
+      "rawGeneration": "media-generation-hero-vesper-raw-0-0d43b983-5530-401d-b9df-2dc5e534d435.webp"
+    },
+    {
+      "name": "Goldstar",
+      "kind": "Supernova",
+      "file": "/heroes/Goldstar.webp",
+      "width": 560,
+      "height": 1137,
+      "bytes": 115174,
+      "sourcePortrait": "/photons/Goldstar.png",
+      "rawGeneration": "media-generation-hero-goldstar-raw-0-666a2d0c-284a-426b-96ec-8a77f51ba77d.webp"
+    },
+    {
+      "name": "Mabel",
+      "kind": "Nova",
+      "file": "/heroes/Mabel.webp",
+      "width": 560,
+      "height": 1108,
+      "bytes": 106582,
+      "sourcePortrait": "/atoms/Mabel.png",
+      "rawGeneration": "media-generation-hero-mabel-raw-0-d23be40d-5497-4fe0-b2b4-5cfe84df9059.webp"
+    },
+    {
+      "name": "Hazel",
+      "kind": "Nova",
+      "file": "/heroes/Hazel.webp",
+      "width": 560,
+      "height": 1078,
+      "bytes": 123164,
+      "sourcePortrait": "/atoms/Hazel.png",
+      "rawGeneration": "media-generation-hero-hazel-raw-0-a4606836-f4ec-492c-a771-79388a97aeb2.webp"
+    },
+    {
+      "name": "Willa",
+      "kind": "Nova",
+      "file": "/heroes/Willa.webp",
+      "width": 560,
+      "height": 1122,
+      "bytes": 123234,
+      "sourcePortrait": "/atoms/Willa.png",
+      "rawGeneration": "media-generation-hero-willa-raw-0-c267ac18-9419-4c38-91ac-f078a8d4371d.webp"
+    },
+    {
+      "name": "Ruby",
+      "kind": "Nova",
+      "file": "/heroes/Ruby.webp",
+      "width": 560,
+      "height": 1122,
+      "bytes": 142458,
+      "sourcePortrait": "/atoms/Ruby.png",
+      "rawGeneration": "media-generation-hero-ruby-raw-0-9dfadd6b-9255-49e5-8120-01ea297c711d.webp"
+    },
+    {
+      "name": "Jude",
+      "kind": "Nova",
+      "file": "/heroes/Jude.webp",
+      "width": 560,
+      "height": 1146,
+      "bytes": 107560,
+      "sourcePortrait": "/atoms/Jude.png",
+      "rawGeneration": "media-generation-hero-jude-raw-0-e4308bf9-dfa5-4132-8b0f-f903387476f6.webp"
+    },
+    {
+      "name": "Sadie",
+      "kind": "Nova",
+      "file": "/heroes/Sadie.webp",
+      "width": 560,
+      "height": 1292,
+      "bytes": 119412,
+      "sourcePortrait": "/atoms/Sadie.png",
+      "rawGeneration": "media-generation-hero-sadie-raw-0-937724db-1cca-4282-b847-fdee6d09c51c.webp"
+    },
+    {
+      "name": "Bea",
+      "kind": "Nova",
+      "file": "/heroes/Bea.webp",
+      "width": 560,
+      "height": 1158,
+      "bytes": 130416,
+      "sourcePortrait": "/atoms/Bea.png",
+      "rawGeneration": "media-generation-hero-bea-raw-0-d3f83b6a-ec09-40c1-b5e8-117df9cf9229.webp"
+    },
+    {
+      "name": "Flora",
+      "kind": "Nova",
+      "file": "/heroes/Flora.webp",
+      "width": 560,
+      "height": 1192,
+      "bytes": 136214,
+      "sourcePortrait": "/atoms/Flora.png",
+      "rawGeneration": "media-generation-hero-flora-raw-0-2e14c5ba-fcab-4401-afae-30f2b3a486e9.webp"
+    },
+    {
+      "name": "Pierce",
+      "kind": "Nova",
+      "file": "/heroes/Pierce.webp",
+      "width": 560,
+      "height": 1220,
+      "bytes": 130206,
+      "sourcePortrait": "/atoms/Pierce.png",
+      "rawGeneration": "media-generation-hero-pierce-raw-0-b9fc80b3-58d2-444b-8cbe-d1209752a0b9.webp"
+    },
+    {
+      "name": "Iris",
+      "kind": "Nova",
+      "file": "/heroes/Iris.webp",
+      "width": 560,
+      "height": 1158,
+      "bytes": 111848,
+      "sourcePortrait": "/atoms/Iris.png",
+      "rawGeneration": "media-generation-hero-iris-raw-0-1cb96218-ec6a-484f-ba8c-2e18e72689bd.webp"
+    },
+    {
+      "name": "Clive",
+      "kind": "Nova",
+      "file": "/heroes/Clive.webp",
+      "width": 560,
+      "height": 1159,
+      "bytes": 104064,
+      "sourcePortrait": "/atoms/Clive.png",
+      "rawGeneration": "media-generation-hero-clive-raw-0-d3c5051e-9124-408d-8703-bf6d223098a9.webp"
+    },
+    {
+      "name": "Nora",
+      "kind": "Nova",
+      "file": "/heroes/Nora.webp",
+      "width": 560,
+      "height": 1696,
+      "bytes": 155518,
+      "sourcePortrait": "/atoms/Nora.png",
+      "rawGeneration": "media-generation-hero-nora-raw-0-9486b87d-177d-42ff-8b47-939405634774.webp"
+    }
+  ],
+  "count": 23,
+  "totalBytes": 2805056
+}

@@ -4937,7 +4937,7 @@ function setupKeyboardDock(): void {
 // runs). Tap skips it early: the owner never has to wait out the
 // full 10s. If the v4 film fails to load, the v3 opening plays
 // instead; if that fails too, the splash just goes away. On the
-// v5 film, the ending is the Atomic poster finale (below); the v3
+// v5 film, the ending is the hero finale (below); the v3
 // fallback keeps its own ending.
 //
 // First ever open reads "Welcome"; every open after that reads
@@ -4998,101 +4998,124 @@ function dismissSplashWithCurtain(fast = false): void {
   }, fast ? 400 : 750);
 }
 
-// ---------- Opening poster finale ----------
-// Neil, Nov 22, 2026: the film keeps its first beat — the crystal
-// Prism forming on the diner counter and standing complete — but
-// its old ending, the figure dissolving into light that pours
-// into the prism mark, is replaced. At POSTER_HANDOFF_S, with the
-// figure still standing, the Atomic poster takes over: all 24
-// Faces (the 12 Photons and the 12 Atoms) fly in and form up like
-// a Marvel ensemble poster — Prism front and centre, largest; the
-// other Supernovas as the big anchors flanking her and the mid
-// rank; the Novas filling the outer and upper ranks, with a
-// silhouetted Nova row standing at the base; atomic light breaking
-// behind the group (orbit rings, starbursts, a breathing glow, in
-// the active scheme's colors). The poster then holds for about a
-// second, alive rather than frozen: every Face breathes on its own
-// timing (a slow rise and fall with a gentle wind sway), sparkle
-// drifts up through the formation, and one soft band of light
-// crosses the group. Then every Face flies off in a different
-// direction and the usual curtain hands over to the app. The film
-// file itself is untouched, the poster stage is a sibling of the
-// film (never an ancestor, so its fade cannot stall the film's
-// surface — the curtain rule), and the v3 fallback film keeps its
-// own ending: the poster only replaces the v5 film's finale.
-const POSTER_HANDOFF_S = 5.15;
-// Form-up finishes ~1.46s in (last tier's delay + flight); the
-// fly-away starts after the ~1s living hold, and the dismiss
-// follows the last Face out.
-const POSTER_FLY_AFTER_MS = 2460;
-const POSTER_DISMISS_AFTER_MS = 3420;
+// ---------- Opening hero finale ----------
+// Neil, Nov 23, 2026: the Atomic poster was decent, but he wants
+// individual HEROES, not portraits in a big symmetrical grouping
+// — and Prism is OUT of the opening entirely. So the film keeps
+// only its first beat (the crystal forming on the diner counter;
+// the dissolve into light is never reached), and at
+// HERO_HANDOFF_S the hero stage takes over: the 23 remaining
+// Faces — the 11 Supernovas and the 12 Novas, Prism not among
+// them — as full-figure heroes, each with painted full-body art
+// in public/heroes/ (see public/heroes/manifest.json). They
+// assemble Avengers-style: asymmetric and layered, foreground
+// figures large and cropped by the frame's edge, anchors at
+// mid-depth, a few small and high, nobody lined up and nobody
+// mirrored. Each hero arrives their own way — a drop-in, a
+// streak-in with a light trail, a rise, or a flash of light —
+// in staggered waves over a stage of orbit rings, starbursts,
+// drifting sparks, and a lit ground-glow. The assembly then
+// holds for a breath, alive: every figure breathes and stirs on
+// its own timing, subtler than the old poster's sway, as befits
+// figures over portraits. Then the light charges — the glow
+// surges, the figures brighten — and they FLASH OUT: every hero
+// streaks away as light along their own vector, centre first,
+// trails burning behind them, resolving in a white-gold flash
+// that fades as the usual curtain hands over to the app. The
+// film file itself is untouched, the hero stage is a sibling of
+// the film (never an ancestor, so its fade cannot stall the
+// film's surface — the curtain rule), and the v3 fallback film
+// keeps its own ending: the heroes only replace the v5 finale.
+const HERO_HANDOFF_S = 5.15;
+// The flash-out starts once the last hero has landed (~3.1s in)
+// and the assembly has held for a breath; the dismiss follows
+// the flash's fade. Total: the film's 5.15s beat + ~5.8s of
+// heroes + the curtain — a little longer than v60's poster,
+// which the spectacle is there to earn.
+const HERO_FLASH_AFTER_MS = 4350;
+const HERO_DISMISS_AFTER_MS = 5800;
 
-type PosterSlot = {
-  // Centre-x and top of the figure, in % of the stage; width in %
-  // of stage width. Tier staggers the form-up: 0 hero, 1 anchors,
-  // 2 mid rank, 3 outer/upper rank, 4 the silhouetted base row.
+type HeroEntrance = "drop" | "streak" | "rise" | "flash";
+type HeroSlot = {
+  // Centre-x in % of stage width; bottom in % of stage height
+  // (figures are bottom-anchored, so a tall cape or a compact
+  // figure never shifts its ground line); width in % of stage
+  // width; z is the layer; wave staggers the assembly; enter is
+  // the way this hero arrives.
   x: number;
-  y: number;
+  b: number;
   w: number;
   z: number;
-  tier: number;
-  dark?: boolean;
+  wave: number;
+  enter: HeroEntrance;
 };
-const POSTER_SLOTS: Record<string, PosterSlot> = {
-  Prism: { x: 50, y: 34, w: 50, z: 30, tier: 0 },
-  Juniper: { x: 18, y: 43, w: 36, z: 26, tier: 1 },
-  Encore: { x: 82, y: 43, w: 36, z: 26, tier: 1 },
-  Vesper: { x: 50, y: 12, w: 29, z: 20, tier: 2 },
-  Keystone: { x: 30, y: 23, w: 29, z: 21, tier: 2 },
-  Barnstormer: { x: 70, y: 23, w: 29, z: 21, tier: 2 },
-  Blueprint: { x: 11, y: 27, w: 29, z: 20, tier: 2 },
-  Shopbell: { x: 89, y: 27, w: 29, z: 20, tier: 2 },
-  Zero: { x: 8, y: 10, w: 22, z: 14, tier: 3 },
-  Proof: { x: 25, y: 5, w: 22, z: 14, tier: 3 },
-  Calendra: { x: 41, y: 3, w: 22, z: 14, tier: 3 },
-  Goldstar: { x: 59, y: 3, w: 22, z: 14, tier: 3 },
-  Mabel: { x: 75, y: 5, w: 22, z: 14, tier: 3 },
-  Hazel: { x: 92, y: 10, w: 22, z: 14, tier: 3 },
-  Willa: { x: 7, y: 77, w: 16.5, z: 8, tier: 4, dark: true },
-  Ruby: { x: 16.5, y: 78, w: 16.5, z: 8, tier: 4, dark: true },
-  Jude: { x: 26, y: 77, w: 16.5, z: 9, tier: 4, dark: true },
-  Sadie: { x: 35.5, y: 78, w: 16.5, z: 8, tier: 4, dark: true },
-  Bea: { x: 45, y: 77, w: 16.5, z: 9, tier: 4, dark: true },
-  Flora: { x: 55, y: 77, w: 16.5, z: 9, tier: 4, dark: true },
-  Pierce: { x: 64.5, y: 78, w: 16.5, z: 8, tier: 4, dark: true },
-  Iris: { x: 74, y: 77, w: 16.5, z: 9, tier: 4, dark: true },
-  Clive: { x: 83.5, y: 78, w: 16.5, z: 8, tier: 4, dark: true },
-  Nora: { x: 93, y: 77, w: 16.5, z: 8, tier: 4, dark: true },
+// The assembly, laid out by hand to be dynamic, not symmetrical:
+// an off-centre lead, anchors staggered at different heights on
+// each side, a high scattered rank, and two foreground figures
+// cropped by the bottom corners of the frame.
+const HERO_SLOTS: Record<string, HeroSlot> = {
+  Juniper: { x: 47, b: 9, w: 47, z: 30, wave: 0, enter: "drop" },
+  Encore: { x: 78, b: 24, w: 37, z: 27, wave: 1, enter: "flash" },
+  Keystone: { x: 16, b: 13, w: 36, z: 27, wave: 1, enter: "drop" },
+  Barnstormer: { x: 89, b: 42, w: 30, z: 26, wave: 1, enter: "streak" },
+  Blueprint: { x: 11, b: 40, w: 29, z: 26, wave: 1, enter: "drop" },
+  Shopbell: { x: 64, b: 33, w: 31, z: 23, wave: 2, enter: "drop" },
+  Calendra: { x: 29, b: 32, w: 30, z: 23, wave: 2, enter: "rise" },
+  Goldstar: { x: 56, b: 53, w: 28, z: 24, wave: 2, enter: "drop" },
+  Vesper: { x: 85, b: 59, w: 25, z: 22, wave: 2, enter: "flash" },
+  Zero: { x: 19, b: 57, w: 26, z: 22, wave: 2, enter: "streak" },
+  Proof: { x: 37, b: 56, w: 25, z: 21, wave: 2, enter: "flash" },
+  Mabel: { x: 5, b: 0, w: 34, z: 34, wave: 3, enter: "streak" },
+  Pierce: { x: 96, b: 0, w: 33, z: 34, wave: 3, enter: "rise" },
+  Hazel: { x: 68, b: 65, w: 21, z: 18, wave: 3, enter: "flash" },
+  Willa: { x: 29, b: 69, w: 21, z: 18, wave: 3, enter: "rise" },
+  Ruby: { x: 91, b: 71, w: 20, z: 17, wave: 3, enter: "rise" },
+  Jude: { x: 12, b: 71, w: 21, z: 18, wave: 3, enter: "streak" },
+  Sadie: { x: 58, b: 77, w: 18, z: 16, wave: 3, enter: "flash" },
+  Bea: { x: 36, b: 81, w: 18, z: 16, wave: 3, enter: "flash" },
+  Flora: { x: 75, b: 81, w: 18, z: 16, wave: 3, enter: "rise" },
+  Iris: { x: 47, b: 72, w: 20, z: 17, wave: 3, enter: "flash" },
+  Clive: { x: 21, b: 85, w: 17, z: 15, wave: 3, enter: "streak" },
+  Nora: { x: 87, b: 87, w: 17, z: 15, wave: 3, enter: "rise" },
 };
-const POSTER_TIER_DELAY = [60, 200, 340, 470, 580];
-const POSTER_FORM_MS = 880;
-
-// The way a Face arrives from, and the way it leaves: outward from
-// the group's heart. Near-centre slots get a set direction — the
-// hero descends in and rises out; the base row rises in from below
-// and drops away.
-function posterDir(slot: PosterSlot, name: string): { dx: number; dy: number } {
-  const cy = slot.y + slot.w * 0.23;
-  const dx = (slot.x - 50) / 50;
-  const dy = (cy - 46) / 46;
-  const len = Math.hypot(dx, dy);
-  if (len < 0.3) {
-    if (name === "Prism") return { dx: 0, dy: -1 };
-    if (slot.tier === 4) return { dx: 0, dy: 1 };
-    return { dx: (slot.x >= 50 ? 1 : -1) * 0.9, dy: -0.35 };
-  }
-  return { dx: dx / len, dy: dy / len };
-}
+// Assembly order inside each wave (the stagger index).
+const HERO_WAVES: string[][] = [
+  ["Juniper"],
+  ["Encore", "Keystone", "Barnstormer", "Blueprint"],
+  ["Shopbell", "Calendra", "Goldstar", "Vesper", "Zero", "Proof"],
+  [
+    "Mabel",
+    "Pierce",
+    "Hazel",
+    "Willa",
+    "Ruby",
+    "Jude",
+    "Sadie",
+    "Bea",
+    "Flora",
+    "Iris",
+    "Clive",
+    "Nora",
+  ],
+];
+const HERO_WAVE_DELAY = [480, 660, 1040, 1580];
+const HERO_WAVE_STAGGER = [0, 95, 80, 62];
+const HERO_ENTER_MS: Record<HeroEntrance, number> = {
+  drop: 760,
+  streak: 640,
+  rise: 820,
+  flash: 520,
+};
 
 // Small deterministic scatter for the sparkle field, so every open
 // lays the same sky (no Math.random in a boot path).
-function posterRnd(n: number): number {
+function heroRnd(n: number): number {
   const v = Math.sin(n * 127.1) * 43758.5453;
   return v - Math.floor(v);
 }
 
-// The film's caption and controls bow out as the poster forms —
-// the poster is the finale, and a settings pill does not belong
+// The film's caption and controls bow out as the heroes form —
+// the finale is the show, and a settings pill does not belong
 // on it. Tap-to-skip still works everywhere on the splash.
 function fadeSplashChrome(splash: HTMLElement): void {
   splash
@@ -5105,88 +5128,123 @@ function fadeSplashChrome(splash: HTMLElement): void {
     });
 }
 
-let posterStarted = false;
-function runPosterFinale(
+let heroStarted = false;
+function runHeroFinale(
   splash: HTMLElement,
   video: HTMLVideoElement,
   dismiss: () => void,
 ): void {
-  if (posterStarted) return;
-  posterStarted = true;
+  if (heroStarted) return;
+  heroStarted = true;
   const stage = document.createElement("div");
-  stage.className = "opening-poster";
+  stage.className = "opening-hero-stage";
   stage.setAttribute("aria-hidden", "true");
   const glow = document.createElement("div");
-  glow.className = "opening-poster-glow";
+  glow.className = "opening-hero-glow";
   stage.appendChild(glow);
   const orbits = document.createElement("div");
-  orbits.className = "opening-poster-orbits";
+  orbits.className = "opening-hero-orbits";
   orbits.innerHTML = "<i></i><i></i><i></i>";
   stage.appendChild(orbits);
-  const facesBox = document.createElement("div");
-  facesBox.className = "opening-poster-faces";
-  stage.appendChild(facesBox);
+  const ground = document.createElement("div");
+  ground.className = "opening-hero-ground";
+  stage.appendChild(ground);
+  const castBox = document.createElement("div");
+  castBox.className = "opening-hero-cast";
+  stage.appendChild(castBox);
+  const burstsBox = document.createElement("div");
+  burstsBox.className = "opening-hero-bursts";
+  stage.appendChild(burstsBox);
   const wind = document.createElement("div");
-  wind.className = "opening-poster-wind";
+  wind.className = "opening-hero-wind";
   stage.appendChild(wind);
+  const charge = document.createElement("div");
+  charge.className = "opening-hero-charge";
+  stage.appendChild(charge);
+  const flash = document.createElement("div");
+  flash.className = "opening-hero-flash";
+  stage.appendChild(flash);
   const sparksBox = document.createElement("div");
-  sparksBox.className = "opening-poster-sparks";
+  sparksBox.className = "opening-hero-sparks";
   stage.appendChild(sparksBox);
   // Drifting sparkle and a few still starbursts, laid over the
-  // formation for the whole finale.
-  for (let i = 0; i < 16; i++) {
+  // assembly for the whole finale.
+  for (let i = 0; i < 18; i++) {
     const s = document.createElement("i");
     const star = i % 3 === 0;
-    s.className = star ? "opening-poster-spark is-star" : "opening-poster-spark";
-    s.style.left = `${6 + posterRnd(i + 1) * 88}%`;
-    s.style.top = `${6 + posterRnd(i + 31) * 78}%`;
-    const size = star ? 12 + posterRnd(i + 61) * 12 : 3 + posterRnd(i + 61) * 3.5;
+    s.className = star ? "opening-hero-spark is-star" : "opening-hero-spark";
+    s.style.left = `${6 + heroRnd(i + 1) * 88}%`;
+    s.style.top = `${6 + heroRnd(i + 31) * 78}%`;
+    const size = star ? 12 + heroRnd(i + 61) * 12 : 3 + heroRnd(i + 61) * 3.5;
     s.style.width = `${size}px`;
     s.style.height = `${size}px`;
-    s.style.setProperty("--sx", `${((posterRnd(i + 91) - 0.5) * 26).toFixed(0)}px`);
-    s.style.setProperty("--sy", `${(-(10 + posterRnd(i + 121) * 22)).toFixed(0)}px`);
-    s.style.animationDelay = `${(posterRnd(i + 151) * 2400).toFixed(0)}ms`;
-    s.style.animationDuration = `${(2300 + posterRnd(i + 181) * 1300).toFixed(0)}ms`;
+    s.style.setProperty("--sx", `${((heroRnd(i + 91) - 0.5) * 26).toFixed(0)}px`);
+    s.style.setProperty("--sy", `${(-(10 + heroRnd(i + 121) * 22)).toFixed(0)}px`);
+    s.style.animationDelay = `${(heroRnd(i + 151) * 2400).toFixed(0)}ms`;
+    s.style.animationDuration = `${(2300 + heroRnd(i + 181) * 1300).toFixed(0)}ms`;
     sparksBox.appendChild(s);
   }
   type Built = {
+    name: string;
     outer: HTMLElement;
     sway: HTMLElement;
-    slot: PosterSlot;
-    dx: number;
-    dy: number;
+    trail: HTMLElement;
+    slot: HeroSlot;
+    delay: number;
     idx: number;
   };
   const built: Built[] = [];
-  const all: { name: string; kind: "photons" | "atoms" }[] = [
-    ...PHOTONS.map((p) => ({ name: p.name, kind: "photons" as const })),
-    ...ATOMS.map((a) => ({ name: a.name, kind: "atoms" as const })),
-  ];
-  all.forEach((f, idx) => {
-    const slot = POSTER_SLOTS[f.name];
-    if (!slot) return;
-    const outer = document.createElement("div");
-    outer.className = "opening-poster-face" + (slot.dark ? " is-dark" : "");
-    outer.style.left = `${slot.x}%`;
-    outer.style.top = `${slot.y}%`;
-    outer.style.width = `${slot.w}%`;
-    outer.style.zIndex = String(slot.z);
-    // The sway rides a child element, so the living hold never
-    // fights the form-up and fly-away transforms on the outer.
-    const sway = document.createElement("div");
-    sway.className = "opening-poster-sway";
-    const img = document.createElement("img");
-    img.src = `/${f.kind}/thumbs/${encodeURIComponent(f.name)}.webp`;
-    img.alt = "";
-    img.decoding = "async";
-    img.addEventListener("error", () => {
-      outer.style.visibility = "hidden";
+  let idx = 0;
+  HERO_WAVES.forEach((names, wave) => {
+    names.forEach((name, inWave) => {
+      const slot = HERO_SLOTS[name];
+      if (!slot) return;
+      const delay = HERO_WAVE_DELAY[wave] + inWave * HERO_WAVE_STAGGER[wave];
+      const outer = document.createElement("div");
+      outer.className = "opening-hero";
+      outer.dataset.hero = name;
+      outer.style.left = `${slot.x}%`;
+      outer.style.bottom = `${slot.b}%`;
+      outer.style.width = `${slot.w}%`;
+      outer.style.zIndex = String(slot.z);
+      // The light trail rides behind the figure: it burns during
+      // a streak-in and again, for every hero, at the flash-out.
+      const trail = document.createElement("div");
+      trail.className = "opening-hero-trail";
+      outer.appendChild(trail);
+      // The sway rides a child element, so the living hold never
+      // fights the entrance and flash-out transforms on the outer.
+      const sway = document.createElement("div");
+      sway.className = "opening-hero-sway";
+      const img = document.createElement("img");
+      img.src = `/heroes/${encodeURIComponent(name)}.webp`;
+      img.alt = "";
+      img.decoding = "async";
+      img.addEventListener("error", () => {
+        outer.style.visibility = "hidden";
+      });
+      sway.appendChild(img);
+      outer.appendChild(sway);
+      castBox.appendChild(outer);
+      // A landing burst at the hero's ground line (for a flash-in,
+      // the burst is the flash, centred on the figure).
+      const burst = document.createElement("div");
+      burst.className = "opening-hero-burst";
+      burst.style.left = `${slot.x}%`;
+      burst.style.bottom = `${slot.b + (slot.enter === "flash" ? 10 : 0)}%`;
+      burst.style.width = `${slot.w * 1.7}%`;
+      burstsBox.appendChild(burst);
+      const dur = HERO_ENTER_MS[slot.enter];
+      burst.animate(
+        [
+          { transform: "translate(-50%, 50%) scale(0.3)", opacity: 0 },
+          { opacity: 0.85, offset: 0.25 },
+          { transform: "translate(-50%, 50%) scale(1.5)", opacity: 0 },
+        ],
+        { duration: 480, delay: delay + dur * 0.8, easing: "ease-out", fill: "both" },
+      );
+      built.push({ name, outer, sway, trail, slot, delay, idx: idx++ });
     });
-    sway.appendChild(img);
-    outer.appendChild(sway);
-    facesBox.appendChild(outer);
-    const { dx, dy } = posterDir(slot, f.name);
-    built.push({ outer, sway, slot, dx, dy, idx });
   });
   // Directly after the film, under the caption and the controls.
   splash.insertBefore(stage, video.nextSibling);
@@ -5205,109 +5263,220 @@ function runPosterFinale(
   const W = stage.clientWidth || window.innerWidth;
   const H = stage.clientHeight || window.innerHeight;
   const base = "translate(-50%, 0px)";
+  // Aim a hero's trail along a travel vector: the trail element
+  // is centred on the figure and rotated to the vector, then
+  // stretched and faded by the caller's keyframes.
+  const aimTrail = (b: Built, dxPx: number, dyPx: number) => {
+    const ang = (Math.atan2(dyPx, dxPx) * 180) / Math.PI;
+    b.trail.style.transform = `translate(-50%, -50%) rotate(${ang.toFixed(1)}deg)`;
+  };
   for (const b of built) {
-    const ox = b.dx * W * 1.05;
-    const oy = b.dy * H * 1.05;
-    b.outer.animate(
-      [
-        {
-          transform: `${base} translate(${ox}px, ${oy}px) rotate(${(-b.dx * 10).toFixed(1)}deg) scale(0.6)`,
-          opacity: 0,
-        },
-        { opacity: 1, offset: 0.35 },
-        { transform: `${base} translate(0px, 0px) rotate(0deg) scale(1)`, opacity: 1 },
-      ],
-      {
-        duration: POSTER_FORM_MS,
-        delay: POSTER_TIER_DELAY[b.slot.tier],
-        easing: "cubic-bezier(.2,.85,.3,1.06)",
-        fill: "both",
-      },
-    );
-    // The living hold: from the moment the Face lands, a slow
-    // breathing rise and fall with a gentle wind sway — hair and
-    // capes stirring, read at the whole-figure scale our portraits
-    // allow. Every Face keeps its own period and phase (duration
-    // and amplitude vary by index), the periods are long, and the
-    // hold is short, so nothing ever visibly loops. Transforms
-    // only, a few pixels at most — cheap on any phone GPU.
-    const swayAmp = 2.5 + (b.idx % 3);
+    const { slot } = b;
+    const dur = HERO_ENTER_MS[slot.enter];
+    // Where this hero comes from, by the way they arrive: drops
+    // fall from above, streaks tear in from their side of the
+    // frame, risers come up from below the ground line, and a
+    // flash simply arrives, small and blazing, out of the light.
+    let ox = 0;
+    let oy = 0;
+    if (slot.enter === "drop") {
+      ox = (slot.x - 50) * 0.004 * W;
+      oy = -H * 1.05;
+    } else if (slot.enter === "streak") {
+      ox = (slot.x <= 50 ? -1 : 1) * W * 1.15;
+      oy = slot.b >= 50 ? -H * 0.3 : H * 0.12;
+    } else if (slot.enter === "rise") {
+      ox = (slot.x - 50) * 0.003 * W;
+      oy = H * 1.05;
+    }
+    const start = `${base} translate(${ox.toFixed(0)}px, ${oy.toFixed(0)}px)`;
+    if (slot.enter === "flash") {
+      b.outer.animate(
+        [
+          { transform: `${base} scale(0.55)`, opacity: 0 },
+          { opacity: 1, offset: 0.4 },
+          { transform: `${base} scale(1)`, opacity: 1 },
+        ],
+        { duration: dur, delay: b.delay, easing: "cubic-bezier(.2,.8,.3,1.15)", fill: "both" },
+      );
+      // The blaze of the arrival, on the figure itself.
+      b.sway.animate(
+        [{ filter: "brightness(2.4)" }, { filter: "brightness(1)" }],
+        { duration: dur, delay: b.delay, easing: "ease-out", fill: "both" },
+      );
+    } else if (slot.enter === "drop") {
+      b.outer.animate(
+        [
+          { transform: start, opacity: 0 },
+          { opacity: 1, offset: 0.3 },
+          { transform: `${base} translate(0px, 12px)`, opacity: 1, offset: 0.82 },
+          { transform: `${base} translate(0px, 0px)`, opacity: 1 },
+        ],
+        { duration: dur, delay: b.delay, easing: "cubic-bezier(.3,.65,.4,1)", fill: "both" },
+      );
+    } else if (slot.enter === "streak") {
+      aimTrail(b, -ox, -oy);
+      b.outer.animate(
+        [
+          { transform: `${start} scale(1.14)`, opacity: 0 },
+          { opacity: 1, offset: 0.25 },
+          { transform: `${base} scale(1)`, opacity: 1 },
+        ],
+        { duration: dur, delay: b.delay, easing: "cubic-bezier(.12,.75,.25,1)", fill: "both" },
+      );
+      b.trail.animate(
+        [
+          { opacity: 0, scale: "1.6 1" },
+          { opacity: 0.8, offset: 0.3 },
+          { opacity: 0, scale: "0.4 1" },
+        ],
+        { duration: dur, delay: b.delay, easing: "ease-out", fill: "both" },
+      );
+    } else {
+      // rise
+      b.outer.animate(
+        [
+          { transform: start, opacity: 0 },
+          { opacity: 1, offset: 0.35 },
+          { transform: `${base} translate(0px, 0px)`, opacity: 1 },
+        ],
+        { duration: dur, delay: b.delay, easing: "cubic-bezier(.2,.8,.3,1.02)", fill: "both" },
+      );
+    }
+    // The living hold: from the moment the hero lands, a slow
+    // breathing rise and fall with the faintest wind sway — every
+    // figure on its own period and phase, amplitudes smaller than
+    // the old poster's, as befits figures over portraits: a few
+    // pixels at most, transforms only, cheap on any phone GPU.
+    const swayAmp = 1.4 + (b.idx % 3) * 0.5;
     b.sway.animate(
       [
         { transform: "translateY(0px) rotate(0deg)" },
         {
-          transform: `translateY(${(-swayAmp).toFixed(1)}px) rotate(${(0.3 + (b.idx % 4) * 0.12).toFixed(2)}deg)`,
+          transform: `translateY(${(-swayAmp).toFixed(1)}px) rotate(${(0.18 + (b.idx % 4) * 0.07).toFixed(2)}deg)`,
           offset: 0.38,
         },
         {
-          transform: `translateY(${(swayAmp * 0.7).toFixed(1)}px) rotate(${(-0.26 - (b.idx % 3) * 0.1).toFixed(2)}deg)`,
+          transform: `translateY(${(swayAmp * 0.7).toFixed(1)}px) rotate(${(-0.16 - (b.idx % 3) * 0.06).toFixed(2)}deg)`,
           offset: 0.72,
         },
         { transform: "translateY(0px) rotate(0deg)" },
       ],
       {
-        duration: 2700 + ((b.idx * 137) % 1700),
-        delay: POSTER_TIER_DELAY[b.slot.tier] + POSTER_FORM_MS,
+        duration: 2900 + ((b.idx * 149) % 1800),
+        delay: b.delay + dur,
         iterations: Infinity,
         easing: "ease-in-out",
       },
     );
   }
-  // One soft band of light drifts across the held poster, the
+  // The ground lights as the assembly gathers.
+  ground.animate([{ opacity: 0 }, { opacity: 0.55 }], {
+    duration: 1600,
+    delay: 400,
+    easing: "ease-out",
+    fill: "both",
+  });
+  // One soft band of light drifts across the held assembly, the
   // wind made visible, while the group breathes.
   wind.animate(
     [
       { transform: "translateX(-65%) rotate(10deg)", opacity: 0 },
-      { opacity: 0.13, offset: 0.35 },
+      { opacity: 0.12, offset: 0.35 },
       { transform: "translateX(65%) rotate(10deg)", opacity: 0 },
     ],
-    { duration: 2300, delay: 1450, easing: "ease-in-out", fill: "both" },
+    { duration: 2100, delay: 3050, easing: "ease-in-out", fill: "both" },
   );
-  // The fly-away: every Face out along its own vector, a slight
-  // turn and shrink as it goes, staggered by a breath.
+  // The charge: just before the flash-out, the stage's heart
+  // surges and the whole assembly brightens, gathering the light
+  // it is about to leave as.
+  window.setTimeout(() => {
+    if (!splash.isConnected) return;
+    charge.animate([{ opacity: 0 }, { opacity: 0.55 }], {
+      duration: 450,
+      easing: "ease-in",
+      fill: "both",
+    });
+    glow.animate(
+      [
+        { transform: "translate(-50%, -50%) scale(1)", opacity: 0.58 },
+        { transform: "translate(-50%, -50%) scale(1.22)", opacity: 0.95 },
+      ],
+      { duration: 450, easing: "ease-in", fill: "both" },
+    );
+    for (const b of built) {
+      b.sway.animate([{ filter: "brightness(1)" }, { filter: "brightness(1.3)" }], {
+        duration: 450,
+        easing: "ease-in",
+        fill: "both",
+      });
+    }
+  }, HERO_FLASH_AFTER_MS - 450);
+  // THE FLASH-OUT: every hero streaks away as light along their
+  // own vector — up and out, each in a different direction, the
+  // centre of the assembly first and the edges a ripple behind —
+  // with their trails burning, into the white-gold flash.
   window.setTimeout(() => {
     if (!splash.isConnected) return;
     for (const b of built) {
-      const ex = b.dx * W * 1.25;
-      const ey = b.dy * H * 1.25;
-      const rot = b.dx * 20 + ((b.idx % 3) - 1) * 5;
+      const dxu = (b.slot.x - 50) / 50;
+      const ex = dxu * W * 1.3;
+      const ey = -(0.6 + ((100 - b.slot.b) / 100) * 0.65) * H * 1.15;
+      aimTrail(b, ex, ey);
+      const dist = Math.hypot(dxu, (b.slot.b - 38) / 60);
+      const delay = Math.round(dist * 240);
       b.outer.animate(
         [
-          { transform: `${base} translate(0px, 0px) rotate(0deg) scale(1)`, opacity: 1 },
-          { opacity: 1, offset: 0.55 },
+          { transform: `${base} scale(1.04)`, opacity: 1 },
+          { opacity: 1, offset: 0.5 },
           {
-            transform: `${base} translate(${ex}px, ${ey}px) rotate(${rot.toFixed(1)}deg) scale(0.82)`,
+            transform: `${base} translate(${ex.toFixed(0)}px, ${ey.toFixed(0)}px) scale(0.88)`,
             opacity: 0,
           },
         ],
-        {
-          duration: 780,
-          delay: (b.idx % 6) * 25,
-          easing: "cubic-bezier(.5,.05,.8,.4)",
-          fill: "both",
-        },
+        { duration: 560, delay, easing: "cubic-bezier(.55,.06,.85,.4)", fill: "both" },
+      );
+      b.trail.animate(
+        [
+          { opacity: 0, scale: "0.4 1" },
+          { opacity: 0.9, offset: 0.35 },
+          { opacity: 0, scale: "1.7 1" },
+        ],
+        { duration: 560, delay, easing: "ease-out", fill: "both" },
       );
     }
-  }, POSTER_FLY_AFTER_MS);
+    // The flash itself: a white-gold bloom at the assembly's
+    // heart that peaks as the last heroes leave, then fades —
+    // the fade rule — into the curtain's handover.
+    flash.animate(
+      [
+        { opacity: 0 },
+        { opacity: 0.95, offset: 0.18 },
+        { opacity: 0.55, offset: 0.45 },
+        { opacity: 0 },
+      ],
+      { duration: 1250, delay: 150, easing: "ease-out", fill: "both" },
+    );
+  }, HERO_FLASH_AFTER_MS);
   window.setTimeout(() => {
     if (splash.isConnected) dismiss();
-  }, POSTER_DISMISS_AFTER_MS);
+  }, HERO_DISMISS_AFTER_MS);
 }
 
 // Poll the film's clock (rAF, so a stalled or backgrounded film
-// cannot desync the handoff) and start the poster the moment the
-// standing-figure beat completes. The v3 fallback never gets the
-// poster: fellBack() is checked on every frame.
-function watchPosterHandoff(
+// cannot desync the handoff) and start the heroes the moment the
+// crystal's standing beat completes. The v3 fallback never gets
+// the heroes: fellBack() is checked on every frame.
+function watchHeroHandoff(
   video: HTMLVideoElement,
   splash: HTMLElement,
   fellBack: () => boolean,
   dismiss: () => void,
 ): void {
   const tick = () => {
-    if (!splash.isConnected || splashDismissing || posterStarted) return;
-    if (!fellBack() && video.currentTime >= POSTER_HANDOFF_S) {
-      runPosterFinale(splash, video, dismiss);
+    if (!splash.isConnected || splashDismissing || heroStarted) return;
+    if (!fellBack() && video.currentTime >= HERO_HANDOFF_S) {
+      runHeroFinale(splash, video, dismiss);
       return;
     }
     requestAnimationFrame(tick);
@@ -5382,16 +5551,18 @@ function playOpeningSplash(returning: boolean): void {
     return;
   }
   splash.addEventListener("click", dismissByTap, { once: true });
-  // Warm the poster finale's portraits while the film plays: the
-  // 24 thumbnails are small, and the asset cache keeps them for
-  // later opens.
+  // Warm the hero finale's full-figure art while the film plays:
+  // 23 heroes at ~120 KB each, and the asset cache keeps them for
+  // later opens. Prism is not among them — she is out of the
+  // opening entirely (Neil, Nov 23, 2026).
   for (const p of PHOTONS) {
+    if (p.name === "Prism") continue;
     const i = new Image();
-    i.src = `/photons/thumbs/${encodeURIComponent(p.name)}.webp`;
+    i.src = `/heroes/${encodeURIComponent(p.name)}.webp`;
   }
   for (const a of ATOMS) {
     const i = new Image();
-    i.src = `/atoms/thumbs/${encodeURIComponent(a.name)}.webp`;
+    i.src = `/heroes/${encodeURIComponent(a.name)}.webp`;
   }
   video.addEventListener("ended", dismiss, { once: true });
   // If the v5 film fails to load or play, fall back to the v3 opening
@@ -5435,9 +5606,9 @@ function playOpeningSplash(returning: boolean): void {
   }, 9000);
   const p = video.play();
   if (p) p.catch(() => tryV3Fallback());
-  // The poster finale replaces the v5 film's ending: hand off as
-  // the standing-figure beat completes (see the poster section).
-  watchPosterHandoff(video, splash, () => fellBack, dismiss);
+  // The hero finale replaces the v5 film's ending: hand off as
+  // the crystal's standing beat completes (see the hero section).
+  watchHeroHandoff(video, splash, () => fellBack, dismiss);
   // If the video already finished before this ran, dismiss now.
   if (video.ended) dismiss();
 }
