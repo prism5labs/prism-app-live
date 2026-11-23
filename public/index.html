@@ -74,13 +74,6 @@
   <nav id="nav" class="nav" aria-label="Sections"></nav>
   <div id="toast" class="toast" role="status"></div>
   <div id="card-modal" class="card-modal" hidden></div>
-  <script src="/main.js" defer></script>
-  <script>
-    if ("serviceWorker" in navigator) {
-      window.addEventListener("load", () => {
-        navigator.serviceWorker.register("/sw.js").catch(() => {});
-      });
-    }
-  </script>
+  <script src="/update-gate.js"></script>
 </body>
 </html>

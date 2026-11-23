@@ -208,7 +208,11 @@
 // assembling asymmetrically and flashing out as light. Prism is
 // out of the opening entirely. The bump makes installs fetch the
 // new main.js and styles.css instead of serving the v60 copies.
-const CACHE = "prism5-v61";
+// CACHE v62: open-time version check (Neil, Nov 23, 2026) — the new
+// update-gate.js registers this worker at launch, checks for a newer
+// build before the opening plays, and reloads once behind a veil when
+// one lands, so no install settles into a stale copy.
+const CACHE = "prism5-v62";
 // Images (portraits, thumbnails, brand art, chat backgrounds, icons)
 // live in their own cache whose name does NOT change with the shell
 // version. Before v52 every shell bump deleted the one cache on
@@ -222,7 +226,7 @@ const ASSETS = "prism5-assets-v1";
 // chat backgrounds are NOT precached any more (v52): they were ~11 MB
 // of the ~12 MB install, and the fetch handler now caches each one in
 // the asset cache the first time the rotation reaches it.
-const SHELL = ["/", "/index.html", "/styles.css", "/main.js", "/manifest.json", "/opening-animation-v3.mp4", "/opening-v5-poster.jpg"];
+const SHELL = ["/", "/index.html", "/styles.css", "/main.js", "/update-gate.js", "/manifest.json", "/opening-animation-v3.mp4", "/opening-v5-poster.jpg"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -238,6 +242,10 @@ self.addEventListener("install", (event) => {
       )
       .then(() => self.skipWaiting()),
   );
+});
+
+self.addEventListener("message", (event) => {
+  if (event.data && event.data.type === "SKIP_WAITING") self.skipWaiting();
 });
 
 self.addEventListener("activate", (event) => {
