@@ -193,7 +193,16 @@
 // built natively in the client. The cache bump makes existing
 // installs fetch the new main.js and styles.css instead of serving
 // the cached ones.
-const CACHE = "prism5-v59";
+// v60: the opening's finale is replaced (Neil, Nov 22, 2026) — the
+// v5 film keeps its first beat (the crystal Prism forming), and at
+// 5.15s the Atomic poster takes over: all 24 Faces form up like a
+// Marvel ensemble poster, hold alive for about a second (breathing
+// sway, drifting sparkle, one band of wind-light), then fly away in
+// different directions before the curtain handover. The film files
+// are untouched; the v3 fallback keeps its own ending. The cache
+// bump makes existing installs fetch the new main.js and styles.css
+// instead of serving the cached ones.
+const CACHE = "prism5-v60";
 // Images (portraits, thumbnails, brand art, chat backgrounds, icons)
 // live in their own cache whose name does NOT change with the shell
 // version. Before v52 every shell bump deleted the one cache on

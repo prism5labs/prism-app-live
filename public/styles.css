@@ -861,6 +861,136 @@ textarea { width: 100%; resize: vertical; }
 .opening-splash-off:active {
   background: rgba(0, 0, 0, 0.45);
 }
+/* Atomic poster finale (client/main.ts builds it over the film at
+   the handoff): the 24 Faces form up like a Marvel ensemble
+   poster in 1950s atomic styling — orbit rings, starbursts, a
+   breathing glow — hold alive for about a second, then fly away.
+   Everything moves on transform/opacity only. The stage is a
+   sibling of the film, never an ancestor, so its fade-in cannot
+   stall the film's surface (the curtain rule above). All colors
+   come from the active scheme's variables, so the poster matches
+   whichever of the ten colorings this open drew. */
+.opening-poster {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  overflow: hidden;
+  background:
+    linear-gradient(to top, rgba(0, 0, 0, 0.35), rgba(0, 0, 0, 0) 30%),
+    radial-gradient(115% 80% at 50% 40%, rgba(255, 243, 220, 0.14), rgba(0, 0, 0, 0) 60%),
+    var(--splash-bg, #0f5257);
+  opacity: 0;
+  transition: opacity 0.55s ease;
+}
+.opening-poster.is-in {
+  opacity: 1;
+}
+.opening-poster-glow {
+  position: absolute;
+  left: 50%;
+  top: 42%;
+  width: 135%;
+  aspect-ratio: 1 / 1;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--splash-accent2, #f4c95d) 0%, rgba(0, 0, 0, 0) 62%);
+  animation: op-breathe 3.8s ease-in-out infinite alternate;
+}
+@keyframes op-breathe {
+  from { transform: translate(-50%, -50%) scale(1); opacity: 0.4; }
+  to { transform: translate(-50%, -50%) scale(1.05); opacity: 0.58; }
+}
+.opening-poster-orbits {
+  position: absolute;
+  left: 50%;
+  top: 42%;
+  width: 125vmin;
+  height: 125vmin;
+  opacity: 0.5;
+  animation: op-spin 48s linear infinite;
+}
+.opening-poster-orbits i {
+  position: absolute;
+  inset: 0;
+  border: 2px solid var(--splash-accent2, #f4c95d);
+  border-radius: 50%;
+  opacity: 0.4;
+}
+.opening-poster-orbits i:nth-child(1) { transform: scaleY(0.36); }
+.opening-poster-orbits i:nth-child(2) { transform: rotate(60deg) scaleY(0.36); }
+.opening-poster-orbits i:nth-child(3) { transform: rotate(120deg) scaleY(0.36); }
+@keyframes op-spin {
+  from { transform: translate(-50%, -50%) rotate(0deg); }
+  to { transform: translate(-50%, -50%) rotate(360deg); }
+}
+.opening-poster-faces {
+  position: absolute;
+  inset: 0;
+}
+.opening-poster-face {
+  position: absolute;
+  transform: translate(-50%, 0);
+  will-change: transform, opacity;
+}
+.opening-poster-sway {
+  transform-origin: 50% 88%;
+  will-change: transform;
+}
+.opening-poster-face img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 14px;
+  border: 2px solid var(--splash-accent2, #f4c95d);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+  background: var(--splash-bg, #0f5257);
+}
+/* The base row stands in silhouette, the way the Endgame poster's
+   back row stands dark against the light. */
+.opening-poster-face.is-dark img {
+  filter: brightness(0.52) saturate(0.7);
+  border-color: rgba(0, 0, 0, 0.35);
+}
+/* The wind made visible: one soft band of light crossing the held
+   poster (client/main.ts drives its transform/opacity). */
+.opening-poster-wind {
+  position: absolute;
+  top: -12%;
+  bottom: -12%;
+  left: 22%;
+  width: 56%;
+  background: linear-gradient(90deg, rgba(255, 243, 220, 0), rgba(255, 243, 220, 0.5), rgba(255, 243, 220, 0));
+  opacity: 0;
+  pointer-events: none;
+}
+.opening-poster-sparks {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.opening-poster-spark {
+  position: absolute;
+  border-radius: 50%;
+  background: var(--splash-ink, #fff3dc);
+  opacity: 0;
+  animation-name: op-spark-drift;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  animation-fill-mode: both;
+}
+.opening-poster-spark.is-star {
+  border-radius: 0;
+  background: var(--splash-accent2, #f4c95d);
+  clip-path: polygon(50% 0, 63% 37%, 100% 50%, 63% 63%, 50% 100%, 37% 63%, 0 50%, 37% 37%);
+}
+@keyframes op-spark-drift {
+  0% { transform: translate(0, 0); opacity: 0; }
+  22% { opacity: 0.95; }
+  70% { opacity: 0.7; }
+  100% { transform: translate(var(--sx, 8px), var(--sy, -18px)); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .opening-poster { display: none; }
+}
 @media (prefers-reduced-motion: reduce) {
   .opening-splash { display: none; }
 }

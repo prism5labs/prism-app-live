@@ -4936,7 +4936,9 @@ function setupKeyboardDock(): void {
 // entirely (the CSS hides it too, so it never shows even before this
 // runs). Tap skips it early: the owner never has to wait out the
 // full 10s. If the v4 film fails to load, the v3 opening plays
-// instead; if that fails too, the splash just goes away.
+// instead; if that fails too, the splash just goes away. On the
+// v5 film, the ending is the Atomic poster finale (below); the v3
+// fallback keeps its own ending.
 //
 // First ever open reads "Welcome"; every open after that reads
 // "Welcome back" — same film either way, the words are an overlay
@@ -4994,6 +4996,323 @@ function dismissSplashWithCurtain(fast = false): void {
     c.classList.add("out");
     window.setTimeout(() => c.remove(), fast ? 700 : 1400);
   }, fast ? 400 : 750);
+}
+
+// ---------- Opening poster finale ----------
+// Neil, Nov 22, 2026: the film keeps its first beat — the crystal
+// Prism forming on the diner counter and standing complete — but
+// its old ending, the figure dissolving into light that pours
+// into the prism mark, is replaced. At POSTER_HANDOFF_S, with the
+// figure still standing, the Atomic poster takes over: all 24
+// Faces (the 12 Photons and the 12 Atoms) fly in and form up like
+// a Marvel ensemble poster — Prism front and centre, largest; the
+// other Supernovas as the big anchors flanking her and the mid
+// rank; the Novas filling the outer and upper ranks, with a
+// silhouetted Nova row standing at the base; atomic light breaking
+// behind the group (orbit rings, starbursts, a breathing glow, in
+// the active scheme's colors). The poster then holds for about a
+// second, alive rather than frozen: every Face breathes on its own
+// timing (a slow rise and fall with a gentle wind sway), sparkle
+// drifts up through the formation, and one soft band of light
+// crosses the group. Then every Face flies off in a different
+// direction and the usual curtain hands over to the app. The film
+// file itself is untouched, the poster stage is a sibling of the
+// film (never an ancestor, so its fade cannot stall the film's
+// surface — the curtain rule), and the v3 fallback film keeps its
+// own ending: the poster only replaces the v5 film's finale.
+const POSTER_HANDOFF_S = 5.15;
+// Form-up finishes ~1.46s in (last tier's delay + flight); the
+// fly-away starts after the ~1s living hold, and the dismiss
+// follows the last Face out.
+const POSTER_FLY_AFTER_MS = 2460;
+const POSTER_DISMISS_AFTER_MS = 3420;
+
+type PosterSlot = {
+  // Centre-x and top of the figure, in % of the stage; width in %
+  // of stage width. Tier staggers the form-up: 0 hero, 1 anchors,
+  // 2 mid rank, 3 outer/upper rank, 4 the silhouetted base row.
+  x: number;
+  y: number;
+  w: number;
+  z: number;
+  tier: number;
+  dark?: boolean;
+};
+const POSTER_SLOTS: Record<string, PosterSlot> = {
+  Prism: { x: 50, y: 34, w: 50, z: 30, tier: 0 },
+  Juniper: { x: 18, y: 43, w: 36, z: 26, tier: 1 },
+  Encore: { x: 82, y: 43, w: 36, z: 26, tier: 1 },
+  Vesper: { x: 50, y: 12, w: 29, z: 20, tier: 2 },
+  Keystone: { x: 30, y: 23, w: 29, z: 21, tier: 2 },
+  Barnstormer: { x: 70, y: 23, w: 29, z: 21, tier: 2 },
+  Blueprint: { x: 11, y: 27, w: 29, z: 20, tier: 2 },
+  Shopbell: { x: 89, y: 27, w: 29, z: 20, tier: 2 },
+  Zero: { x: 8, y: 10, w: 22, z: 14, tier: 3 },
+  Proof: { x: 25, y: 5, w: 22, z: 14, tier: 3 },
+  Calendra: { x: 41, y: 3, w: 22, z: 14, tier: 3 },
+  Goldstar: { x: 59, y: 3, w: 22, z: 14, tier: 3 },
+  Mabel: { x: 75, y: 5, w: 22, z: 14, tier: 3 },
+  Hazel: { x: 92, y: 10, w: 22, z: 14, tier: 3 },
+  Willa: { x: 7, y: 77, w: 16.5, z: 8, tier: 4, dark: true },
+  Ruby: { x: 16.5, y: 78, w: 16.5, z: 8, tier: 4, dark: true },
+  Jude: { x: 26, y: 77, w: 16.5, z: 9, tier: 4, dark: true },
+  Sadie: { x: 35.5, y: 78, w: 16.5, z: 8, tier: 4, dark: true },
+  Bea: { x: 45, y: 77, w: 16.5, z: 9, tier: 4, dark: true },
+  Flora: { x: 55, y: 77, w: 16.5, z: 9, tier: 4, dark: true },
+  Pierce: { x: 64.5, y: 78, w: 16.5, z: 8, tier: 4, dark: true },
+  Iris: { x: 74, y: 77, w: 16.5, z: 9, tier: 4, dark: true },
+  Clive: { x: 83.5, y: 78, w: 16.5, z: 8, tier: 4, dark: true },
+  Nora: { x: 93, y: 77, w: 16.5, z: 8, tier: 4, dark: true },
+};
+const POSTER_TIER_DELAY = [60, 200, 340, 470, 580];
+const POSTER_FORM_MS = 880;
+
+// The way a Face arrives from, and the way it leaves: outward from
+// the group's heart. Near-centre slots get a set direction — the
+// hero descends in and rises out; the base row rises in from below
+// and drops away.
+function posterDir(slot: PosterSlot, name: string): { dx: number; dy: number } {
+  const cy = slot.y + slot.w * 0.23;
+  const dx = (slot.x - 50) / 50;
+  const dy = (cy - 46) / 46;
+  const len = Math.hypot(dx, dy);
+  if (len < 0.3) {
+    if (name === "Prism") return { dx: 0, dy: -1 };
+    if (slot.tier === 4) return { dx: 0, dy: 1 };
+    return { dx: (slot.x >= 50 ? 1 : -1) * 0.9, dy: -0.35 };
+  }
+  return { dx: dx / len, dy: dy / len };
+}
+
+// Small deterministic scatter for the sparkle field, so every open
+// lays the same sky (no Math.random in a boot path).
+function posterRnd(n: number): number {
+  const v = Math.sin(n * 127.1) * 43758.5453;
+  return v - Math.floor(v);
+}
+
+// The film's caption and controls bow out as the poster forms —
+// the poster is the finale, and a settings pill does not belong
+// on it. Tap-to-skip still works everywhere on the splash.
+function fadeSplashChrome(splash: HTMLElement): void {
+  splash
+    .querySelectorAll<HTMLElement>(".opening-splash-caption, .opening-splash-controls")
+    .forEach((n) => {
+      n.style.animation = "none";
+      n.style.transition = "opacity 0.45s ease";
+      void n.offsetWidth;
+      n.style.opacity = "0";
+    });
+}
+
+let posterStarted = false;
+function runPosterFinale(
+  splash: HTMLElement,
+  video: HTMLVideoElement,
+  dismiss: () => void,
+): void {
+  if (posterStarted) return;
+  posterStarted = true;
+  const stage = document.createElement("div");
+  stage.className = "opening-poster";
+  stage.setAttribute("aria-hidden", "true");
+  const glow = document.createElement("div");
+  glow.className = "opening-poster-glow";
+  stage.appendChild(glow);
+  const orbits = document.createElement("div");
+  orbits.className = "opening-poster-orbits";
+  orbits.innerHTML = "<i></i><i></i><i></i>";
+  stage.appendChild(orbits);
+  const facesBox = document.createElement("div");
+  facesBox.className = "opening-poster-faces";
+  stage.appendChild(facesBox);
+  const wind = document.createElement("div");
+  wind.className = "opening-poster-wind";
+  stage.appendChild(wind);
+  const sparksBox = document.createElement("div");
+  sparksBox.className = "opening-poster-sparks";
+  stage.appendChild(sparksBox);
+  // Drifting sparkle and a few still starbursts, laid over the
+  // formation for the whole finale.
+  for (let i = 0; i < 16; i++) {
+    const s = document.createElement("i");
+    const star = i % 3 === 0;
+    s.className = star ? "opening-poster-spark is-star" : "opening-poster-spark";
+    s.style.left = `${6 + posterRnd(i + 1) * 88}%`;
+    s.style.top = `${6 + posterRnd(i + 31) * 78}%`;
+    const size = star ? 12 + posterRnd(i + 61) * 12 : 3 + posterRnd(i + 61) * 3.5;
+    s.style.width = `${size}px`;
+    s.style.height = `${size}px`;
+    s.style.setProperty("--sx", `${((posterRnd(i + 91) - 0.5) * 26).toFixed(0)}px`);
+    s.style.setProperty("--sy", `${(-(10 + posterRnd(i + 121) * 22)).toFixed(0)}px`);
+    s.style.animationDelay = `${(posterRnd(i + 151) * 2400).toFixed(0)}ms`;
+    s.style.animationDuration = `${(2300 + posterRnd(i + 181) * 1300).toFixed(0)}ms`;
+    sparksBox.appendChild(s);
+  }
+  type Built = {
+    outer: HTMLElement;
+    sway: HTMLElement;
+    slot: PosterSlot;
+    dx: number;
+    dy: number;
+    idx: number;
+  };
+  const built: Built[] = [];
+  const all: { name: string; kind: "photons" | "atoms" }[] = [
+    ...PHOTONS.map((p) => ({ name: p.name, kind: "photons" as const })),
+    ...ATOMS.map((a) => ({ name: a.name, kind: "atoms" as const })),
+  ];
+  all.forEach((f, idx) => {
+    const slot = POSTER_SLOTS[f.name];
+    if (!slot) return;
+    const outer = document.createElement("div");
+    outer.className = "opening-poster-face" + (slot.dark ? " is-dark" : "");
+    outer.style.left = `${slot.x}%`;
+    outer.style.top = `${slot.y}%`;
+    outer.style.width = `${slot.w}%`;
+    outer.style.zIndex = String(slot.z);
+    // The sway rides a child element, so the living hold never
+    // fights the form-up and fly-away transforms on the outer.
+    const sway = document.createElement("div");
+    sway.className = "opening-poster-sway";
+    const img = document.createElement("img");
+    img.src = `/${f.kind}/thumbs/${encodeURIComponent(f.name)}.webp`;
+    img.alt = "";
+    img.decoding = "async";
+    img.addEventListener("error", () => {
+      outer.style.visibility = "hidden";
+    });
+    sway.appendChild(img);
+    outer.appendChild(sway);
+    facesBox.appendChild(outer);
+    const { dx, dy } = posterDir(slot, f.name);
+    built.push({ outer, sway, slot, dx, dy, idx });
+  });
+  // Directly after the film, under the caption and the controls.
+  splash.insertBefore(stage, video.nextSibling);
+  fadeSplashChrome(splash);
+  requestAnimationFrame(() => stage.classList.add("is-in"));
+  // Once the stage covers the film, stop the film decoding — its
+  // beat is done, and a hidden decoder helps nobody's battery.
+  window.setTimeout(() => {
+    try {
+      video.pause();
+    } catch {
+      // The film is already gone; nothing to stop.
+    }
+    video.style.visibility = "hidden";
+  }, 620);
+  const W = stage.clientWidth || window.innerWidth;
+  const H = stage.clientHeight || window.innerHeight;
+  const base = "translate(-50%, 0px)";
+  for (const b of built) {
+    const ox = b.dx * W * 1.05;
+    const oy = b.dy * H * 1.05;
+    b.outer.animate(
+      [
+        {
+          transform: `${base} translate(${ox}px, ${oy}px) rotate(${(-b.dx * 10).toFixed(1)}deg) scale(0.6)`,
+          opacity: 0,
+        },
+        { opacity: 1, offset: 0.35 },
+        { transform: `${base} translate(0px, 0px) rotate(0deg) scale(1)`, opacity: 1 },
+      ],
+      {
+        duration: POSTER_FORM_MS,
+        delay: POSTER_TIER_DELAY[b.slot.tier],
+        easing: "cubic-bezier(.2,.85,.3,1.06)",
+        fill: "both",
+      },
+    );
+    // The living hold: from the moment the Face lands, a slow
+    // breathing rise and fall with a gentle wind sway — hair and
+    // capes stirring, read at the whole-figure scale our portraits
+    // allow. Every Face keeps its own period and phase (duration
+    // and amplitude vary by index), the periods are long, and the
+    // hold is short, so nothing ever visibly loops. Transforms
+    // only, a few pixels at most — cheap on any phone GPU.
+    const swayAmp = 2.5 + (b.idx % 3);
+    b.sway.animate(
+      [
+        { transform: "translateY(0px) rotate(0deg)" },
+        {
+          transform: `translateY(${(-swayAmp).toFixed(1)}px) rotate(${(0.3 + (b.idx % 4) * 0.12).toFixed(2)}deg)`,
+          offset: 0.38,
+        },
+        {
+          transform: `translateY(${(swayAmp * 0.7).toFixed(1)}px) rotate(${(-0.26 - (b.idx % 3) * 0.1).toFixed(2)}deg)`,
+          offset: 0.72,
+        },
+        { transform: "translateY(0px) rotate(0deg)" },
+      ],
+      {
+        duration: 2700 + ((b.idx * 137) % 1700),
+        delay: POSTER_TIER_DELAY[b.slot.tier] + POSTER_FORM_MS,
+        iterations: Infinity,
+        easing: "ease-in-out",
+      },
+    );
+  }
+  // One soft band of light drifts across the held poster, the
+  // wind made visible, while the group breathes.
+  wind.animate(
+    [
+      { transform: "translateX(-65%) rotate(10deg)", opacity: 0 },
+      { opacity: 0.13, offset: 0.35 },
+      { transform: "translateX(65%) rotate(10deg)", opacity: 0 },
+    ],
+    { duration: 2300, delay: 1450, easing: "ease-in-out", fill: "both" },
+  );
+  // The fly-away: every Face out along its own vector, a slight
+  // turn and shrink as it goes, staggered by a breath.
+  window.setTimeout(() => {
+    if (!splash.isConnected) return;
+    for (const b of built) {
+      const ex = b.dx * W * 1.25;
+      const ey = b.dy * H * 1.25;
+      const rot = b.dx * 20 + ((b.idx % 3) - 1) * 5;
+      b.outer.animate(
+        [
+          { transform: `${base} translate(0px, 0px) rotate(0deg) scale(1)`, opacity: 1 },
+          { opacity: 1, offset: 0.55 },
+          {
+            transform: `${base} translate(${ex}px, ${ey}px) rotate(${rot.toFixed(1)}deg) scale(0.82)`,
+            opacity: 0,
+          },
+        ],
+        {
+          duration: 780,
+          delay: (b.idx % 6) * 25,
+          easing: "cubic-bezier(.5,.05,.8,.4)",
+          fill: "both",
+        },
+      );
+    }
+  }, POSTER_FLY_AFTER_MS);
+  window.setTimeout(() => {
+    if (splash.isConnected) dismiss();
+  }, POSTER_DISMISS_AFTER_MS);
+}
+
+// Poll the film's clock (rAF, so a stalled or backgrounded film
+// cannot desync the handoff) and start the poster the moment the
+// standing-figure beat completes. The v3 fallback never gets the
+// poster: fellBack() is checked on every frame.
+function watchPosterHandoff(
+  video: HTMLVideoElement,
+  splash: HTMLElement,
+  fellBack: () => boolean,
+  dismiss: () => void,
+): void {
+  const tick = () => {
+    if (!splash.isConnected || splashDismissing || posterStarted) return;
+    if (!fellBack() && video.currentTime >= POSTER_HANDOFF_S) {
+      runPosterFinale(splash, video, dismiss);
+      return;
+    }
+    requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
 }
 
 function playOpeningSplash(returning: boolean): void {
@@ -5063,6 +5382,17 @@ function playOpeningSplash(returning: boolean): void {
     return;
   }
   splash.addEventListener("click", dismissByTap, { once: true });
+  // Warm the poster finale's portraits while the film plays: the
+  // 24 thumbnails are small, and the asset cache keeps them for
+  // later opens.
+  for (const p of PHOTONS) {
+    const i = new Image();
+    i.src = `/photons/thumbs/${encodeURIComponent(p.name)}.webp`;
+  }
+  for (const a of ATOMS) {
+    const i = new Image();
+    i.src = `/atoms/thumbs/${encodeURIComponent(a.name)}.webp`;
+  }
   video.addEventListener("ended", dismiss, { once: true });
   // If the v5 film fails to load or play, fall back to the v3 opening
   // instead of a black screen. If that fails too, dismiss — the chat
@@ -5105,6 +5435,9 @@ function playOpeningSplash(returning: boolean): void {
   }, 9000);
   const p = video.play();
   if (p) p.catch(() => tryV3Fallback());
+  // The poster finale replaces the v5 film's ending: hand off as
+  // the standing-figure beat completes (see the poster section).
+  watchPosterHandoff(video, splash, () => fellBack, dismiss);
   // If the video already finished before this ran, dismiss now.
   if (video.ended) dismiss();
 }
