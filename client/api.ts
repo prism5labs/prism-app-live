@@ -118,6 +118,17 @@ export const api = {
   // exactly as the thread read does.
   threadExportUrl: (photon: string) =>
     `/api/threads/${encodeURIComponent(photon)}/export?accountId=${encodeURIComponent(getAccountId())}`,
+  pinned: () => req(`/api/pinned?accountId=${encodeURIComponent(getAccountId())}`),
+  pin: (photon: string) =>
+    req(`/api/threads/${encodeURIComponent(photon)}/pin`, {
+      method: "POST",
+      body: JSON.stringify({ accountId: getAccountId() }),
+    }),
+  unpin: (photon: string) =>
+    req(`/api/threads/${encodeURIComponent(photon)}/unpin`, {
+      method: "POST",
+      body: JSON.stringify({ accountId: getAccountId() }),
+    }),
   chat: (photon: string, message: string) =>
     req(
       "/api/chat",

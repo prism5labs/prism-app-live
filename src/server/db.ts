@@ -181,6 +181,12 @@ CREATE TABLE IF NOT EXISTS contacts (
   PRIMARY KEY (account_id, id)
 );
 CREATE INDEX IF NOT EXISTS idx_contacts_address ON contacts (account_id, address);
+CREATE TABLE IF NOT EXISTS pinned_faces (
+  account_id TEXT NOT NULL,
+  photon TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (account_id, photon)
+);
 `);
 
 // --- Imported-memory columns added Nov 18, 2026 (memory import fix) ---
@@ -242,6 +248,8 @@ try {
     db.query(`UPDATE messages SET photon = ? WHERE photon = ?`).run(newName, oldName);
     db.query(`UPDATE customizations SET photon = ? WHERE photon = ?`).run(newName, oldName);
     db.query(`UPDATE contacts SET photon = ? WHERE photon = ?`).run(newName, oldName);
+    db.query(`UPDATE OR IGNORE pinned_faces SET photon = ? WHERE photon = ?`).run(newName, oldName);
+    db.query(`DELETE FROM pinned_faces WHERE photon = ?`).run(oldName);
     db.query(`UPDATE owned SET ref = ? WHERE kind = 'atom' AND ref = ?`).run(newName, oldName);
   }
 } catch (err) {
@@ -668,6 +676,35 @@ export function addMessage(
     `INSERT INTO threads (account_id, photon, created_at, updated_at) VALUES (?, ?, ?, ?)
      ON CONFLICT(account_id, photon) DO UPDATE SET updated_at = excluded.updated_at`,
   ).run(accountId, photon, now, now);
+}
+
+// --- Pinned Faces ---
+// A pinned Photon or Atom conversation, so the Faces the owner uses
+// most sit at the top of the Chat front. Pinning is idempotent: a
+// re-pin keeps the original pinned time, so the order stays stable.
+export function pinFace(accountId: string, photon: string): void {
+  const now = new Date().toISOString();
+  db.query(
+    `INSERT OR IGNORE INTO pinned_faces (account_id, photon, created_at) VALUES (?, ?, ?)`,
+  ).run(accountId, photon, now);
+}
+
+export function unpinFace(accountId: string, photon: string): void {
+  db.query(`DELETE FROM pinned_faces WHERE account_id = ? AND photon = ?`).run(accountId, photon);
+}
+
+export function listPinnedFaces(accountId: string): string[] {
+  const rows = db
+    .query(`SELECT photon FROM pinned_faces WHERE account_id = ? ORDER BY created_at ASC, rowid ASC`)
+    .all(accountId) as { photon: string }[];
+  return rows.map((r) => r.photon);
+}
+
+export function isFacePinned(accountId: string, photon: string): boolean {
+  const row = db
+    .query(`SELECT 1 AS x FROM pinned_faces WHERE account_id = ? AND photon = ?`)
+    .get(accountId, photon) as any;
+  return !!row;
 }
 
 export type GmailAccount = {

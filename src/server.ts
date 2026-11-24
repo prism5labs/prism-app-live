@@ -12,6 +12,10 @@ import {
   ownsAtom,
   getThread,
   addMessage,
+  pinFace,
+  unpinFace,
+  listPinnedFaces,
+  isFacePinned,
   incrementMeter,
   meterState,
   redeemFreeCode,
@@ -863,6 +867,34 @@ async function handleApi(req: Request, path: string): Promise<Response> {
         "content-type": "text/markdown; charset=utf-8",
         "content-disposition": `attachment; filename="${filename}"`,
       },
+    });
+  }
+
+  // GET /api/pinned — the account's pinned Faces, in pinned order.
+  if (path === "/api/pinned" && method === "GET") {
+    const accountId = accountIdFrom(req, {});
+    if (!isValidAccountId(accountId)) return bad("accountId required", 400);
+    return json({ ok: true, pinned: listPinnedFaces(accountId) });
+  }
+
+  // POST /api/threads/:name/pin and /unpin — pin or unpin a Photon or
+  // Atom conversation. Same account and name checks as the thread
+  // export route. Pinning is idempotent.
+  const threadPinMatch = path.match(/^\/api\/threads\/([A-Za-z]+)\/(pin|unpin)$/);
+  if (threadPinMatch && method === "POST") {
+    const photon = threadPinMatch[1];
+    const verb = threadPinMatch[2];
+    const body = await readBody(req);
+    const accountId = accountIdFrom(req, body);
+    if (!isValidAccountId(accountId)) return bad("accountId required", 400);
+    if (!isChatName(photon)) return bad("unknown photon", 400);
+    if (verb === "pin") pinFace(accountId, photon);
+    else unpinFace(accountId, photon);
+    return json({
+      ok: true,
+      photon,
+      pinned: isFacePinned(accountId, photon),
+      pinnedFaces: listPinnedFaces(accountId),
     });
   }
 

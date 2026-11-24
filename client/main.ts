@@ -105,6 +105,16 @@ let storeVariant: "personal" | "business" = sideOrDefault();
 let storeOpen: Record<string, boolean> = { photons: true, atoms: true, sparks: false, plugs: false };
 let threadMessages: any[] = [];
 let threadLoading = false;
+let pinnedFaces: string[] = [];
+
+function isPinnedFace(name: string): boolean {
+  return pinnedFaces.includes(name);
+}
+
+async function loadPinnedFaces(): Promise<void> {
+  const r = await api.pinned();
+  if (r && r.ok && Array.isArray(r.pinned)) pinnedFaces = r.pinned;
+}
 let toastTimer: number | null = null;
 // Customization wizard: which Photon is being customized, which step,
 // and the design-your-own tuning draft (answered yes/no, saved on Save).
@@ -1274,6 +1284,24 @@ function renderChatFront(): string {
           <div class="card-head"><img class="mark" src="/brand/gem.jpg" alt=""><h2>Nothing to talk to yet.</h2></div>
           <button class="btn store-outline store-btn" data-action="goto" data-tab="store">Browse the Store</button>
         </div>`;
+  const ownedPhotonNames = new Set(owned.map((p: any) => p.name));
+  const ownedAtomNames = new Set(ownedAtoms.map((a) => a.name));
+  const pinnedOwned = pinnedFaces.filter(
+    (name) => ownedPhotonNames.has(name) || ownedAtomNames.has(name),
+  );
+  const pinnedHtml = pinnedOwned.length
+    ? `<h2 class="front-strip-label">Pinned</h2><div class="pinned-list">` +
+      pinnedOwned
+        .map((name) => {
+          const photonObj = owned.find((p: any) => p.name === name);
+          const label = photonObj ? faceNameOf(photonObj) : name;
+          return photonObj
+            ? `<button class="btn pinned-row" data-action="open-photon" data-photon="${esc(name)}">${esc(label)}</button>`
+            : `<button class="btn pinned-row" data-action="open-atom" data-atom="${esc(name)}">${esc(label)}</button>`;
+        })
+        .join("") +
+      `</div>`
+    : "";
   return `
   <section class="front">
     <div class="front-body">
@@ -1282,6 +1310,7 @@ function renderChatFront(): string {
     ${ownsStartMyDay()
       ? `<button class="day-strip" data-action="day-start"><img src="/brand/gem.jpg" alt=""><span>Start My Day</span></button>`
       : ""}
+    ${pinnedHtml}
     ${ownedHtml}
   </section>`;
 }
@@ -1347,6 +1376,7 @@ function renderChatThread(): string {
         ${customized ? `<span class="thread-voice">Voice: ${esc(voiceNameOf(p.name))}</span>` : ""}
       </div>
       <a class="btn small" href="${esc(api.threadExportUrl(p.name))}" download>Export</a>
+      <button class="btn small" data-action="${isPinnedFace(p.name) ? "unpin-face" : "pin-face"}" data-photon="${esc(p.name)}">${isPinnedFace(p.name) ? "Unpin" : "Pin"}</button>
       ${isAtom ? "" : `<details class="thread-menu">
         <summary aria-label="More options">···</summary>
         <div class="thread-menu-list">
@@ -1537,6 +1567,7 @@ async function openThread(name: string) {
   } else {
     threadMessages = [];
   }
+  await loadPinnedFaces();
   render();
   scrollMessages();
 }
@@ -3621,6 +3652,7 @@ async function refreshState(): Promise<boolean> {
   if (r && r.ok) {
     state = r;
     stateFailed = false;
+    await loadPinnedFaces();
     // The side lives on the account: the account wins over the device
     // cache. When the account has no side yet but this device picked
     // one (while signed out, or on a device that never synced), push
@@ -3886,6 +3918,8 @@ const TOGGLE_DIRECTIONS: Record<string, () => boolean> = {
   "nova-nudges": () => !(state?.novaSettings?.gettingStartedNudges ?? true),
   "day-move-show": () => !dayMoveOpen,
   "call-mic": () => callPhase !== "recording",
+  "pin-face": () => true,
+  "unpin-face": () => false,
 };
 
 document.addEventListener("click", async (e) => {
@@ -4286,6 +4320,32 @@ document.addEventListener("click", async (e) => {
     customizePhoton = null;
     dayOpen = false;
     render();
+  } else if (action === "pin-face") {
+    const name = t.dataset.photon || "";
+    if (name) {
+      const r = await api.pin(name);
+      if (r && r.ok) {
+        pinnedFaces = Array.isArray(r.pinnedFaces) ? r.pinnedFaces : [...pinnedFaces, name];
+        toast(`${name} pinned.`);
+      } else {
+        toast(r?.message || "That didn't pin. Try again.", "err");
+      }
+      render();
+    }
+  } else if (action === "unpin-face") {
+    const name = t.dataset.photon || "";
+    if (name) {
+      const r = await api.unpin(name);
+      if (r && r.ok) {
+        pinnedFaces = Array.isArray(r.pinnedFaces)
+          ? r.pinnedFaces
+          : pinnedFaces.filter((x) => x !== name);
+        toast(`${name} unpinned.`);
+      } else {
+        toast(r?.message || "That didn't unpin. Try again.", "err");
+      }
+      render();
+    }
   } else if (action === "call") {
     callPhoton(t.dataset.photon || "");
   } else if (action === "report-prism") {
