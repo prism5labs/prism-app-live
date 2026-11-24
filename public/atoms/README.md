@@ -1,13 +1,16 @@
 # Atom portraits
 
-Drop a real portrait PNG here, one per Atom, named exactly:
+Drop a real portrait WebP here, one per Atom, named exactly:
 
-- `Mabel.png`, `Hazel.png`, `Willa.png`, `Ruby.png`, `Jude.png`,
-  `Sadie.png`, `Bea.png`, `Flora.png`, `Pierce.png`, `Iris.png`,
-  `Clive.png`, `Nora.png`
+- `Mabel.webp`, `Hazel.webp`, `Willa.webp`, `Ruby.webp`, `Jude.webp`,
+  `Sadie.webp`, `Bea.webp`, `Flora.webp`, `Pierce.webp`, `Iris.webp`,
+  `Clive.webp`, `Nora.webp`
 
-Square, at least 256x256. The app uses the PNG when it exists and falls
+Square, 800x800. The app uses the WebP when it exists and falls
 back to a generated placeholder tile (initial + triangle) when it does not.
+(Until Nov 23, 2026 these were 1600px PNGs of ~3.5 MB each; the
+lightweight pass replaced them with 800px WebPs of ~120 KB. The
+originals live in the Labs art archive.)
 
 All twelve are in place (Nov 19, 2026): 1950s pulp-poster portraits in
 the same family as the Photon portraits — faceted deep-teal armor with

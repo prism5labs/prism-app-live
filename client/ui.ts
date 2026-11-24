@@ -1,6 +1,6 @@
 // Logo and portrait helpers. The logo is the Triangle/Pyramid mark
 // (confirmed Nov 13, with the extra line that makes it read as a pyramid).
-// Photon portraits live at public/photons/<Name>.png (the twelve 1950s
+// Photon portraits live at public/photons/<Name>.webp (the twelve 1950s
 // superhero portraits; Prism is the 1950s superhero picture from the Labs
 // website, swapped in Nov 15, 2026, replacing the teal crystalline figure).
 // The tile below is only a fallback for a Photon with no portrait file yet.
@@ -31,26 +31,29 @@ function tileSvg(name: string): string {
 }
 
 // Portraits are served as small WebP thumbnails (public/<kind>/thumbs/,
-// 480px, ~50 KB) instead of the full 1600px PNGs (~3.5 MB each): every
-// display size in the app is 220 CSS px or less, so the thumbnails are
-// indistinguishable on screen and the Store and Chat fronts load in a
-// fraction of the time (speed pass, Nov 22, 2026). The full PNGs stay on
-// the server untouched; if a thumbnail is missing (a portrait added
-// without regenerating thumbs) the img falls back to the full PNG, and
-// if that is missing too, to the tile — see window.__photonImgErr.
+// 480px, ~50 KB) instead of the full portraits: every display size in
+// the app is 220 CSS px or less, so the thumbnails are indistinguishable
+// on screen and the Store and Chat fronts load in a fraction of the time
+// (speed pass, Nov 22, 2026). If a thumbnail is missing (a portrait added
+// without regenerating thumbs) the img falls back to the full portrait,
+// and if that is missing too, to the tile — see window.__photonImgErr.
+// The full portraits themselves were 1600px PNGs of ~3.5 MB each until
+// the lightweight pass (Nov 23, 2026) replaced them with 800px WebPs
+// (~120 KB): still far beyond any display size, at a thirtieth of the
+// bytes. The original PNGs live in the Labs' art archive, not the app.
 export function portraitHtml(name: string, size: number): string {
   // Inline version for template strings; the img falls back via the
   // global handler below (window.__photonImgErr).
   const enc = encodeURIComponent(name);
-  return `<span class="portrait" style="width:${size}px;height:${size}px"><img src="/photons/thumbs/${enc}.webp" data-full="/photons/${enc}.png" alt="${name} portrait" width="${size}" height="${size}" loading="lazy" decoding="async" onerror="window.__photonImgErr(this,'${name}')"></span>`;
+  return `<span class="portrait" style="width:${size}px;height:${size}px"><img src="/photons/thumbs/${enc}.webp" data-full="/photons/${enc}.webp" alt="${name} portrait" width="${size}" height="${size}" loading="lazy" decoding="async" onerror="window.__photonImgErr(this,'${name}')"></span>`;
 }
 
-// Atoms live at public/atoms/<Name>.png (the twelve 1950s pulp-poster
+// Atoms live at public/atoms/<Name>.webp (the twelve 1950s pulp-poster
 // portraits, Nov 19, 2026), with thumbnails alongside like the Photons.
 // Same fallback chain as the Photons.
 export function atomPortraitHtml(name: string, size: number): string {
   const enc = encodeURIComponent(name);
-  return `<span class="portrait" style="width:${size}px;height:${size}px"><img src="/atoms/thumbs/${enc}.webp" data-full="/atoms/${enc}.png" alt="${name} portrait" width="${size}" height="${size}" loading="lazy" decoding="async" onerror="window.__photonImgErr(this,'${name}')"></span>`;
+  return `<span class="portrait" style="width:${size}px;height:${size}px"><img src="/atoms/thumbs/${enc}.webp" data-full="/atoms/${enc}.webp" alt="${name} portrait" width="${size}" height="${size}" loading="lazy" decoding="async" onerror="window.__photonImgErr(this,'${name}')"></span>`;
 }
 
 declare global {
@@ -60,7 +63,7 @@ declare global {
   }
 }
 window.__photonTile = (name: string) => tileSvg(name);
-// First error: the thumbnail is missing — try the full-size PNG.
+// First error: the thumbnail is missing — try the full-size WebP.
 // Second error: no portrait at all — the tile takes its place.
 window.__photonImgErr = (img: HTMLImageElement, name: string) => {
   if (!img.dataset.fb) {

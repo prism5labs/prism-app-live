@@ -1882,6 +1882,8 @@ async function handleApi(req: Request, path: string): Promise<Response> {
 }
 
 // --- Static files ---
+const GZIP_EXTS = new Set([".html", ".css", ".js", ".json", ".svg", ".txt", ".xml"]);
+
 async function serveStatic(req: Request, path: string): Promise<Response> {
   let rel = path === "/" ? "index.html" : path.slice(1);
   rel = normalize(rel).replace(/^(\.\.[\/\\])+/, "");
@@ -1925,6 +1927,27 @@ async function serveStatic(req: Request, path: string): Promise<Response> {
     // portrait still lands within a reasonable window; inside the app
     // the service worker's asset cache serves them first anyway.
     headers["cache-control"] = "public, max-age=2592000";
+  }
+  // Text assets travel gzipped when the client accepts it (lightweight
+  // pass, Nov 23, 2026): the shell's HTML/CSS/JS is the cold-open cost
+  // on every first visit and every version bump, and gzip takes roughly
+  // two-thirds off it. Images and films are already compressed formats
+  // and are never gzipped; Range requests (film slicing) always get the
+  // plain file; sw.js is served plain so the open-time version check
+  // reads exactly the bytes on disk.
+  if (
+    rel !== "sw.js" &&
+    !req.headers.has("range") &&
+    GZIP_EXTS.has(ext) &&
+    (req.headers.get("accept-encoding") || "").includes("gzip")
+  ) {
+    const raw = Buffer.from(await file.arrayBuffer());
+    const zipped = Bun.gzipSync(raw);
+    if (zipped.length < raw.length) {
+      headers["content-encoding"] = "gzip";
+      headers["vary"] = "accept-encoding";
+      return new Response(zipped, { headers });
+    }
   }
   return new Response(file, { headers });
 }

@@ -1,13 +1,16 @@
 # Photon portraits
 
-Drop a real portrait PNG here, one per Photon, named exactly:
+Drop a real portrait WebP here, one per Photon, named exactly:
 
-- `Prism.png`, `Juniper.png`, `Encore.png`, `Zero.png`, `Proof.png`,
-  `Barnstormer.png`, `Blueprint.png`, `Calendra.png`, `Shopbell.png`,
-  `Keystone.png`, `Vesper.png`, `Goldstar.png`
+- `Prism.webp`, `Juniper.webp`, `Encore.webp`, `Zero.webp`, `Proof.webp`,
+  `Barnstormer.webp`, `Blueprint.webp`, `Calendra.webp`, `Shopbell.webp`,
+  `Keystone.webp`, `Vesper.webp`, `Goldstar.webp`
 
-Square, at least 256x256. The app uses the PNG when it exists and falls
+Square, 800x800. The app uses the WebP when it exists and falls
 back to a generated placeholder tile (initial + triangle) when it does not.
+(Until Nov 23, 2026 these were 1600px PNGs of ~3.5 MB each; the
+lightweight pass replaced them with 800px WebPs of ~120 KB. The
+originals live in the Labs art archive.)
 
 All twelve are in place (Nov 19, 2026): 1950s retro-futuristic armor
 portraits — faceted deep-teal armor with chrome trim and red piping,

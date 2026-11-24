@@ -212,7 +212,13 @@
 // update-gate.js registers this worker at launch, checks for a newer
 // build before the opening plays, and reloads once behind a veil when
 // one lands, so no install settles into a stale copy.
-const CACHE = "prism5-v62";
+// CACHE v63: the lightweight pass (Nov 23, 2026) — the 24 full
+// portraits are 800px WebPs (~120 KB) instead of 1600px PNGs
+// (~3.5 MB each; the fallback path and the push image point at the
+// WebPs now), and the shell's text assets travel gzipped. The asset
+// cache name is unchanged on purpose: thumbnail URLs did not move,
+// and the old PNG entries in it are simply never requested again.
+const CACHE = "prism5-v63";
 // Images (portraits, thumbnails, brand art, chat backgrounds, icons)
 // live in their own cache whose name does NOT change with the shell
 // version. Before v52 every shell bump deleted the one cache on
