@@ -136,6 +136,7 @@ import {
 } from "./server/research";
 import { handleStripeWebhook, handleStripeStatus } from "./server/stripe";
 import { buildThreadExport, threadExportFilename } from "./server/threadExport";
+import { recordDemoRequest, demoRequestRateLimited } from "./server/demoRequests";
 // Google sign-in for the app itself: a person, not a device. Same OAuth
 // client as Gmail; the account follows the owner across devices.
 import {
@@ -622,9 +623,85 @@ async function handleApi(req: Request, path: string): Promise<Response> {
     return await handleStripeStatus(req);
   }
 
+  // Website demo requests (Nov 23, 2026) — CORS preflight. The demo
+  // form on prism5labs.com posts cross-origin with no credentials, so
+  // this path gets its own preflight: exact-origin echo only (the
+  // same allowlist as /api/state and /api/profile), POST and
+  // content-type only, no credentials.
+  if (method === "OPTIONS" && path === "/api/demo-request") {
+    const origin = corsOriginFor(req);
+    const headers: Record<string, string> = { Vary: "Origin" };
+    if (origin) {
+      headers["Access-Control-Allow-Origin"] = origin;
+      headers["Access-Control-Allow-Methods"] = "POST, OPTIONS";
+      headers["Access-Control-Allow-Headers"] = "content-type";
+      headers["Access-Control-Max-Age"] = "86400";
+    }
+    return new Response(null, { status: 204, headers });
+  }
+
   // Step 10 — POST /api/research — live web search with sources.
   if (path === "/api/research" && method === "POST") {
     return await handleResearch(req);
+  }
+
+  // POST /api/demo-request — the website's "Text me the demo" form.
+  // Public on purpose: the visitor has no account. The handler
+  // validates the number, this route rate-limits by client address,
+  // and the request is stored and emailed to the business inbox in
+  // the shape the old mailto flow composed (src/server/demoRequests.ts).
+  // A honeypot field rides along: a submission with anything in it
+  // is a bot's, and it gets a quiet ok with no row and no email.
+  if (path === "/api/demo-request" && method === "POST") {
+    const withCors = (res: Response): Response => {
+      const origin = corsOriginFor(req);
+      if (!origin) return res;
+      const headers = new Headers(res.headers);
+      headers.set("Access-Control-Allow-Origin", origin);
+      headers.set("Vary", "Origin");
+      return new Response(res.body, { status: res.status, headers });
+    };
+    const body = await readBody(req);
+    if (typeof body.website === "string" && body.website.trim() !== "") {
+      return withCors(json({ ok: true }));
+    }
+    const ipKey =
+      (req.headers.get("x-forwarded-for") || "").split(",")[0].trim() || "noip";
+    if (demoRequestRateLimited(ipKey)) {
+      return withCors(
+        json(
+          {
+            ok: false,
+            error: "too_many_attempts",
+            message: "Too many tries. Wait a few minutes and try again.",
+          },
+          429,
+        ),
+      );
+    }
+    const result = await recordDemoRequest(String(body.phone || ""));
+    if (!result.ok) {
+      return withCors(
+        json(
+          {
+            ok: false,
+            error: result.error,
+            message:
+              "That number doesn't look like a US cell number — check it and try again.",
+          },
+          400,
+        ),
+      );
+    }
+    return withCors(
+      json({
+        ok: true,
+        already: result.already,
+        message: result.already
+          ? `Your demo request is already in — we'll text the demo to ${result.display}. Every text includes the opt-out: reply STOP to opt out.`
+          : `Your demo request is in — we'll text the demo to ${result.display}. Every text includes the opt-out: reply STOP to opt out.`,
+      }),
+    );
   }
 
   // Step 9 — Messenger (Facebook Pages only). The module returns null

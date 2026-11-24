@@ -1432,3 +1432,81 @@ export function markRequestSent(accountId: string, id: string): void {
     id,
   );
 }
+
+// --- Website demo requests (Nov 23, 2026) ---
+// The "Text me the demo" form on prism5labs.com posts to
+// /api/demo-request (see src/server/demoRequests.ts). One row per
+// accepted request: the number the visitor asked to have the demo
+// texted to, and whether the notification email to the business inbox
+// went out. Nothing else is collected — no name, no email, no account.
+
+db.exec(`
+CREATE TABLE IF NOT EXISTS demo_requests (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  phone TEXT NOT NULL,
+  phone_display TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  notified INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_demo_requests_phone ON demo_requests (phone, created_at);
+`);
+
+export interface DemoRequest {
+  id: number;
+  phone: string;
+  phoneDisplay: string;
+  createdAt: string;
+  notified: boolean;
+}
+
+export function addDemoRequest(phone: string, phoneDisplay: string): DemoRequest {
+  const now = new Date().toISOString();
+  const info = db
+    .query(
+      `INSERT INTO demo_requests (phone, phone_display, created_at) VALUES (?, ?, ?)`,
+    )
+    .run(phone, phoneDisplay, now);
+  return {
+    id: Number(info.lastInsertRowid),
+    phone,
+    phoneDisplay,
+    createdAt: now,
+    notified: false,
+  };
+}
+
+// The most recent request for a number, or null. The endpoint uses it
+// to keep a double-tap (or a flood) from emailing the business inbox
+// twice for the same number in a day.
+export function latestDemoRequest(phone: string): DemoRequest | null {
+  const row = db
+    .query(`SELECT * FROM demo_requests WHERE phone = ? ORDER BY id DESC LIMIT 1`)
+    .get(phone) as any;
+  if (!row) return null;
+  return {
+    id: row.id,
+    phone: row.phone,
+    phoneDisplay: row.phone_display,
+    createdAt: row.created_at,
+    notified: row.notified === 1,
+  };
+}
+
+export function markDemoRequestNotified(id: number): void {
+  db.query(`UPDATE demo_requests SET notified = 1 WHERE id = ?`).run(id);
+}
+
+// The app account that has a given Gmail address connected, or null.
+// The demo-request notification is sent through the business
+// mailbox's own Gmail connection when one exists in this app (the
+// same connection the Switchboard sends from).
+export function gmailConnectionForEmail(
+  email: string,
+): { accountId: string; label: string } | null {
+  const row = db
+    .query(
+      `SELECT account_id, label FROM gmail_accounts WHERE lower(email) = lower(?) LIMIT 1`,
+    )
+    .get(email) as any;
+  return row ? { accountId: row.account_id, label: row.label } : null;
+}
