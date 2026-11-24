@@ -1,5 +1,5 @@
 {
-  "note": "Full-figure hero art for the Prism app opening (SW v61, Nov 23, 2026). One painted full-body hero per Face, generated from the Face's portrait as identity reference, black background keyed to alpha. Prism is deliberately absent: she is out of the opening at Neil's order. Raw generations live in ~/workspace/business/prism-hero-art-raw/ (outside the repo).",
+  "note": "Full-figure hero art for the Prism app opening. One painted full-body hero per Face, generated from the Face's portrait as identity reference, black background keyed to alpha. Prism is deliberately absent as a figure: in the opening she is only her light, which gathers at the stage's heart and splits into the Faces (SW v64 choreography, Nov 23, 2026). The cast is 23 figures \u2014 the 24th Face is Prism herself, present as the light. Raw generations live in ~/workspace/business/prism-hero-art-raw/ (outside the repo).",
   "heroes": [
     {
       "name": "Juniper",
@@ -233,5 +233,36 @@
     }
   ],
   "count": 23,
-  "totalBytes": 2805056
+  "totalBytes": 2805056,
+  "clips": {
+    "status": "EMPTY as of SW v64 (Nov 23, 2026): the image-to-video pipeline was unavailable at build time (two independent generation attempts, both upstream 502). The client mechanism is wired and proven: add the file, add one HERO_CLIPS line in client/main.ts, bump the SW. No other code change.",
+    "mechanism": "HERO_CLIPS in client/main.ts maps a Face name to /heroes/clips/<Name>.mp4. The builder then renders a muted, looping, autoplaying <video> masked by the still webp's own alpha (so the figure keeps its exact silhouette and stage place), with the still as poster and as error fallback.",
+    "spec": "Short seamless loop, ~480px wide, MP4 (H.264), no audio, compressed (target <= 350 KB each). Motion: subtle and lifelike only \u2014 breathing, a slight shift of stance, fabric and hair in a light breeze, a small turn of the head. Camera locked off; figure stays in place at the same size; pure black background (the alpha mask carries the silhouette).",
+    "priorityOrder": [
+      "Juniper",
+      "Encore",
+      "Keystone",
+      "Mabel",
+      "Pierce",
+      "Shopbell",
+      "Calendra",
+      "Barnstormer",
+      "Blueprint",
+      "Goldstar",
+      "Vesper",
+      "Zero",
+      "Proof",
+      "Hazel",
+      "Willa",
+      "Ruby",
+      "Jude",
+      "Iris",
+      "Sadie",
+      "Bea",
+      "Flora",
+      "Clive",
+      "Nora"
+    ],
+    "rawClipsDir": "~/workspace/business/prism-hero-clips-raw/ (outside the repo)"
+  }
 }

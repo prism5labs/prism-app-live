@@ -1,14 +1,20 @@
 // Hero-opening probe (jsdom). Loads the real built bundle against the
 // running scratch server (port 3100, same harness as test-render.ts),
 // forces the film's clock past the handoff, records every WAAPI call
-// the finale makes, and verifies the hero sequence end to end:
-//   - the stage appears and Prism is nowhere in the opening
+// the finale makes, and verifies the v64 choreography end to end:
+//   - the stage appears; Prism is nowhere in the opening — no
+//     figure, no disc (the orbit rings are gone), only her light:
+//     one shaft and one gathering core
 //   - exactly 23 heroes, each once, all full-figure /heroes/ art
+//     (a still, or an animated clip wearing the still as poster)
 //   - the staging is asymmetric (no mirrored pairs, wide scale range)
-//   - every hero gets its own entrance (all four kinds present),
-//     a living-hold sway on its own period, and a flash-out
-//   - the charge and the white-gold flash fire, and the splash is
-//     dismissed afterwards with no console errors
+//   - the split: one ray of light per hero, running from the heart
+//     to the hero's place; every hero then condenses out of the
+//     light where they stand (a brightness/blur resolve) — no
+//     figure travels in from off-stage any more
+//   - a living-hold sway per hero on its own period
+//   - the charge and the white-gold flash fire, every hero streaks
+//     out, and the splash is dismissed with no console errors
 // Run: bun scripts/probe-hero-opening.ts   (server on :3100)
 import { JSDOM } from "jsdom";
 import { readFileSync } from "node:fs";
@@ -62,7 +68,7 @@ const anims: AnimRec[] = [];
   const heroEl = el.closest(".opening-hero") as HTMLElement | null;
   anims.push({
     cls: el.className,
-    hero: heroEl ? heroEl.dataset.hero || null : null,
+    hero: heroEl ? heroEl.dataset.hero || null : el.dataset?.hero || null,
     keyframes: Array.isArray(keyframes) ? keyframes : [keyframes],
     opts: opts || {},
   });
@@ -116,15 +122,31 @@ check("no Prism anywhere in the opening", !names.includes("Prism") &&
   ![...window.document.querySelectorAll("#opening-splash img")].some((i: any) =>
     (i.getAttribute("src") || "").includes("Prism")));
 
-// 3. All art is the full-figure hero art.
-const srcs = heroEls.map((el) => el.querySelector("img")?.getAttribute("src") || "");
+// 3. Her light, and only her light: a shaft and a core, no disc.
+check("the light's shaft is on the stage", !!window.document.querySelector(".opening-hero-shaft"));
+check("the light's core is on the stage", !!window.document.querySelector(".opening-hero-core"));
 check(
-  "every figure uses /heroes/<Name>.webp (no portrait thumbs)",
-  srcs.every((s, i) => s === `/heroes/${encodeURIComponent(names[i])}.webp`),
-  srcs.slice(0, 3).join(", "),
+  "no disc: the orbit rings are gone",
+  !window.document.querySelector(".opening-hero-orbits"),
 );
+const coreIn = anims.find(
+  (a) => a.cls === "opening-hero-core" && JSON.stringify(a.keyframes).includes("scale(0.45)"),
+);
+check("the core gathers (animates in from a point of light)", !!coreIn);
+const shaftIn = anims.find((a) => a.cls === "opening-hero-shaft");
+check("the shaft falls in (animates in)", !!shaftIn);
 
-// 4. Asymmetric staging, from the placed inline styles.
+// 4. All art is the full-figure hero art: a still, or a clip that
+// wears the still as its poster.
+const artOk = heroEls.every((el, i) => {
+  const img = el.querySelector("img");
+  if (img) return img.getAttribute("src") === `/heroes/${encodeURIComponent(names[i])}.webp`;
+  const vid = el.querySelector("video");
+  return !!vid && vid.getAttribute("poster") === `/heroes/${encodeURIComponent(names[i])}.webp`;
+});
+check("every figure uses /heroes/<Name>.webp art (still or clip poster)", artOk);
+
+// 5. Asymmetric staging, from the placed inline styles.
 const slots = heroEls.map((el) => ({
   name: el.dataset.hero || "",
   x: parseFloat(el.style.left),
@@ -142,58 +164,51 @@ check("no mirrored pairs (not a symmetrical grouping)", !mirrored);
 const bottoms = new Set(slots.map((s) => s.b));
 check("at least 12 distinct ground lines / heights", bottoms.size >= 12, `${bottoms.size} distinct bottoms`);
 
-// 5. Entrances: one per hero, staggered, all four kinds present.
-const entrances = anims.filter((a) => a.hero && a.cls === "opening-hero");
-const byHero = new Map<string, AnimRec[]>();
-for (const a of entrances) {
-  const list = byHero.get(a.hero!) || [];
-  list.push(a);
-  byHero.set(a.hero!, list);
-}
-check("every hero has an entrance animation", EXPECTED.every((n) => (byHero.get(n) || []).length >= 1));
-const delays = new Set(entrances.map((a) => a.opts.delay || 0));
-check("entrances are staggered (at least 10 distinct delays)", delays.size >= 10, `${delays.size} distinct`);
-function kindOf(a: AnimRec): string {
-  const first = JSON.stringify(a.keyframes[0] || {});
-  if (first.includes("scale(0.55)")) return "flash";
-  const m = first.match(/translate\((-?[\d.]+)px,\s*(-?[\d.]+)px\)/);
-  if (m) {
-    const oy = parseFloat(m[2]);
-    if (oy < -300) return "drop";
-    if (oy > 300) return "rise";
-  }
-  if (first.includes("scale(1.14)")) return "streak";
-  return "unknown";
-}
-const kinds = new Map<string, string>();
-for (const n of EXPECTED) {
-  const first = (byHero.get(n) || [])[0];
-  if (first) kinds.set(n, kindOf(first));
-}
-const kindCounts: Record<string, number> = {};
-for (const k of kinds.values()) kindCounts[k] = (kindCounts[k] || 0) + 1;
+// 6. The split: one ray per hero, then the condense. The ray's
+// delay and the condense's delay are one schedule (the figure
+// condenses 130ms after its ray sets out).
+const rays = anims.filter((a) => a.cls === "opening-hero-ray");
+check("one ray of light per hero (23 rays)", rays.length === 23, `${rays.length} rays`);
 check(
-  "all four entrance kinds present (drop/streak/rise/flash)",
-  ["drop", "streak", "rise", "flash"].every((k) => (kindCounts[k] || 0) >= 3),
-  JSON.stringify(kindCounts),
+  "every hero is reached by a ray",
+  EXPECTED.every((n) => rays.some((r) => r.hero === n)),
 );
-// Streak heroes trail on the way in (their trail keyframes open
-// stretched at "1.6 1"; the flash-out trails open at "0.4 1").
-const trailIns = anims.filter(
-  (a) => a.cls === "opening-hero-trail" && JSON.stringify(a.keyframes[0] || {}).includes("1.6 1"),
+const condenses = anims.filter(
+  (a) => a.hero && a.cls === "opening-hero" && JSON.stringify(a.keyframes).includes("brightness(3.4"),
 );
-check("streak entrances burn a light trail", trailIns.length >= 5, `${trailIns.length} trail-ins`);
+check("every hero condenses out of the light (23 condenses)", condenses.length === 23, `${condenses.length} found`);
+check(
+  "each condense follows its ray by 130ms",
+  EXPECTED.every((n) => {
+    const ray = rays.find((r) => r.hero === n);
+    const con = condenses.find((c) => c.hero === n);
+    return !!ray && !!con && (con.opts.delay || 0) - (ray.opts.delay || 0) === 130;
+  }),
+);
+const delays = new Set(condenses.map((a) => a.opts.delay || 0));
+check("the split is staggered (at least 10 distinct delays)", delays.size >= 10, `${delays.size} distinct`);
+// No figure travels: a condense keyframe never translates the
+// figure by more than a few pixels (the base -50% centring is a
+// percentage, and the flash-out is a separate 560ms animation).
+const travels = condenses.some((a) =>
+  JSON.stringify(a.keyframes).match(/translate\((-?\d{2,})px/) ||
+  JSON.stringify(a.keyframes).match(/,\s*(-?\d{2,})px\)/));
+check("no figure travels in from off-stage (no travelling cutouts)", !travels);
 
-// 6. The living hold: an infinite sway per hero, on its own period.
+// 7. The living hold: an infinite sway per hero, on its own period.
 const sways = anims.filter((a) => a.cls === "opening-hero-sway" && a.opts.iterations === Infinity);
 check("every hero breathes in the hold (infinite sway)", sways.length === 23, `${sways.length} sways`);
 const periods = new Set(sways.map((a) => a.opts.duration));
 check("sway periods are per-hero (at least 10 distinct)", periods.size >= 10, `${periods.size} distinct`);
 
-// 7. The charge and the flash-out fire; then the splash goes away.
+// 8. The charge and the flash-out fire; then the splash goes away.
 const gone = await waitFor(() => !window.document.getElementById("opening-splash"), 12000);
 const chargeAnim = anims.some((a) => a.cls === "opening-hero-charge");
 check("the charge-up fires before the flash-out", chargeAnim);
+const coreSurge = anims.some(
+  (a) => a.cls === "opening-hero-core" && a.opts.duration === 450,
+);
+check("her light surges at the charge (the core flares)", coreSurge);
 const flashAnim = anims.find((a) => a.cls === "opening-hero-flash");
 check(
   "the white-gold flash blooms (peaks at 0.95 opacity)",

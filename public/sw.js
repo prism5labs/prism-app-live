@@ -218,7 +218,17 @@
 // WebPs now), and the shell's text assets travel gzipped. The asset
 // cache name is unchanged on purpose: thumbnail URLs did not move,
 // and the old PNG entries in it are simply never requested again.
-const CACHE = "prism5-v63";
+// CACHE v64: the opening re-choreographed to the owner's second
+// word (Nov 23, 2026) — the v5 film now hands off at 1.8s, while
+// it is still only a shaft of light on the crystal, so Prism
+// herself never appears; on the stage her light gathers at the
+// heart and SPLITS, one ray per hero, and the 23 Faces condense
+// out of the light where they stand instead of travelling in as
+// cutouts. The flash-out, tap-to-skip, opening setting, and
+// sounds are unchanged. Animated per-Face clips are wired
+// (HERO_CLIPS in main.js) but ship empty — the image-to-video
+// pipeline was down at build time; see public/heroes/manifest.json.
+const CACHE = "prism5-v64";
 // Images (portraits, thumbnails, brand art, chat backgrounds, icons)
 // live in their own cache whose name does NOT change with the shell
 // version. Before v52 every shell bump deleted the one cache on
