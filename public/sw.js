@@ -228,7 +228,7 @@
 // sounds are unchanged. Animated per-Face clips are wired
 // (HERO_CLIPS in main.js) but ship empty — the image-to-video
 // pipeline was down at build time; see public/heroes/manifest.json.
-const CACHE = "prism5-v64";
+const CACHE = "prism5-v65";
 // Images (portraits, thumbnails, brand art, chat backgrounds, icons)
 // live in their own cache whose name does NOT change with the shell
 // version. Before v52 every shell bump deleted the one cache on
