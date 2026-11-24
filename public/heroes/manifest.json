@@ -235,7 +235,7 @@
   "count": 23,
   "totalBytes": 2805056,
   "clips": {
-    "status": "EMPTY as of SW v64 (Nov 23, 2026): the image-to-video pipeline was unavailable at build time (two independent generation attempts, both upstream 502). The client mechanism is wired and proven: add the file, add one HERO_CLIPS line in client/main.ts, bump the SW. No other code change.",
+    "status": "PRIORITY SIX LIVE as of SW v65 (Nov 23, 2026): the image-to-video pipeline recovered (one 503 on the first retry attempt, then six clean generations). Juniper, Encore, Keystone, Mabel, Pierce and Shopbell have clips in public/heroes/clips/ and HERO_CLIPS lines in client/main.ts. Each shipped clip is a 10s seamless boomerang loop (a 5s generated segment played forward and reversed), 480px wide, H.264, no audio. The remaining 17 Faces await a later generation run (per-run generation cap), in the priorityOrder below. History: SW v64 shipped EMPTY because the pipeline was down at build time (two attempts, both upstream 502).",
     "mechanism": "HERO_CLIPS in client/main.ts maps a Face name to /heroes/clips/<Name>.mp4. The builder then renders a muted, looping, autoplaying <video> masked by the still webp's own alpha (so the figure keeps its exact silhouette and stage place), with the still as poster and as error fallback.",
     "spec": "Short seamless loop, ~480px wide, MP4 (H.264), no audio, compressed (target <= 350 KB each). Motion: subtle and lifelike only \u2014 breathing, a slight shift of stance, fabric and hair in a light breeze, a small turn of the head. Camera locked off; figure stays in place at the same size; pure black background (the alpha mask carries the silhouette).",
     "priorityOrder": [
@@ -263,6 +263,14 @@
       "Clive",
       "Nora"
     ],
-    "rawClipsDir": "~/workspace/business/prism-hero-clips-raw/ (outside the repo)"
+    "rawClipsDir": "~/workspace/business/prism-hero-clips-raw/ (outside the repo)",
+    "shipped": {
+      "Juniper": { "file": "/heroes/clips/Juniper.mp4", "width": 480, "height": 986, "durationS": 10, "bytes": 311006 },
+      "Encore": { "file": "/heroes/clips/Encore.mp4", "width": 480, "height": 936, "durationS": 10, "bytes": 277894 },
+      "Keystone": { "file": "/heroes/clips/Keystone.mp4", "width": 480, "height": 892, "durationS": 10, "bytes": 292548 },
+      "Mabel": { "file": "/heroes/clips/Mabel.mp4", "width": 480, "height": 948, "durationS": 10, "bytes": 312692 },
+      "Pierce": { "file": "/heroes/clips/Pierce.mp4", "width": 480, "height": 1044, "durationS": 10, "bytes": 338441 },
+      "Shopbell": { "file": "/heroes/clips/Shopbell.mp4", "width": 480, "height": 960, "durationS": 10, "bytes": 227015 }
+    }
   }
 }

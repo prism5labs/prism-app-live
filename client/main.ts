@@ -5029,15 +5029,16 @@ function dismissSplashWithCurtain(fast = false): void {
 //
 // THE HOLD: the assembly lives. Every figure with an animated
 // clip (HERO_CLIPS, below) plays it, looped; the rest breathe
-// on the sway each figure has always had. The owner's verdict
-// stands over this build in one respect, stated plainly: the
-// image-to-video pipeline was down when this choreography was
-// built (two independent generation attempts, both upstream
-// 502s), so HERO_CLIPS ships EMPTY and every figure currently
-// holds as a still on its sway. The clip mechanism is wired
-// and proven — a clip drops in by adding one file and one
-// HERO_CLIPS line, no other code change — and the generation
-// order is the priority list in public/heroes/manifest.json.
+// on the sway each figure has always had. History, stated
+// plainly: the image-to-video pipeline was down when this
+// choreography was built (SW v64, two generation attempts,
+// both upstream 502s), so v64 shipped with HERO_CLIPS empty
+// and every figure holding as a still. The pipeline recovered
+// the next day and SW v65 landed the priority six clips —
+// Juniper, Encore, Keystone, Mabel, Pierce, Shopbell. The
+// remaining 17 Faces still hold on their sway until a later
+// generation run; the order is the priority list in
+// public/heroes/manifest.json.
 //
 // THE FLASH-OUT is v61's, unchanged in spirit: the light
 // charges, the figures brighten, and every hero streaks away
@@ -5069,16 +5070,20 @@ const HERO_LIGHT_Y = 38;
 // Animated clips for the hold, one per Face, generated from the
 // Face's hero art (image-to-video: subtle lifelike motion —
 // breathing, a shift of stance, fabric and hair in a light
-// breeze — camera locked, figure in place). EMPTY in this
-// build: the video pipeline was unavailable (see the section
-// comment above). When a clip lands it is served from
-// /heroes/clips/<Name>.mp4, masked by the still's own alpha
+// breeze — camera locked, figure in place). Each clip is served
+// from /heroes/clips/<Name>.mp4, masked by the still's own alpha
 // (the builder sets the mask from the hero webp), with the
-// still as its poster and its fallback. Priority order for
-// generation: Juniper, Encore, Keystone, Mabel, Pierce,
-// Shopbell, then the rest by slot size (manifest.json holds
-// the full list).
-const HERO_CLIPS: Record<string, string> = {};
+// still as its poster and its fallback. The priority six landed
+// in SW v65 (Nov 23, 2026); the remaining 17 follow the priority
+// list in public/heroes/manifest.json when generation resumes.
+const HERO_CLIPS: Record<string, string> = {
+  Juniper: "/heroes/clips/Juniper.mp4",
+  Encore: "/heroes/clips/Encore.mp4",
+  Keystone: "/heroes/clips/Keystone.mp4",
+  Mabel: "/heroes/clips/Mabel.mp4",
+  Pierce: "/heroes/clips/Pierce.mp4",
+  Shopbell: "/heroes/clips/Shopbell.mp4",
+};
 
 type HeroSlot = {
   // Centre-x in % of stage width; bottom in % of stage height
