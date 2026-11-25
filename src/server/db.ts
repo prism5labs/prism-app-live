@@ -706,6 +706,18 @@ export function searchMessages(accountId: string, query: string): MessageSearchR
   }));
 }
 
+// The conversations this account can export in full: every named
+// thread holding at least one message, most recently active first.
+export function listExportThreads(accountId: string): { photon: string; messageCount: number }[] {
+  const rows = db
+    .query(
+      `SELECT photon, COUNT(*) AS n FROM messages WHERE account_id = ?
+       GROUP BY photon ORDER BY MAX(id) DESC`,
+    )
+    .all(accountId) as any[];
+  return rows.map((r) => ({ photon: r.photon, messageCount: r.n }));
+}
+
 export function addMessage(
   accountId: string,
   photon: string,

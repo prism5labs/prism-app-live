@@ -1342,6 +1342,7 @@ function renderChatFront(): string {
         ${conversationSearchQuery ? `<button class="btn" type="button" data-action="search-clear">Clear</button>` : ""}
       </form>
       ${searchResultsHtml}
+      <p class="fine"><a href="${esc(api.exportAllUrl())}" download>Export all conversations</a> — one Markdown file with every conversation you hold.</p>
     </div>`;
   return `
   <section class="front">

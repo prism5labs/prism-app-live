@@ -36,3 +36,35 @@ export function buildThreadExport(
   }
   return lines.join("\n");
 }
+
+export function fullExportFilename(exportedAt: Date = new Date()): string {
+  const day = exportedAt.toISOString().slice(0, 10);
+  return `prism-all-conversations-${day}.md`;
+}
+
+// Every conversation the account holds, in one Markdown file: a
+// heading, the export date, a total count, then each conversation in
+// full under its own heading, reusing the single-thread builder's
+// body so the two exports read the same way.
+export function buildFullExport(
+  sections: { photon: string; messages: ExportMessage[] }[],
+  exportedAt: Date = new Date(),
+): string {
+  const total = sections.reduce((n, s) => n + s.messages.length, 0);
+  const lines: string[] = [
+    "# All your Prism conversations",
+    "",
+    `Exported: ${exportedAt.toISOString()}`,
+    "",
+    `${sections.length} ${sections.length === 1 ? "conversation" : "conversations"} · ${total} ${total === 1 ? "message" : "messages"}`,
+    "",
+  ];
+  for (const s of sections) {
+    lines.push("---", "", `## Conversation with ${s.photon}`, "");
+    for (const m of s.messages) {
+      const speaker = m.role === "user" ? "You" : s.photon;
+      lines.push(`**${speaker}:** ${m.content}`, "");
+    }
+  }
+  return lines.join("\n");
+}

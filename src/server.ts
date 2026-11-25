@@ -12,6 +12,7 @@ import {
   ownsAtom,
   getThread,
   searchMessages,
+  listExportThreads,
   addMessage,
   pinFace,
   unpinFace,
@@ -140,7 +141,7 @@ import {
   MAX_QUERY_LENGTH,
 } from "./server/research";
 import { handleStripeWebhook, handleStripeStatus } from "./server/stripe";
-import { buildThreadExport, threadExportFilename } from "./server/threadExport";
+import { buildThreadExport, buildFullExport, fullExportFilename, threadExportFilename } from "./server/threadExport";
 import { recordDemoRequest, demoRequestRateLimited } from "./server/demoRequests";
 // Google sign-in for the app itself: a person, not a device. Same OAuth
 // client as Gmail; the account follows the owner across devices.
@@ -839,6 +840,28 @@ async function handleApi(req: Request, path: string): Promise<Response> {
     const name = String(body.name || "").trim().slice(0, 40);
     setCustomName(accountId, name ? name : null);
     return json({ ok: true, displayName: name || "Prism 5", customName: name || null });
+  }
+
+
+  // GET /api/threads/export-all — every conversation this account
+  // holds, in one downloadable Markdown file. Mounted BEFORE
+  // /api/threads/:name, whose pattern would otherwise swallow
+  // "export-all" as a name. An account with no messages at all gets
+  // the same clean 404 the single-thread export gives an empty thread.
+  if (path === "/api/threads/export-all" && method === "GET") {
+    const accountId = accountIdFrom(req, {});
+    if (!isValidAccountId(accountId)) return bad("accountId required", 400);
+    const threads = listExportThreads(accountId).filter((x) => isChatName(x.photon));
+    if (threads.length === 0) return bad("no messages to export", 404);
+    const exportedAt = new Date();
+    const sections = threads.map((x) => ({ photon: x.photon, messages: getThread(accountId, x.photon) }));
+    return new Response(buildFullExport(sections, exportedAt), {
+      status: 200,
+      headers: {
+        "content-type": "text/markdown; charset=utf-8",
+        "content-disposition": `attachment; filename="${fullExportFilename(exportedAt)}"`,
+      },
+    });
   }
 
   // GET /api/threads/search?q= — search across all of this account's

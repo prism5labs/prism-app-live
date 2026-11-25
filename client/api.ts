@@ -116,6 +116,8 @@ export const api = {
   // Conversation export: a direct download URL (not a req() call — the
   // answer is a Markdown file, not JSON), carrying the current account id
   // exactly as the thread read does.
+  exportAllUrl: () =>
+    `/api/threads/export-all?accountId=${encodeURIComponent(getAccountId())}`,
   threadExportUrl: (photon: string) =>
     `/api/threads/${encodeURIComponent(photon)}/export?accountId=${encodeURIComponent(getAccountId())}`,
   pinned: () => req(`/api/pinned?accountId=${encodeURIComponent(getAccountId())}`),
