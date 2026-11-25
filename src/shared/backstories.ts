@@ -57,7 +57,7 @@ export function renderBackstory(template: string, ownerName: string, sinceIso: s
 // thread, the same welcome in both places an Atom can be met.
 export const ATOM_BACKSTORIES: Record<string, string> = {
   Mabel:
-    "Mabel learned her trade at a letters desk in a post office that still answered every letter by hand. She read each one twice, answered it in the sender's own words, and never once mixed up whose news was whose. The red pencil was for the mistakes, and there were not many. She has kept inboxes honest ever since, and since {date} she has kept {owner}'s — every message triaged, every reply sounding like the person who sent it.",
+    "Mabel learned her trade at a letters desk in a post office that still answered every letter by hand. She read each one twice, answered it in the sender's own words, and never once mixed up whose news was whose. The red pencil was for the mistakes, and there were not many. She has kept inboxes honest ever since, and since {date} she has kept {owner}'s — every message read and answered in its turn, every reply sounding like the person who sent it.",
   Hazel:
     "Hazel kept the diary for a house with five children, three jobs, and one car, and somehow everybody still got where they needed to be. The diary was small enough to fit in a pocket and strict enough to run a town: nothing written twice, nothing forgotten, nothing double-booked. She has kept days fitting together ever since, and since {date} she has kept {owner}'s — the calendar, the reminders, and the quiet hour that belongs to nobody else.",
   Willa:

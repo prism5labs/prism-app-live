@@ -33,12 +33,12 @@ export const TIER_COPY = {
 export const UPKEEP_COPY = {
   title: "Upkeep",
   priceLine: "$29 a month",
-  body: "Upkeep is the care that keeps your Launch alive: unlimited chat, Launch updates as they come out, priority support, and live voice calls. Every purchase already includes 300 chats a month on the standard brain, free forever, no subscription needed. Upkeep is never required to use what you bought.",
+  body: "Upkeep is the care that keeps your Launch alive: unlimited chat, Launch updates as they come out, priority support, and voice calls in chat — talk out loud, turn by turn. Every purchase already includes 300 chats a month on the standard brain, free forever, no subscription needed. Upkeep is never required to use what you bought.",
   included: [
     "Unlimited chat",
     "Launch updates",
     "Priority support",
-    "Live voice calls",
+    "Voice calls in chat",
   ],
 };
 

@@ -2,11 +2,13 @@
 // server and the client never disagree.
 //
 // A Nova is the personal helper: it opens the PERSONAL set, the things
-// that keep one person's own day in order. The BUSINESS set — the front
-// desk that answers for a business, quotes and invoices, client
-// handling, more than one account, team features — stays locked unless
-// the account owns a business Launch (Supernova or Satellite). The
-// free code opens everything, as it always has.
+// that keep one person's own day in order. The BUSINESS set — a Photon
+// working in chat with the business's inbox, calendar and files,
+// Switchboard email to approved contacts, proactive checks and
+// reminders, more than one account, and a helper who knows the
+// business — stays locked unless the account owns a business Launch
+// (Supernova or Satellite). The free code opens everything, as it
+// always has.
 //
 // The gate follows the pattern the app already uses everywhere else:
 // ownership is a row in the `owned` table (kind 'product' with the
@@ -20,19 +22,19 @@ export type FeatureSet = "personal" | "business";
 
 // The personal set, in plain words — what a Nova opens.
 export const PERSONAL_FEATURES: { id: string; label: string }[] = [
-  { id: "inbox-triage", label: "One inbox, triaged, with replies drafted in your words" },
+  { id: "inbox-triage", label: "One inbox — new mail brought to you, replies drafted in your words" },
   { id: "calendar-reminders", label: "Calendar and reminders, kept where you can see them" },
-  { id: "morning-briefing", label: "A morning briefing, and an end-of-day wrap" },
+  { id: "morning-briefing", label: "A morning briefing that walks your day, one item at a time" },
   { id: "check-ins", label: "Gentle check-ins, and nudges to get started" },
 ];
 
 // The business set, in plain words — what stays locked on Nova alone.
 export const BUSINESS_FEATURES: { id: string; label: string }[] = [
-  { id: "front-desk", label: "Front-desk answering — phone and text answered for the business" },
-  { id: "quotes-invoices", label: "Quotes and invoices" },
-  { id: "client-handling", label: "Client handling" },
-  { id: "multiple-accounts", label: "More than one account" },
-  { id: "team", label: "Team features" },
+  { id: "front-desk", label: "Inbox, calendar and files, worked in chat — read for you, drafted for your tap" },
+  { id: "quotes-invoices", label: "Switchboard email to contacts who have approved you" },
+  { id: "client-handling", label: "Proactive checks and reminders — what needs a decision, brought to you" },
+  { id: "multiple-accounts", label: "More than one email account" },
+  { id: "team", label: "A helper who knows your business — your profile and notes, in every chat" },
 ];
 
 export const BUSINESS_LAUNCH_SLUGS = ["supernova", "satellite"] as const;
