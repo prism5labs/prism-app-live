@@ -473,7 +473,7 @@ async function sendPushToSubscription(
 // The face that goes with a Prism push: Prism's own portrait, same-origin
 // so the phone can fetch it. Absolute when APP_URL is set, else the
 // root-relative path (the service worker resolves it against the origin).
-const PRISM_PUSH_IMAGE_PATH = "/photons/Prism.webp";
+const PRISM_PUSH_IMAGE_PATH = "/supernovas/Prism.webp";
 function pushImageUrl(path: string): string {
   const base = (config.appUrl || "").replace(/\/$/, "");
   return base ? `${base}${path}` : path;

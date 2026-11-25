@@ -565,9 +565,9 @@ function stateFor(accountId: string) {
     accountId,
     displayName,
     customName: a.custom_name,
-    ownedPhotons: owned.photons,
+    ownedSupernovas: owned.photons,
     ownedProducts: owned.products,
-    ownedAtoms: owned.atoms,
+    ownedNovas: owned.atoms,
     // Nova feature sets (Nov 19, 2026): personal open with a Nova (or a
     // business Launch, or the free code); business open only with a
     // business Launch (or the free code). The client shows locked sets
@@ -595,7 +595,7 @@ function stateFor(accountId: string) {
     perk: getPerk(accountId),
     backstories: getBackstories(accountId, ownerName, a.created_at),
     customizations: getCustomizations(accountId),
-    photons: PHOTONS.map((p) => ({
+    supernovas: PHOTONS.map((p) => ({
       name: p.name,
       pronoun: p.pronoun,
       tagline: p.tagline,
@@ -742,7 +742,7 @@ async function handleApi(req: Request, path: string): Promise<Response> {
       upkeep: UPKEEP,
       nova: NOVA,
       personalUpkeep: PERSONAL_UPKEEP,
-      atoms: ATOMS.map((a) => ({
+      novas: ATOMS.map((a) => ({
         name: a.name,
         pronoun: a.pronoun,
         tagline: a.tagline,
@@ -750,7 +750,7 @@ async function handleApi(req: Request, path: string): Promise<Response> {
       })),
       categories: CATEGORIES,
       products: PRODUCTS,
-      photonNames: PHOTON_NAMES,
+      supernovaNames: PHOTON_NAMES,
     });
   }
 

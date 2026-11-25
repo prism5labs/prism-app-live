@@ -1,9 +1,9 @@
 // Logo and portrait helpers. The logo is the Triangle/Pyramid mark
 // (confirmed Nov 13, with the extra line that makes it read as a pyramid).
-// Photon portraits live at public/photons/<Name>.webp (the twelve 1950s
+// Supernova portraits live at public/supernovas/<Name>.webp (the twelve 1950s
 // superhero portraits; Prism is the 1950s superhero picture from the Labs
 // website, swapped in Nov 15, 2026, replacing the teal crystalline figure).
-// The tile below is only a fallback for a Photon with no portrait file yet.
+// The tile below is only a fallback for a Supernova with no portrait file yet.
 
 export const TRIANGLE_SVG = `<svg viewBox="0 0 100 100" aria-hidden="true"><path d="M50 12 L92 88 L8 88 Z" fill="none" stroke="currentColor" stroke-width="7" stroke-linejoin="round"/><path d="M28 62 L72 62" stroke="currentColor" stroke-width="6" stroke-linecap="round"/><circle cx="50" cy="78" r="5" fill="currentColor"/></svg>`;
 
@@ -45,15 +45,15 @@ export function portraitHtml(name: string, size: number): string {
   // Inline version for template strings; the img falls back via the
   // global handler below (window.__photonImgErr).
   const enc = encodeURIComponent(name);
-  return `<span class="portrait" style="width:${size}px;height:${size}px"><img src="/photons/thumbs/${enc}.webp" data-full="/photons/${enc}.webp" alt="${name} portrait" width="${size}" height="${size}" loading="lazy" decoding="async" onerror="window.__photonImgErr(this,'${name}')"></span>`;
+  return `<span class="portrait" style="width:${size}px;height:${size}px"><img src="/supernovas/thumbs/${enc}.webp" data-full="/supernovas/${enc}.webp" alt="${name} portrait" width="${size}" height="${size}" loading="lazy" decoding="async" onerror="window.__photonImgErr(this,'${name}')"></span>`;
 }
 
-// Atoms live at public/atoms/<Name>.webp (the twelve 1950s pulp-poster
-// portraits, Nov 19, 2026), with thumbnails alongside like the Photons.
-// Same fallback chain as the Photons.
+// Novas live at public/novas/<Name>.webp (the twelve 1950s pulp-poster
+// portraits, Nov 19, 2026), with thumbnails alongside like the Supernovas.
+// Same fallback chain as the Supernovas.
 export function atomPortraitHtml(name: string, size: number): string {
   const enc = encodeURIComponent(name);
-  return `<span class="portrait" style="width:${size}px;height:${size}px"><img src="/atoms/thumbs/${enc}.webp" data-full="/atoms/${enc}.webp" alt="${name} portrait" width="${size}" height="${size}" loading="lazy" decoding="async" onerror="window.__photonImgErr(this,'${name}')"></span>`;
+  return `<span class="portrait" style="width:${size}px;height:${size}px"><img src="/novas/thumbs/${enc}.webp" data-full="/novas/${enc}.webp" alt="${name} portrait" width="${size}" height="${size}" loading="lazy" decoding="async" onerror="window.__photonImgErr(this,'${name}')"></span>`;
 }
 
 declare global {

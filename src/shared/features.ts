@@ -2,7 +2,7 @@
 // server and the client never disagree.
 //
 // A Nova is the personal helper: it opens the PERSONAL set, the things
-// that keep one person's own day in order. The BUSINESS set — a Photon
+// that keep one person's own day in order. The BUSINESS set — a Supernova
 // working in chat with the business's inbox, calendar and files,
 // Switchboard email to approved contacts, proactive checks and
 // reminders, more than one account, and a helper who knows the
@@ -47,8 +47,8 @@ export function hasPersonalAccess(
   ownedAtoms: string[] = [],
 ): boolean {
   if (freeCode) return true;
-  // Owning any Atom opens the personal set too: an Atom IS a Nova, the
-  // same way a Photon is a Supernova, and it is bought on a Nova link.
+  // Owning any named Nova opens the personal set too: each named personal helper IS a Nova,
+  // the same way each named business helper is a Supernova, and it is bought on a Nova link.
   if (ownedAtoms.length > 0) return true;
   return (
     ownedProducts.includes(NOVA_SLUG) ||
@@ -56,7 +56,7 @@ export function hasPersonalAccess(
   );
 }
 
-/** Personal access: a Nova, an Atom, a business Launch (which includes the
+/** Personal access: a Nova (any of the twelve named Novas), a business Launch (which includes the
  *  personal set), or the free code. */
 export function featureAccess(
   ownedProducts: string[],

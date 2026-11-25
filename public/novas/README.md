@@ -1,6 +1,6 @@
-# Atom portraits
+# Nova portraits
 
-Drop a real portrait WebP here, one per Atom, named exactly:
+Drop a real portrait WebP here, one per Nova, named exactly:
 
 - `Mabel.webp`, `Hazel.webp`, `Willa.webp`, `Ruby.webp`, `Jude.webp`,
   `Sadie.webp`, `Bea.webp`, `Flora.webp`, `Pierce.webp`, `Iris.webp`,
@@ -13,7 +13,7 @@ lightweight pass replaced them with 800px WebPs of ~120 KB. The
 originals live in the Labs art archive.)
 
 All twelve are in place (Nov 19, 2026): 1950s pulp-poster portraits in
-the same family as the Photon portraits — faceted deep-teal armor with
+the same family as the Supernova portraits — faceted deep-teal armor with
 chrome trim and red piping, young faces with fifties hair, each keeping
 its role's costume, emblem, and prop, with gold rank bars and serial
 N-01..N-12 — Mabel (letters and red pencil), Hazel (pocket diary),

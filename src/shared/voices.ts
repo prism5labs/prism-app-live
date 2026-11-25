@@ -119,7 +119,7 @@ export function tuningStyle(tuning: Tuning): string {
 }
 
 // Step 3 — cosmetic sets. The portrait is picked from the canonical
-// Photon portraits; the set is the colors and style the owner chose.
+// Supernova portraits; the set is the colors and style the owner chose.
 export type LookSet = { id: string; name: string; blurb: string };
 
 export const LOOK_SETS: LookSet[] = [

@@ -1,6 +1,6 @@
-// A Photon's backstory: a short piece of fiction about how they began,
+// A Supernova's backstory: a short piece of fiction about how they began,
 // given to the owner when they create an account, so their helper feels
-// like theirs and not a generic greeting. One per Photon. {owner} is the
+// like theirs and not a generic greeting. One per Supernova. {owner} is the
 // owner's name and {date} is the day the account was created, filled in
 // when the story is shown, so a rename still reads right. The stories are
 // fixed text, not generated on the fly: they are the same every time, they
@@ -48,13 +48,13 @@ export function renderBackstory(template: string, ownerName: string, sinceIso: s
   return template.replaceAll("{owner}", ownerName).replaceAll("{date}", date);
 }
 
-// An Atom's backstory, the same welcome material as a Photon's: a short
+// A Nova's backstory, the same welcome material as a Supernova's: a short
 // piece of fiction about how they began, given to the owner when they
-// create an account. One per Atom. Same rules as the Photon stories —
+// create an account. One per Nova. Same rules as the Supernova stories —
 // {owner} and {date} filled in when shown, fixed text, display only,
 // never read into a chat system prompt as instructions. Their stories
 // are read on their character cards and as the intro of an empty chat
-// thread, the same welcome in both places an Atom can be met.
+// thread, the same welcome in both places a Nova can be met.
 export const ATOM_BACKSTORIES: Record<string, string> = {
   Mabel:
     "Mabel learned her trade at a letters desk in a post office that still answered every letter by hand. She read each one twice, answered it in the sender's own words, and never once mixed up whose news was whose. The red pencil was for the mistakes, and there were not many. She has kept inboxes honest ever since, and since {date} she has kept {owner}'s — every message read and answered in its turn, every reply sounding like the person who sent it.",

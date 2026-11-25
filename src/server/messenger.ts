@@ -59,7 +59,7 @@ export function messengerConfigured(): boolean {
 
 // Personal Messenger, in plain words, wherever a status answer goes.
 export const PERSONAL_MESSENGER_NOTE =
-  "Personal Messenger has no supported API: Meta offers messaging for Facebook Pages (business pages) only, so a personal Messenger account cannot be connected by this module. For personal threads, paste the messages into chat and the Photon will read them there.";
+  "Personal Messenger has no supported API: Meta offers messaging for Facebook Pages (business pages) only, so a personal Messenger account cannot be connected by this module. For personal threads, paste the messages into chat and your Supernova will read them there.";
 
 export type MessengerStatus = {
   ok: boolean;

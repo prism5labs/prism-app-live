@@ -43,6 +43,22 @@ function faceNameOf(p: any): string {
   return customFor(p.name).faceName || p.name;
 }
 
+// Display labels (Nov 25, 2026): an assistant is presented as its tier
+// word plus its name — "Supernova Prism", "Nova Mabel". An owner's own
+// chosen name for their Supernova stands alone, as they gave it.
+function superLabel(p: any): string {
+  return customFor(p.name).faceName || "Supernova " + p.name;
+}
+function novaLabel(a: any): string {
+  return "Nova " + a.name;
+}
+function labelForName(name: string): string {
+  const p = PHOTONS.find((x) => x.name === name);
+  if (p) return superLabel(p);
+  if (ATOMS.some((x) => x.name === name)) return "Nova " + name;
+  return name;
+}
+
 function portraitNameOf(p: any): string {
   return customFor(p.name).portrait || p.name;
 }
@@ -102,7 +118,7 @@ function setSide(s: Side): void {
 let storeVariant: "personal" | "business" = sideOrDefault();
 // Which Store sections are open. Remembered across re-renders, so the
 // Personal/Business toggle doesn't collapse what the user opened.
-let storeOpen: Record<string, boolean> = { photons: true, atoms: true, sparks: false, plugs: false };
+let storeOpen: Record<string, boolean> = { supernovas: true, novas: true, sparks: false, plugs: false };
 let threadMessages: any[] = [];
 let threadLoading = false;
 let pinnedFaces: string[] = [];
@@ -375,12 +391,12 @@ function cardStats(rows: [string, string][]): string {
 }
 
 function photonCardHtml(p: (typeof PHOTONS)[number]): string {
-  const owned = state?.freeCode === true || (state?.ownedPhotons || []).includes(p.name);
-  const face = faceNameOf(p);
+  const owned = state?.freeCode === true || (state?.ownedSupernovas || []).includes(p.name);
+  const face = superLabel(p);
   const body = `
     <div class="card-hero">${portraitHtml(portraitNameOf(p), 140)}</div>
     <h2 class="card-title">${esc(face)}</h2>
-    <p class="card-kind">Photon · Supernova · ${esc(p.pronoun)}</p>
+    <p class="card-kind">Supernova · ${esc(p.pronoun)}</p>
     <p class="card-tagline">${esc(p.tagline)}</p>
     <p><b>What ${esc(face)} does out of the box:</b> ${esc(p.focus)}</p>
     <p class="card-intro">“${esc(p.intro.replaceAll("{name}", face))}”</p>
@@ -392,9 +408,9 @@ function photonCardHtml(p: (typeof PHOTONS)[number]): string {
       ["Build time", "About 300 hours, about 37 working days"],
       ["Chats", "300 chats a month, free forever — no subscription needed"],
     ])}
-    <p class="fine">A Supernova is unlimited in usefulness: each Photon has a focus out of the box but does far more, and becomes you through use.</p>
+    <p class="fine">A Supernova is unlimited in usefulness: each Supernova has a focus out of the box but does far more, and becomes you through use.</p>
     <div class="card-actions">
-      ${owned ? `<span class="owned-badge">Owned — yours already</span><button class="btn primary" data-action="card-chat" data-photon="${esc(p.name)}">Start chatting</button>` : buyButton(buyUrl(SUPERNOVA.url, "Photon-" + p.name), "$514.00", false)}
+      ${owned ? `<span class="owned-badge">Owned — yours already</span><button class="btn primary" data-action="card-chat" data-photon="${esc(p.name)}">Start chatting</button>` : buyButton(buyUrl(SUPERNOVA.url, "Supernova-" + p.name), "$514.00", false)}
     </div>`;
   return cardShell(face, body);
 }
@@ -508,7 +524,7 @@ function atomCardHtml(a: (typeof ATOMS)[number]): string {
   // owners count as owning each Atom here too.
   const owned =
     state?.freeCode === true ||
-    (state?.ownedAtoms || []).includes(a.name) ||
+    (state?.ownedNovas || []).includes(a.name) ||
     (state?.ownedProducts || []).includes("nova");
   // An Atom's backstory, from the day the owner's account was created —
   // the same welcome material as a Photon's. Empty for accounts that
@@ -517,12 +533,12 @@ function atomCardHtml(a: (typeof ATOMS)[number]): string {
   const story = (state as any)?.backstories?.[a.name] || "";
   const body = `
     <div class="card-hero">${atomPortraitHtml(a.name, 140)}</div>
-    <h2 class="card-title">${esc(a.name)}</h2>
-    <p class="card-kind">Atom · Nova · ${esc(a.pronoun)}</p>
+    <h2 class="card-title">${esc(novaLabel(a))}</h2>
+    <p class="card-kind">Nova · ${esc(a.pronoun)}</p>
     <p class="card-tagline">${esc(a.tagline)}</p>
-    <p><b>What ${esc(a.name)} does out of the box:</b> ${esc(a.focus)}</p>
-    <p class="card-intro">“${esc(a.intro.replaceAll("{name}", a.name))}”</p>
-    ${story ? `<p><b>How ${esc(a.name)} began:</b> ${esc(story)}</p>` : ""}
+    <p><b>What ${esc(novaLabel(a))} does out of the box:</b> ${esc(a.focus)}</p>
+    <p class="card-intro">“${esc(a.intro.replaceAll("{name}", novaLabel(a)))}”</p>
+    ${story ? `<p><b>How ${esc(novaLabel(a))} began:</b> ${esc(story)}</p>` : ""}
     ${cardStats([
       ["Price", "$79.00 ($81.37 at checkout)"],
       ["Or monthly", "$10/mo ($10.30 at checkout)"],
@@ -530,9 +546,9 @@ function atomCardHtml(a: (typeof ATOMS)[number]): string {
     ])}
     <p class="fine">A Nova is for your own day, not a business: your inbox, with replies drafted in your words, your calendar and reminders, a morning briefing, and gentle check-ins.</p>
     <div class="card-actions">
-      ${owned ? `<span class="owned-badge">Owned — yours already</span><button class="btn primary" data-action="card-chat-atom" data-atom="${esc(a.name)}">Start chatting</button>` : buyButton(buyUrl(NOVA.url, "Atom-" + a.name), "$81.37", false)}
+      ${owned ? `<span class="owned-badge">Owned — yours already</span><button class="btn primary" data-action="card-chat-atom" data-atom="${esc(a.name)}">Start chatting</button>` : buyButton(buyUrl(NOVA.url, "Nova-" + a.name), "$81.37", false)}
     </div>`;
-  return cardShell(a.name, body);
+  return cardShell(novaLabel(a), body);
 }
 
 function openAtomCard(name: string, opener: HTMLElement | null) {
@@ -874,7 +890,7 @@ function photonCard(p: any, size = 150): string {
     owned ? "" : "disabled"
   }>
     ${portraitHtml(portraitNameOf(p), size)}
-    <span class="photon-name">${esc(faceNameOf(p))}</span>
+    <span class="photon-name">${esc(superLabel(p))}</span>
   </button>`;
 }
 
@@ -883,7 +899,7 @@ function photonCard(p: any, size = 150): string {
 function atomCard(a: (typeof ATOMS)[number], size = 150): string {
   return `<button class="photon-card" data-action="open-atom" data-atom="${esc(a.name)}">
     ${atomPortraitHtml(a.name, size)}
-    <span class="photon-name">${esc(a.name)}</span>
+    <span class="photon-name">${esc(novaLabel(a))}</span>
   </button>`;
 }
 
@@ -1242,18 +1258,18 @@ function renderChatFront(): string {
   // the Nova product (which opens every Atom), or the free code.
   const ownsEveryAtom =
     state?.freeCode === true || (state?.ownedProducts || []).includes("nova");
-  const ownedAtoms = ATOMS.filter(
-    (a) => ownsEveryAtom || (state?.ownedAtoms || []).includes(a.name),
+  const ownedNovas = ATOMS.filter(
+    (a) => ownsEveryAtom || (state?.ownedNovas || []).includes(a.name),
   );
   const ownedHtml =
-    owned.length > 0 || ownedAtoms.length > 0
+    owned.length > 0 || ownedNovas.length > 0
       ? [
           owned.length > 0
-            ? `<h2 class="front-strip-label">Your Photons</h2>` +
-              machineHtml("front-photons", {
+            ? `<h2 class="front-strip-label">Your Supernovas</h2>` +
+              machineHtml("front-supernovas", {
                 title: "SUPERNOVAS",
                 priceLine: "",
-                listLabel: `See all ${owned.length} of your Photons`,
+                listLabel: `See all ${owned.length} of your Supernovas`,
                 dispenseAction: "machine-dispense-chat",
                 kind: "photon",
                 items: owned.map((p: any, i: number) => ({
@@ -1266,15 +1282,15 @@ function renderChatFront(): string {
                 })),
               })
             : "",
-          ownedAtoms.length > 0
-            ? `<h2 class="front-strip-label">Your Atoms</h2>` +
-              machineHtml("front-atoms", {
+          ownedNovas.length > 0
+            ? `<h2 class="front-strip-label">Your Novas</h2>` +
+              machineHtml("front-novas", {
                 title: "NOVAS",
                 priceLine: "",
-                listLabel: `See all ${ownedAtoms.length} of your Atoms`,
+                listLabel: `See all ${ownedNovas.length} of your Novas`,
                 dispenseAction: "machine-dispense-chat",
                 kind: "atom",
-                items: ownedAtoms.map((a, i: number) => ({
+                items: ownedNovas.map((a, i: number) => ({
                   code: machineCode(i),
                   name: a.name,
                   openName: a.name,
@@ -1290,7 +1306,7 @@ function renderChatFront(): string {
           <button class="btn store-outline store-btn" data-action="goto" data-tab="store">Browse the Store</button>
         </div>`;
   const ownedPhotonNames = new Set(owned.map((p: any) => p.name));
-  const ownedAtomNames = new Set(ownedAtoms.map((a) => a.name));
+  const ownedAtomNames = new Set(ownedNovas.map((a) => a.name));
   const pinnedOwned = pinnedFaces.filter(
     (name) => ownedPhotonNames.has(name) || ownedAtomNames.has(name),
   );
@@ -1299,7 +1315,7 @@ function renderChatFront(): string {
       pinnedOwned
         .map((name) => {
           const photonObj = owned.find((p: any) => p.name === name);
-          const label = photonObj ? faceNameOf(photonObj) : name;
+          const label = labelForName(name);
           return photonObj
             ? `<button class="btn pinned-row" data-action="open-photon" data-photon="${esc(name)}">${esc(label)}</button>`
             : `<button class="btn pinned-row" data-action="open-atom" data-atom="${esc(name)}">${esc(label)}</button>`;
@@ -1314,7 +1330,7 @@ function renderChatFront(): string {
         ? `<p class="fine">No conversations found for &ldquo;${esc(conversationSearchQuery)}&rdquo;.</p>`
         : conversationSearchResults
             .map(
-              (r: any) => `<button class="inbox-msg" data-action="search-open-thread" data-photon="${esc(String(r.photon || ""))}"><span class="inbox-subject">${esc(String(r.photon || ""))}</span><span class="inbox-snippet">${esc(String(r.snippet || ""))}</span><span class="inbox-meta">${esc(r.role === "user" ? "You" : String(r.photon || ""))} · ${esc(fmtWhen(String(r.created_at || "")))}</span></button>`,
+              (r: any) => `<button class="inbox-msg" data-action="search-open-thread" data-photon="${esc(String(r.photon || ""))}"><span class="inbox-subject">${esc(labelForName(String(r.photon || "")))}</span><span class="inbox-snippet">${esc(String(r.snippet || ""))}</span><span class="inbox-meta">${esc(r.role === "user" ? "You" : labelForName(String(r.photon || "")))} · ${esc(fmtWhen(String(r.created_at || "")))}</span></button>`,
             )
             .join("");
   const searchHtml = `
@@ -1352,7 +1368,7 @@ function backstoryBlock(photon: string): string {
   const portrait = p
     ? portraitHtml(portraitNameOf(p), 28)
     : atomPortraitHtml(photon, 28);
-  return `<div class="msg bot">${portrait}<div><p><b>How ${esc(photon)} began.</b></p><p>${esc(story)}</p></div></div>`;
+  return `<div class="msg bot">${portrait}<div><p><b>How ${esc(labelForName(photon))} began.</b></p><p>${esc(story)}</p></div></div>`;
 }
 
 // ---------- Chat thread ----------
@@ -1367,7 +1383,7 @@ function renderChatThread(): string {
   const p: any = photon || atom;
   if (!p) return renderChatFront();
   const isAtom = !!atom;
-  const face = isAtom ? p.name : faceNameOf(p);
+  const face = isAtom ? novaLabel(p) : superLabel(p);
   const portrait = isAtom ? p.name : portraitNameOf(p);
   const portraitImg = (size: number) =>
     isAtom ? atomPortraitHtml(portrait, size) : portraitHtml(portrait, size);
@@ -1395,7 +1411,7 @@ function renderChatThread(): string {
   return `
   <section class="thread${look ? ` look-${look.id}` : ""}">
     <div class="thread-head">
-      <button class="back-btn" data-action="back-to-front">← <span>${isAtom ? "Back" : "All Photons"}</span></button>
+      <button class="back-btn" data-action="back-to-front">← <span>${isAtom ? "Back" : "All Supernovas"}</span></button>
       <div class="thread-title">
         <h2>${esc(face)}</h2>
         <span class="thread-tag">${esc(p.tagline)}</span>
@@ -1456,7 +1472,7 @@ function renderCustomName(p: any, c: Customization): string {
   return `
   <div class="card">
     <h3>Step 1 — One name for your Face</h3>
-    <p>One name, like the install. It replaces "${esc(p.name)}" in chat for this Photon only.</p>
+    <p>One name, like the install. It replaces "${esc(p.name)}" in chat for this Supernova only.</p>
     <form id="custom-name-form" class="row">
       <input id="custom-name-input" type="text" maxlength="40" placeholder="${esc(p.name)}" value="${esc(c.faceName || "")}" aria-label="Face name">
       <button class="btn primary" type="submit">Save name &amp; continue</button>
@@ -1554,7 +1570,7 @@ function renderCustomize(): string {
     .join("");
   return `
   <section class="customize">
-    <button class="back-btn" data-action="custom-back">← ${c.done ? "Back to chat" : "All Photons"}</button>
+    <button class="back-btn" data-action="custom-back">← ${c.done ? "Back to chat" : "All Supernovas"}</button>
     <h2 class="page-title">Make ${esc(face)} yours</h2>
     <p class="page-lede">Three quick steps, like the install. Skip any of them. Nothing here blocks chatting, and you can come back and change all of this later.</p>
     <div class="custom-steps">${tabs}</div>
@@ -1970,7 +1986,7 @@ function renderSwitchboardContacts(): string {
     s === "approved" ? "Approved — can send" : s === "declined" ? "Declined" : "Waiting for approval";
   const row = (c: any) =>
     `<div class="inbox-msg"><p class="inbox-subject">${esc(c.name || c.address)}</p><p class="inbox-meta">${esc(c.address)}${c.phone ? ` · ${esc(c.phone)}` : ""} · ${esc(c.photon)} · ${statusWord(c.status)}</p><p class="inbox-meta">Channels: ${esc(channelsFor(c))}</p></div>`;
-  const owned = (state?.ownedPhotons || []) as string[];
+  const owned = (state?.ownedSupernovas || []) as string[];
   const photonOpts = (owned.length ? owned : ["Prism"])
     .map((n: string) => `<option value="${esc(n)}">${esc(n)}</option>`)
     .join("");
@@ -1981,15 +1997,15 @@ function renderSwitchboardContacts(): string {
     .join("");
   return `<div class="card" id="contacts">
     <h3>Contacts — address book</h3>
-    <p class="fine">Switchboard is email and texts. A Photon can only send to a contact who approved the connection first, like a friend request. Names come from this book only — an unknown number stays an unknown number, never a guessed name.</p>
-    ${prism ? row(prism) : `<p class="fine">Prism 5 (prism5labstest@gmail.com) — no connection yet. Ask a Photon to write a report, then tap Report to Prism 5 in chat.</p>`}
+    <p class="fine">Switchboard is email and texts. A Supernova can only send to a contact who approved the connection first, like a friend request. Names come from this book only — an unknown number stays an unknown number, never a guessed name.</p>
+    ${prism ? row(prism) : `<p class="fine">Prism 5 (prism5labstest@gmail.com) — no connection yet. Ask a Supernova to write a report, then tap Report to Prism 5 in chat.</p>`}
     ${others.map(row).join("") || `<p class="fine">No other contacts yet.</p>`}
     <form class="contact-form">
       <h4>Add someone by hand</h4>
       <input name="name" type="text" placeholder="Name" required>
       <input name="address" type="email" placeholder="Email address" required>
       <input name="phone" type="tel" placeholder="Phone (optional — needed for texts)">
-      <select name="photon" aria-label="Photon">${photonOpts}</select>
+      <select name="photon" aria-label="Supernova">${photonOpts}</select>
       <button class="btn primary" type="submit">Send connection request</button>
     </form>
     <div class="import-box">
@@ -2193,7 +2209,7 @@ function renderMessenger(): string {
   const s = messengerStatusData as any;
   const threads = (messengerThreadsData || []) as any[];
   const pages = (messengerPagesData || []) as any[];
-  const personal = `<p class="fine">Personal Messenger can't be connected — Meta offers messaging for Facebook Pages only, not personal accounts. For a personal thread, paste the messages into chat and your Photon will read them there.</p>`;
+  const personal = `<p class="fine">Personal Messenger can't be connected — Meta offers messaging for Facebook Pages only, not personal accounts. For a personal thread, paste the messages into chat and your Supernova will read them there.</p>`;
   const connectForm = `<form id="page-connect-form" class="page-connect-form">
         <h4>Connect your Facebook Page</h4>
         <p class="fine">Paste a Page access token from Meta's developer console (your Page's settings, under Messenger). It is tested before it is stored, it is kept on the server like your Gmail sign-in, and it is never shown back to you.</p>
@@ -2704,10 +2720,10 @@ function renderConnected(): string {
 function renderProfile(): string {
   const p = profileData || {};
   const saved = profileSaved
-    ? `<p class="fine">Saved. Your Photons know you now.</p>`
+    ? `<p class="fine">Saved. Your Supernovas know you now.</p>`
     : "";
   return `<div class="card" id="about-you"><h3>About you</h3>
-    <p class="fine">Tell your Photons who you are, so they know you instead of starting cold. This stays on the server for your account only. It is never shared with anyone else.</p>
+    <p class="fine">Tell your Supernovas who you are, so they know you instead of starting cold. This stays on the server for your account only. It is never shared with anyone else.</p>
     <form id="profile-form" class="profile-form">
       <label class="field-label">What should they call you?
         <input name="displayName" type="text" placeholder="Your name" value="${esc(p.displayName || "")}" maxlength="80">
@@ -2864,19 +2880,19 @@ function kindGroups(kind: "Spark" | "Plug"): string {
 
 function renderStore(): string {
   const ownedProducts: string[] = state?.ownedProducts || [];
-  const ownedPhotons: string[] = state?.ownedPhotons || [];
-  const ownedAtoms: string[] = state?.ownedAtoms || [];
+  const ownedSupernovas: string[] = state?.ownedSupernovas || [];
+  const ownedNovas: string[] = state?.ownedNovas || [];
   const allOwned = state?.freeCode === true;
   const variant = storeVariant;
   const photonCards = PHOTONS.map((p) => {
-    const owned = allOwned || ownedPhotons.includes(p.name);
+    const owned = allOwned || ownedSupernovas.includes(p.name);
     return `<div class="card product-card photon-store">
-      <button class="portrait-btn" data-action="photon-info" data-photon="${esc(p.name)}" aria-label="More about ${esc(p.name)}">${portraitHtml(p.name, 220)}</button>
-      <h3 class="photon-name">${esc(p.name)}</h3>
+      <button class="portrait-btn" data-action="photon-info" data-photon="${esc(p.name)}" aria-label="More about ${esc(superLabel(p))}">${portraitHtml(p.name, 220)}</button>
+      <h3 class="photon-name">${esc(superLabel(p))}</h3>
       <p>${esc(p.tagline)}</p>
       <p class="fine">${esc(p.focus)} And so much more.</p>
       <p class="price">$499.00 <span class="fine">($514.00 at checkout)</span></p>
-      ${buyButton(buyUrl(SUPERNOVA.url, "Photon-" + p.name), "$514.00", owned)}
+      ${buyButton(buyUrl(SUPERNOVA.url, "Supernova-" + p.name), "$514.00", owned)}
     </div>`;
   });
 
@@ -2906,14 +2922,14 @@ function renderStore(): string {
   // never changes which sections show.
   const isPersonal = sideOrDefault() === "personal";
   const atomCards = ATOMS.map((a) => {
-    const owned = allOwned || ownedAtoms.includes(a.name);
+    const owned = allOwned || ownedNovas.includes(a.name);
     return `<div class="card product-card photon-store">
-      <button class="portrait-btn" data-action="atom-info" data-atom="${esc(a.name)}" aria-label="More about ${esc(a.name)}">${atomPortraitHtml(a.name, 220)}</button>
-      <h3 class="photon-name">${esc(a.name)}</h3>
+      <button class="portrait-btn" data-action="atom-info" data-atom="${esc(a.name)}" aria-label="More about ${esc(novaLabel(a))}">${atomPortraitHtml(a.name, 220)}</button>
+      <h3 class="photon-name">${esc(novaLabel(a))}</h3>
       <p>${esc(a.tagline)}</p>
       <p class="fine">${esc(a.focus)} And so much more.</p>
       <p class="price">$79.00 <span class="fine">($81.37 at checkout)</span></p>
-      ${buyButton(buyUrl(NOVA.url, "Atom-" + a.name), "$81.37", owned)}
+      ${buyButton(buyUrl(NOVA.url, "Nova-" + a.name), "$81.37", owned)}
     </div>`;
   });
   const supernovaRow = `    <div class="poster-row" id="store-supernova"><button class="poster-btn" data-action="tier-info" data-tier="supernova" aria-label="More about Supernova"><img src="/brand/poster-supernova.jpg" alt="Supernova poster loading="lazy" decoding="async", the whole front office"></button><div class="pr-txt"><b>Supernova</b><span class="desc">${esc(TIER_COPY.supernova.body)}</span><span class="desc">${esc(TIER_COPY.supernova.hours)}</span><span class="price">$499.00</span><span class="at">$514.00 at checkout</span>${buyButton(buyUrl(SUPERNOVA.url, "supernova"), "$514.00", allOwned || ownedProducts.includes("supernova"))}<p class="fine">Or pay monthly:</p><div class="row monthly-row">
@@ -2936,7 +2952,7 @@ function renderStore(): string {
     openName: p.name,
     role: p.tagline,
     price: "$499 one-time",
-    pack: `<button class="machine-pack-btn" data-action="machine-goto" data-machine="store-photons" data-index="${i}" aria-label="Show ${esc(p.name)}">${portraitHtml(p.name, 84)}<span class="pack-name">${esc(p.name)}</span></button>`,
+    pack: `<button class="machine-pack-btn" data-action="machine-goto" data-machine="store-supernovas" data-index="${i}" aria-label="Show ${esc(p.name)}">${portraitHtml(p.name, 84)}<span class="pack-name">${esc(p.name)}</span></button>`,
     bay: photonCards[i],
   }));
   const atomItems = ATOMS.map((a, i) => ({
@@ -2945,18 +2961,18 @@ function renderStore(): string {
     openName: a.name,
     role: a.tagline,
     price: "$79 · or $10/mo",
-    pack: `<button class="machine-pack-btn" data-action="machine-goto" data-machine="store-atoms" data-index="${i}" aria-label="Show ${esc(a.name)}">${atomPortraitHtml(a.name, 84)}<span class="pack-name">${esc(a.name)}</span></button>`,
+    pack: `<button class="machine-pack-btn" data-action="machine-goto" data-machine="store-novas" data-index="${i}" aria-label="Show ${esc(a.name)}">${atomPortraitHtml(a.name, 84)}<span class="pack-name">${esc(a.name)}</span></button>`,
     bay: atomCards[i],
   }));
-  const photonsGroup = `    <details class="store-group" id="store-photons" ${storeOpen.photons ? "open" : ""}>
-      <summary><span class="summary-title">Meet the Photons</span><span class="fine">12 Supernovas · tap to hide</span></summary>
-      <p class="page-lede">Each Photon is a Supernova on its own. Buy one and it drops into your app, ready to talk. Spin the drum to the one you want, then press DISPENSE — it drops into the tray below, ready to buy.</p>
-      ${machineHtml("store-photons", { title: "SUPERNOVAS", priceLine: "$499 one-time", listLabel: "See all 12 Photons", dispenseAction: "machine-dispense", kind: "photon", items: photonItems })}
+  const photonsGroup = `    <details class="store-group" id="store-supernovas" ${storeOpen.supernovas ? "open" : ""}>
+      <summary><span class="summary-title">Meet the Supernovas</span><span class="fine">12 Supernovas · tap to hide</span></summary>
+      <p class="page-lede">Each of the twelve is a Supernova on its own. Buy one and it drops into your app, ready to talk. Spin the drum to the one you want, then press DISPENSE — it drops into the tray below, ready to buy.</p>
+      ${machineHtml("store-supernovas", { title: "SUPERNOVAS", priceLine: "$499 one-time", listLabel: "See all 12 Supernovas", dispenseAction: "machine-dispense", kind: "photon", items: photonItems })}
     </details>`;
-  const atomsGroup = `<details class="store-group" id="store-atoms" ${storeOpen.atoms ? "open" : ""}>
-      <summary><span class="summary-title">Meet the Atoms</span><span class="fine">12 Novas · tap to hide</span></summary>
-      <p class="page-lede">Each Atom is a Nova on its own. Buy one and it drops into your app, ready to help with your own day. Spin the drum to the one you want, then press DISPENSE — it drops into the tray below, ready to buy.</p>
-      ${machineHtml("store-atoms", { title: "NOVAS", priceLine: "$79 outright · or $10/month", listLabel: "See all 12 Novas", dispenseAction: "machine-dispense", kind: "atom", items: atomItems })}
+  const atomsGroup = `<details class="store-group" id="store-novas" ${storeOpen.novas ? "open" : ""}>
+      <summary><span class="summary-title">Meet the Novas</span><span class="fine">12 Novas · tap to hide</span></summary>
+      <p class="page-lede">Each of the twelve is a Nova on its own. Buy one and it drops into your app, ready to help with your own day. Spin the drum to the one you want, then press DISPENSE — it drops into the tray below, ready to buy.</p>
+      ${machineHtml("store-novas", { title: "NOVAS", priceLine: "$79 outright · or $10/month", listLabel: "See all 12 Novas", dispenseAction: "machine-dispense", kind: "atom", items: atomItems })}
     </details>`;
   const upkeepCard = `    <div class="card upkeep-card" id="store-upkeep"><button class="poster-btn upkeep-poster-btn" data-action="tier-info" data-tier="upkeep" aria-label="More about Upkeep"><img src="/brand/starburst.jpg" alt="" loading="lazy" decoding="async"></button><div><h2>Upkeep</h2><p>${esc(UPKEEP_COPY.body)}</p><p class="price">$29.00/month <span class="fine">($29.87 at checkout)</span></p><div class="row">${buyButton(buyUrl(UPKEEP.url, "upkeep"), "$29.87", state?.upkeep === true)}<button class="btn small more-info" data-action="tier-info" data-tier="upkeep">More info</button></div></div></div>`;
   return `
@@ -2975,7 +2991,7 @@ function renderStore(): string {
     <details class="store-group pricing-explainer" id="store-pricing" ${storeOpen.pricing ? "open" : ""}>
       <summary><span class="summary-title">Understand our pricing</span><span class="fine">tap to read, in plain words</span></summary>
       <div class="pricing-body">
-        <p><b>First, what are these things?</b> A Launch is what gives this app someone to talk to. With no Launch, there is no one to talk to. Each Launch is called a Photon, and each Photon has its own way of helping, like reading your messages with you, checking your calendar, or drafting notes in your words.</p>
+        <p><b>First, what are these things?</b> A Launch is what gives this app someone to talk to. With no Launch, there is no one to talk to. A Launch comes in two kinds: a Supernova for a business, or a Nova for your own day. Each one has its own way of helping, like reading your messages with you, checking your calendar, or drafting notes in your words.</p>
         <p><b>A Spark</b> is one button for one job. You press it, it does that one job, and you can press it again as often as you like. It never runs out and it never dies. <b>A Plug</b> is the same idea, except you do not press anything. It runs on its own, in the background, and does its job without being asked.</p>
         <p><b>A Supernova</b> is the full helper. It is the whole front office in one: messages, calendar, paperwork, and anything else that comes up, and it learns how you like things done. <b>A Satellite</b> is a smaller version of the same thing, for one job at a time, with one way of talking and one way of looking. <b>Nova</b> is the helper for your own day, not a business: one inbox, with replies drafted in your words, your calendar and reminders, a morning briefing, and gentle check-ins. The business set — inbox, calendar and files worked in chat, Switchboard email to approved contacts, proactive checks and reminders, more than one account, and a helper who knows your business — stays locked on Nova alone, and opens with a Supernova or a Satellite.</p>
         <p><b>Upkeep</b> is the care that keeps your helper working well: unlimited chats, updates as they come out, help first when you need it, and talking out loud instead of typing. Upkeep is never required. Every purchase already includes 300 chats a month, free forever, with no monthly payment needed.</p>
@@ -2988,10 +3004,10 @@ function renderStore(): string {
 
     <div class="store-jump" aria-label="Jump to a section">
       ${isPersonal ? `<a href="#store-nova">Nova</a>
-      <a href="#store-atoms">Atoms</a>
+      <a href="#store-novas">Novas</a>
       <a href="#store-personal-upkeep">Personal Upkeep</a>` : `<a href="#store-supernova">Supernova</a>
       <a href="#store-satellite">Satellite</a>
-      <a href="#store-photons">Photons</a>
+      <a href="#store-supernovas">Supernovas</a>
       <a href="#store-upkeep">Upkeep</a>`}
       <a href="#store-sparks-plugs">Sparks &amp; Plugs</a>
     </div>
@@ -3254,8 +3270,8 @@ function accountCard(): string {
   if (!auth || !auth.signedIn) {
     return `<div class="card">
       <h2>Your account</h2>
-      <p>You are not signed in. Your Photons, chats, and purchases live on this device only right now — sign in with Google and they follow you to any device, and they survive a new phone.</p>
-      <p class="fine">Signing in creates your account, and it comes with two things: a story for your first Photon, and 15% off your first order for 10 days.</p>
+      <p>You are not signed in. Your Supernovas, chats, and purchases live on this device only right now — sign in with Google and they follow you to any device, and they survive a new phone.</p>
+      <p class="fine">Signing in creates your account, and it comes with two things: a story for your first Supernova, and 15% off your first order for 10 days.</p>
       <div class="row"><button class="btn primary" data-action="signin">Sign in with Google</button></div>
       <p class="fine">We see only your name and email. Nothing else from your Google account is read or kept.</p>
     </div>`;
@@ -3265,7 +3281,7 @@ function accountCard(): string {
   return `<div class="card">
     <h2>Your account</h2>
     <p>Signed in as <b>${esc(auth.name || auth.email || "")}</b>${auth.email && auth.name ? ` (${esc(auth.email)})` : ""}.</p>
-    <p class="fine">Account since ${esc(fmtDateOnly(auth.since || ""))}. Your Photons, chats, and purchases follow this account to any device.</p>
+    <p class="fine">Account since ${esc(fmtDateOnly(auth.since || ""))}. Your Supernovas, chats, and purchases follow this account to any device.</p>
     <div class="row"><button class="btn" data-action="signout">Sign out</button></div>
   </div>
   ${perk && perk.active ? `<div class="card perk-card">
@@ -3422,7 +3438,7 @@ function sideCard(): string {
   const current = sideOrDefault();
   return `<div class="card">
     <h2>Business or Personal</h2>
-    <p class="fine">Two doors, one app. Business shows the business Launches and prices; Personal shows Nova, the Atoms, and personal prices. Switch any time — nothing you own changes.</p>
+    <p class="fine">Two doors, one app. Business shows the business Launches and prices; Personal shows Nova and personal prices. Switch any time — nothing you own changes.</p>
     <div class="row" role="group" aria-label="Business or Personal">
       <button class="btn${current === "business" ? " primary" : ""}" data-action="side-pick" data-side="business" aria-pressed="${current === "business" ? "true" : "false"}">For my business</button>
       <button class="btn${current === "personal" ? " primary" : ""}" data-action="side-pick" data-side="personal" aria-pressed="${current === "personal" ? "true" : "false"}">For me, personally</button>
@@ -3431,15 +3447,15 @@ function sideCard(): string {
 }
 
 function renderYou(): string {
-  const ownedPhotons: string[] = state?.ownedPhotons || [];
-  const ownedAtoms: string[] = state?.ownedAtoms || [];
+  const ownedSupernovas: string[] = state?.ownedSupernovas || [];
+  const ownedNovas: string[] = state?.ownedNovas || [];
   const ownedProducts: string[] = state?.ownedProducts || [];
   // Nova and Personal Upkeep have their own card above; the list below
   // is the business Launches and the Sparks and Plugs.
   const listedProducts = ownedProducts.filter((s) => s !== "nova" && s !== "personal-upkeep");
   const ownedList =
-    ownedPhotons.length || ownedAtoms.length || listedProducts.length
-      ? `<ul class="owned-list">${ownedPhotons.map((n) => `<li>${esc(n)} — Photon</li>`).join("")}${ownedAtoms.map((n) => `<li>${esc(n)} — Atom</li>`).join("")}${listedProducts
+    ownedSupernovas.length || ownedNovas.length || listedProducts.length
+      ? `<ul class="owned-list">${ownedSupernovas.map((n) => `<li>Supernova ${esc(n)}</li>`).join("")}${ownedNovas.map((n) => `<li>Nova ${esc(n)}</li>`).join("")}${listedProducts
           .map((s) => `<li>${esc(productDisplayName(s))}</li>`)
           .join("")}</ul>`
       : `<p class="fine">Nothing owned yet.</p>`;
@@ -4105,8 +4121,8 @@ document.addEventListener("click", async (e) => {
     render();
     toast(
       picked === "personal"
-        ? "Personal side — Nova, the Atoms, and personal prices."
-        : "Business side — Supernova, Satellite, the Photons, and business prices.",
+        ? "Personal side — Nova and personal prices."
+        : "Business side — Supernova, Satellite, and business prices.",
     );
   } else if (action === "chooser-skip") {
     // Continue into the app without signing in — and without picking a
@@ -4566,7 +4582,7 @@ document.addEventListener("click", async (e) => {
     const idx = parseInt(t.dataset.idx || "-1", 10);
     const entry = importedContacts[idx];
     if (!entry) return;
-    const owned = (state?.ownedPhotons || []) as string[];
+    const owned = (state?.ownedSupernovas || []) as string[];
     const photon = owned[0] || "Prism";
     const r = await api.requestContact(photon, entry.name, entry.email, entry.phone || undefined);
     if (r && r.ok) {
@@ -4768,7 +4784,7 @@ document.addEventListener("submit", async (e) => {
     if (r && r.ok) {
       profileData = r.profile || profileData;
       profileSaved = true;
-      toast("Saved. Your Photons know you now.");
+      toast("Saved. Your Supernovas know you now.");
       render();
     } else {
       toast(r?.message || "That didn't save. Try again.", "err");

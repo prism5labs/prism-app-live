@@ -63,10 +63,10 @@ export const PERSONAL_UPKEEP = {
   url: "https://buy.stripe.com/bJeaEW8kU9aw8V04nYfQI1f?client_reference_id=personal-upkeep",
 };
 
-// Each Photon is bought individually on the Supernova link, with the Photon
-// named in client_reference_id so fulfillment can tell which one it is.
+// Each Supernova is bought individually on the Supernova link, with the
+// Supernova named in client_reference_id so fulfillment can tell which one it is.
 export function photonBuyUrl(name: string): string {
-  return SUPERNOVA.url + "?client_reference_id=Photon-" + encodeURIComponent(name);
+  return SUPERNOVA.url + "?client_reference_id=Supernova-" + encodeURIComponent(name);
 }
 
 export const CATEGORIES = ["Everyday Life","Communication","Business Operations","Data & Documents"];

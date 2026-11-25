@@ -177,6 +177,14 @@ const PRODUCT_SLUGS = new Set(PRODUCTS.map((p) => p.slug));
  */
 export function unlocksForHint(hint: string | null): UnlockAction[] | null {
   if (!hint) return null;
+  const supernovaMatch = hint.match(/^Supernova-(.+)$/);
+  if (supernovaMatch && PHOTON_NAMES.includes(supernovaMatch[1])) {
+    return [{ kind: "photon", ref: supernovaMatch[1] }];
+  }
+  const novaMatch = hint.match(/^Nova-(.+)$/);
+  if (novaMatch && ATOM_NAMES.includes(novaMatch[1])) {
+    return [{ kind: "atom", ref: novaMatch[1] }];
+  }
   const photonMatch = hint.match(/^Photon-(.+)$/);
   if (photonMatch && PHOTON_NAMES.includes(photonMatch[1])) {
     return [{ kind: "photon", ref: photonMatch[1] }];

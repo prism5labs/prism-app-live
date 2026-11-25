@@ -1,6 +1,6 @@
-# Photon portraits
+# Supernova portraits
 
-Drop a real portrait WebP here, one per Photon, named exactly:
+Drop a real portrait WebP here, one per Supernova, named exactly:
 
 - `Prism.webp`, `Juniper.webp`, `Encore.webp`, `Zero.webp`, `Proof.webp`,
   `Barnstormer.webp`, `Blueprint.webp`, `Calendra.webp`, `Shopbell.webp`,
@@ -24,7 +24,7 @@ serial), Juniper (juniper emblem, wooden box), Encore (mandolin), Zero
 Shopbell (bell and apron, parcel), Keystone (key emblem), Vesper
 (crescent moon and stars), Goldstar (gold star and prize ribbon),
 Barnstormer (aviator). The large 160px hero portrait at the top of
-Photon chat threads uses these same files. The new portraits are
+Supernova chat threads uses these same files. The new portraits are
 1600x1600 PNGs. If a portrait is ever replaced, drop the new file here
 with the same name and redeploy; the service-worker cache version must
 be bumped too, or existing installs will keep serving the cached portrait.

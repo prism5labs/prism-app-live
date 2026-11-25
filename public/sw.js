@@ -15,7 +15,7 @@
 // new main.js, index.html and styles.css instead of serving the cached
 // ones, and clears any older cache entries on activate.
 // CACHE v36: bumped Nov 19, 2026 for Nova at $79 (one-time $79.00 / $81.37
-// at checkout, $10 a month, Personal Upkeep $9 a month), the twelve Atoms
+// at checkout, $10 a month, Personal Upkeep $9 a month), the twelve Novas
 // in the Store and You, and the first-open Business/Personal chooser that
 // replaces the first-run landing. The cache bump makes existing installs
 // fetch the new main.js, index.html and styles.css instead of serving the
@@ -39,7 +39,7 @@
 // ones, and clears any older cache entries on activate.
 // CACHE v33: bumped Nov 19, 2026 for the humor synthesis — the shared HUMOR
 // const in src/server/personas.ts (Leacock / Wodehouse / Wilde mechanics,
-// Jeeves diction NOT adopted) appended to every Photon system prompt, plus
+// Jeeves diction NOT adopted) appended to every Supernova system prompt, plus
 // the staged Jeeves Face draft in src/shared/voices.ts (not a live Face).
 // The cache bump makes existing installs fetch the new main.js and sw.js
 // instead of serving the cached ones, and clears any older cache entries
@@ -138,17 +138,17 @@
 // gold dust instead of vanishing in one frame. The cache bump makes
 // existing installs fetch the new opening-v5.mp4 instead of serving the
 // cached one.
-// CACHE v42: bumped Nov 21, 2026 for Atom chat — owned Atoms open a
-// chat thread in the same view Photons use. The cache bump makes
+// CACHE v42: bumped Nov 21, 2026 for Nova chat — owned Novas open a
+// chat thread in the same view Supernovas use. The cache bump makes
 // existing installs fetch the new main.js instead of serving the
 // cached one.
-// CACHE v43: bumped Nov 21, 2026 for Photon + Atom tool use (read +
+// CACHE v43: bumped Nov 21, 2026 for Supernova + Nova tool use (read +
 // draft only) on the Anthropic chat path. The cache bump makes
 // existing installs fetch the new main.js instead of serving the
 // cached one.
 // CACHE v44: bumped Nov 21, 2026 for the proactive loop — texts and
 // calendar channel checks, check findings delivered into the owner's
-// Photon thread, and the Nova (Ruby/Jude) check-in and nudge sender.
+// Supernova thread, and the Nova (Ruby/Jude) check-in and nudge sender.
 // The cache bump makes existing installs fetch the new main.js
 // instead of serving the cached one.
 // CACHE v45: bumped Nov 21, 2026 for the readability & elegance pass —
@@ -166,7 +166,7 @@
 // paragraphs cut. The cache bump makes existing installs fetch the
 // new main.js, index.html and styles.css instead of serving the
 // cached ones, and clears any older shell cache entries on activate.
-// CACHE v54: bumped Nov 22, 2026 for the Atom renames — June is now
+// CACHE v54: bumped Nov 22, 2026 for the Nova renames — June is now
 // Jude, Cleo is now Clive, Pearl is now Pierce (the portraits are men;
 // the names were the mismatch). The roster, backstories, nudge sender,
 // portrait filenames and thumbnails all carry the new names, and a
@@ -174,7 +174,7 @@
 // so no customer's conversation is orphaned. The cache bump makes
 // existing installs fetch the new main.js instead of serving the
 // cached one.
-// v55: pronoun pass on the Atom backstories — Jude's story now reads
+// v55: pronoun pass on the Nova backstories — Jude's story now reads
 // they/them and Pierce's he/him throughout, matching the declared
 // pronouns in src/shared/atoms.ts. Text-only change; the cache bump
 // makes existing installs fetch the corrected bundle.
@@ -188,21 +188,21 @@
 // third rename) is carried to Clive with the current template text, or
 // removed when the account already holds a Clive row. Server-only
 // change; the cache bump keeps the shell version honest.
-// v59: the portrait carousels are retired — the Photons and Atoms
+// v59: the portrait carousels are retired — the Supernovas and Novas
 // now ride two rotating-drum vending machines (Chat front and Store),
 // built natively in the client. The cache bump makes existing
 // installs fetch the new main.js and styles.css instead of serving
 // the cached ones.
 // v60: the opening's finale is replaced (Neil, Nov 22, 2026) — the
 // v5 film keeps its first beat (the crystal Prism forming), and at
-// 5.15s the Atomic poster takes over: all 24 Faces form up like a
+// 5.15s the Novaic poster takes over: all 24 Faces form up like a
 // Marvel ensemble poster, hold alive for about a second (breathing
 // sway, drifting sparkle, one band of wind-light), then fly away in
 // different directions before the curtain handover. The film files
 // are untouched; the v3 fallback keeps its own ending. The cache
 // bump makes existing installs fetch the new main.js and styles.css
 // instead of serving the cached ones.
-// CACHE v61: bumped Nov 23, 2026 for the hero opening — the Atomic
+// CACHE v61: bumped Nov 23, 2026 for the hero opening — the Novaic
 // poster finale is replaced by the 23 Novas and Supernovas as
 // full-figure heroes (painted full-body art in public/heroes/),
 // assembling asymmetrically and flashing out as light. Prism is
@@ -228,7 +228,7 @@
 // sounds are unchanged. Animated per-Face clips are wired
 // (HERO_CLIPS in main.js) but ship empty — the image-to-video
 // pipeline was down at build time; see public/heroes/manifest.json.
-const CACHE = "prism5-v68";
+const CACHE = "prism5-v69";
 // Images (portraits, thumbnails, brand art, chat backgrounds, icons)
 // live in their own cache whose name does NOT change with the shell
 // version. Before v52 every shell bump deleted the one cache on
@@ -329,8 +329,8 @@ self.addEventListener("fetch", (event) => {
   // a background refresh, in the cache that survives shell bumps, so a
   // deploy never makes an install re-download its portraits.
   if (
-    url.pathname.startsWith("/photons/") ||
-    url.pathname.startsWith("/atoms/") ||
+    url.pathname.startsWith("/supernovas/") ||
+    url.pathname.startsWith("/novas/") ||
     url.pathname.startsWith("/brand/") ||
     url.pathname.startsWith("/chat-bg/") ||
     url.pathname.startsWith("/icons/")
