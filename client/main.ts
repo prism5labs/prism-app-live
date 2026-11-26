@@ -5282,7 +5282,16 @@ function runOpeningFilm(
     // still — the full assembly as a poster — for a short breath,
     // then out through the curtain as usual.
     vid.remove();
-    if (backdrop instanceof HTMLImageElement) backdrop.src = OPENING_POSTER_SRC;
+    if (backdrop instanceof HTMLImageElement) {
+      // The hold still takes the backdrop's seat: whole and crisp —
+      // clear the letterbox haze and fit the whole frame, or the
+      // fallback would crop the assembly the way cover once cropped
+      // the film (see .opening-film in styles.css).
+      backdrop.style.objectFit = "contain";
+      backdrop.style.filter = "none";
+      backdrop.style.transform = "none";
+      backdrop.src = OPENING_POSTER_SRC;
+    }
     window.setTimeout(dismiss, 3500);
   };
   vid.addEventListener("ended", () => dismiss());

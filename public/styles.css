@@ -726,6 +726,9 @@ textarea { width: 100%; resize: vertical; }
   display: flex;
   align-items: center;
   justify-content: center;
+  /* Clip the backdrop still's letterbox-fill scale (see
+     .opening-splash-poster) to the splash. */
+  overflow: hidden;
   /* No opacity transition on the splash itself, ever: the film inside
      it is dismissed by a black curtain instead (see .film-curtain). */
 }
@@ -749,18 +752,30 @@ textarea { width: 100%; resize: vertical; }
 .opening-splash[data-scheme="checkered-flag"] { --splash-bg: #1c1c1e; --splash-ink: #fff3dc; --splash-accent: #d62828; --splash-accent2: #f4c95d; }
 /* The splash backdrop: the opening film's own gather beat as a
    still (her light on the bare stage), so the splash is dressed
-   from the first paint. The film covers it the moment its first
-   frame lands. */
+   from the first paint. The film seats over it; on screens taller
+   than the film it stays visible in the letterbox bands as the
+   stage's own haze (see the filter below). */
 .opening-splash-poster {
   width: 100%;
   height: 100%;
   object-fit: cover;
   display: block;
+  /* Letterbox fill for the film (see .opening-film): where the
+     film's whole frame leaves spare screen above and below, this
+     same stage fills it — blurred and dimmed into haze, so the
+     frame sits in one continuous stage instead of on a black
+     band, and the fill's own edges never draw a line. The slight
+     scale hides the blur's soft edge (.opening-splash clips it).
+     When the film cannot play, main.ts swaps this still for the
+     hold poster and clears the filter inline, so the fallback
+     shows crisp. */
+  filter: blur(14px) brightness(0.8);
+  transform: scale(1.04);
 }
 /* The opening film itself (client/main.ts seats it over the
    backdrop): the per-Face composite — gather, split, the living
-   hold, the flash — filling the splash exactly as the hero stage
-   did before it. A sibling of the backdrop, never an ancestor,
+   hold, the flash — presented whole on any screen (see the fit
+   note below). A sibling of the backdrop, never an ancestor,
    so nothing about its surface can stall (the curtain rule). */
 .opening-film {
   position: absolute;
@@ -768,8 +783,19 @@ textarea { width: 100%; resize: vertical; }
   z-index: 1;
   width: 100%;
   height: 100%;
-  object-fit: cover;
-  background: #000;
+  /* The WHOLE composed frame, on every screen: the film is 9:16
+     and phone screens run taller (the owner's is ~20.5:9). Cover
+     filled the screen by cutting ~11% off each side of the frame
+     on his phone — the edge Faces sliced mid-body, "their heads
+     and stuff" (his screenshot, Nov 26, 2026) — and the v75
+     in-frame fix could not survive it. Contain shows the frame
+     exactly as composed; the spare screen above and below shows
+     the splash's backdrop still through the letterbox — the
+     film's own stage, hazed (see .opening-splash-poster) — never
+     a black band and never a crop. No background of its own: the
+     letterbox must show that stage through, not paint over it. */
+  object-fit: contain;
+  background: transparent;
   display: block;
 }
 /* Welcome / welcome back caption: an overlay at the bottom of the
