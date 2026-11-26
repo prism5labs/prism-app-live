@@ -23,7 +23,12 @@
 <body>
   <div id="app-bg" class="app-bg" aria-hidden="true"><div class="app-bg-scrim"></div></div>
   <div id="opening-splash" class="opening-splash" aria-hidden="true">
-    <video id="opening-splash-video" class="opening-splash-video" src="/opening-v5.mp4" poster="/opening-v5-poster.jpg" muted playsinline preload="auto" aria-hidden="true"></video>
+    <!-- No film any more (Nov 25, 2026): the v5 opening film and its
+         v3 fallback are retired — the app kept playing the old video
+         on fresh installs. The splash backdrop is the film's first
+         beat as a still (light on the crystal, no figure), and the
+         hero stage in main.js carries the opening from there. -->
+    <img id="opening-splash-poster" class="opening-splash-poster" src="/opening-v5-poster.jpg" alt="" aria-hidden="true">
     <div class="opening-splash-caption" id="opening-splash-caption">
       <span class="opening-splash-eyebrow">Prism 5</span>
       <span class="opening-splash-greeting" id="opening-splash-greeting">Welcome</span>
@@ -41,7 +46,7 @@
   <script>
     // The opening is off on this device (turned off in Upkeep or from
     // the opening itself): take the splash down before main.js even
-    // loads, so the owner never flashes the film on the way in.
+    // loads, so the owner never flashes the opening on the way in.
     // main.js re-checks the same key (prism5.opening.v1) on boot, so
     // this is only the fast path — the setting itself lives there.
     try {

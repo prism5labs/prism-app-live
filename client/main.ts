@@ -258,15 +258,15 @@ loadReadability();
 applyReadability();
 
 // ---------- Opening animation: play it or skip it ----------
-// The opening film (v5: crystalline teal prism figure on the
-// countertop, golden-dust fade, gold pyramid mark) plays on every
-// open — unless the owner turns it off. Same pattern as Reading
-// above: saved on this device only, in localStorage, under one key,
-// read at module load before the first render so the choice holds
-// from the very first paint. Default is ON: a missing or unreadable
-// value plays the film, exactly as before. Turning it off skips the
-// film entirely on every later open until it is turned back on, in
-// Upkeep or from the control on the opening itself.
+// The opening (her light gathering and splitting into the Faces —
+// see the splash section) plays on every open — unless the owner
+// turns it off. Same pattern as Reading above: saved on this device
+// only, in localStorage, under one key, read at module load before
+// the first render so the choice holds from the very first paint.
+// Default is ON: a missing or unreadable value plays the opening,
+// exactly as before. Turning it off skips the opening entirely on
+// every later open until it is turned back on, in Upkeep or from
+// the control on the opening itself.
 const OPENING_KEY = "prism5.opening.v1";
 let playOpening = true;
 function loadOpeningPref(): void {
@@ -1253,7 +1253,12 @@ function machineGo(id: string, next: number): void {
 }
 
 function renderChatFront(): string {
-  const owned = (state?.photons || []).filter((p: any) => p.owned);
+  // The state payload names this list "supernovas" (stateFor in
+  // src/server.ts). This line read "photons" — a leftover the Nov 25
+  // wording sweep missed — so the list was always empty and the Chat
+  // front showed an owner's Novas but never their Supernovas
+  // (Neil, Nov 25, 2026: "only seeing Novas and no Supernovas").
+  const owned = (state?.supernovas || []).filter((p: any) => p.owned);
   // Owned Atoms, the same rule the server chats by: the Atom's own row,
   // the Nova product (which opens every Atom), or the free code.
   const ownsEveryAtom =
@@ -1261,50 +1266,66 @@ function renderChatFront(): string {
   const ownedNovas = ATOMS.filter(
     (a) => ownsEveryAtom || (state?.ownedNovas || []).includes(a.name),
   );
+  const supernovaShelf =
+    owned.length > 0
+      ? `<h2 class="front-strip-label">Your Supernovas</h2>` +
+        machineHtml("front-supernovas", {
+          title: "SUPERNOVAS",
+          priceLine: "",
+          listLabel: `See all ${owned.length} of your Supernovas`,
+          dispenseAction: "machine-dispense-chat",
+          kind: "photon",
+          items: owned.map((p: any, i: number) => ({
+            code: machineCode(i),
+            name: faceNameOf(p),
+            openName: p.name,
+            role: PHOTONS.find((x) => x.name === p.name)?.tagline || "",
+            price: "",
+            pack: photonCard(p, 84),
+          })),
+        })
+      : "";
+  const novaShelf =
+    ownedNovas.length > 0
+      ? `<h2 class="front-strip-label">Your Novas</h2>` +
+        machineHtml("front-novas", {
+          title: "NOVAS",
+          priceLine: "",
+          listLabel: `See all ${ownedNovas.length} of your Novas`,
+          dispenseAction: "machine-dispense-chat",
+          kind: "atom",
+          items: ownedNovas.map((a, i: number) => ({
+            code: machineCode(i),
+            name: a.name,
+            openName: a.name,
+            role: a.tagline,
+            price: "",
+            pack: atomCard(a, 84),
+          })),
+        })
+      : "";
+  // Both shelves show when both are owned; the side the owner is on
+  // (the switch at the top of this front) puts its shelf first.
   const ownedHtml =
-    owned.length > 0 || ownedNovas.length > 0
-      ? [
-          owned.length > 0
-            ? `<h2 class="front-strip-label">Your Supernovas</h2>` +
-              machineHtml("front-supernovas", {
-                title: "SUPERNOVAS",
-                priceLine: "",
-                listLabel: `See all ${owned.length} of your Supernovas`,
-                dispenseAction: "machine-dispense-chat",
-                kind: "photon",
-                items: owned.map((p: any, i: number) => ({
-                  code: machineCode(i),
-                  name: faceNameOf(p),
-                  openName: p.name,
-                  role: PHOTONS.find((x) => x.name === p.name)?.tagline || "",
-                  price: "",
-                  pack: photonCard(p, 84),
-                })),
-              })
-            : "",
-          ownedNovas.length > 0
-            ? `<h2 class="front-strip-label">Your Novas</h2>` +
-              machineHtml("front-novas", {
-                title: "NOVAS",
-                priceLine: "",
-                listLabel: `See all ${ownedNovas.length} of your Novas`,
-                dispenseAction: "machine-dispense-chat",
-                kind: "atom",
-                items: ownedNovas.map((a, i: number) => ({
-                  code: machineCode(i),
-                  name: a.name,
-                  openName: a.name,
-                  role: a.tagline,
-                  price: "",
-                  pack: atomCard(a, 84),
-                })),
-              })
-            : "",
-        ].join("")
+    supernovaShelf || novaShelf
+      ? sideOrDefault() === "personal"
+        ? novaShelf + supernovaShelf
+        : supernovaShelf + novaShelf
       : `<div class="card empty-panel">
           <div class="card-head"><img class="mark" src="/brand/gem.jpg" alt=""><h2>Nothing to talk to yet.</h2></div>
           <button class="btn store-outline store-btn" data-action="goto" data-tab="store">Browse the Store</button>
         </div>`;
+  // The Business / Personal switch, on the shelf view itself (Nov 25,
+  // 2026): before this it lived only at the top of the Store and down
+  // in You → Settings, so an owner on the Chat front had to hunt for
+  // it. Same side-pick action as everywhere else — the choice
+  // persists on the device and the account, and the Store follows.
+  const isPersonalSide = sideOrDefault() === "personal";
+  const sideSwitchHtml = `
+    <div class="store-side-switch front-side-switch" role="group" aria-label="Business or Personal">
+      <button class="btn${isPersonalSide ? "" : " primary"}" data-action="side-pick" data-side="business" aria-pressed="${isPersonalSide ? "false" : "true"}">Business</button>
+      <button class="btn${isPersonalSide ? " primary" : ""}" data-action="side-pick" data-side="personal" aria-pressed="${isPersonalSide ? "true" : "false"}">Personal</button>
+    </div>`;
   const ownedPhotonNames = new Set(owned.map((p: any) => p.name));
   const ownedAtomNames = new Set(ownedNovas.map((a) => a.name));
   const pinnedOwned = pinnedFaces.filter(
@@ -1346,6 +1367,7 @@ function renderChatFront(): string {
     </div>`;
   return `
   <section class="front">
+    ${sideSwitchHtml}
     <div class="front-body">
       <h3 class="greeting">Howdy, <span class="greeting-accent">neighbor!</span></h3>
     </div>
@@ -2918,9 +2940,10 @@ function renderStore(): string {
       </div></div>`;
 
   // The Store shows one side at a time. The side comes from the
-  // first-open chooser (switch it in You) — the Sparks & Plugs
-  // Personal/Business toggle below only changes those prices, it
-  // never changes which sections show.
+  // first-open chooser (switch it on the Chat front, at the top of
+  // the Store, or in You) — the Sparks & Plugs Personal/Business
+  // toggle below only changes those prices, it never changes which
+  // sections show.
   const isPersonal = sideOrDefault() === "personal";
   const atomCards = ATOMS.map((a) => {
     const owned = allOwned || ownedNovas.includes(a.name);
@@ -3313,15 +3336,15 @@ function readabilityCard(): string {
 }
 
 // The opening-animation switch: the same on-this-device setting as
-// Reading, in the same place. On means the opening film plays every
+// Reading, in the same place. On means the opening plays every
 // time the app opens; off means the app opens straight into Chat
-// (or wherever it was left) with no film at all, until it is turned
-// back on here. Reduced motion still skips the film on its own,
-// whatever this says.
+// (or wherever it was left) with no opening at all, until it is
+// turned back on here. Reduced motion still skips the opening on
+// its own, whatever this says.
 function openingCard(): string {
   return `<div class="card">
     <h2>Opening animation</h2>
-    <p class="fine">The short film that plays when the app opens — the prism figure on the countertop, fading into golden dust. Turn it off and the app opens straight in, every time, until you turn it back on. Saved on this device.</p>
+    <p class="fine">The opening that plays when the app opens — a shaft of light that gathers and splits into your helpers. Turn it off and the app opens straight in, every time, until you turn it back on. Saved on this device.</p>
     <div class="row">
       <button class="btn${playOpening ? " primary" : ""}" data-action="opening-toggle" aria-pressed="${playOpening}">${playOpening ? "Opening animation: on" : "Opening animation: off"}</button>
     </div>
@@ -3431,8 +3454,10 @@ function businessLockedCard(): string {
   </div>`;
 }
 
-// The side switcher lives here, in You, under Settings — the same place
-// the other app-wide choices live. Two doors, one app: Business shows
+// The side switcher also lives here, in You, under Settings — the same
+// place the other app-wide choices live. (Since Nov 25, 2026 the same
+// switch sits on the Chat front and at the top of the Store too, so it
+// is never more than a tap away.) Two doors, one app: Business shows
 // the business Launches and prices, Personal shows Nova, the Atoms, and
 // personal prices. Switching never touches what you own.
 function sideCard(): string {
@@ -4070,7 +4095,7 @@ document.addEventListener("click", async (e) => {
   } else if (action === "opening-toggle") {
     // Upkeep switch: flip the opening on or off for every later
     // open, on this device. The change takes effect from the next
-    // open — the film already playing (if any) is untouched.
+    // open — an opening already playing is untouched.
     setPlayOpening(!playOpening);
     toast(
       playOpening
@@ -4106,8 +4131,8 @@ document.addEventListener("click", async (e) => {
     }
     render();
   } else if (action === "opening-off") {
-    // The persistent off switch on the opening itself: turn the film
-    // off for every later open, then skip the rest of this one. The
+    // The persistent off switch on the opening itself: turn the
+    // opening off for every later open, then skip the rest of this one. The
     // splash's own tap-to-skip listener does the fade-out (this tap
     // bubbles up to it); this handler only records the choice.
     setPlayOpening(false);
@@ -5055,21 +5080,28 @@ function setupKeyboardDock(): void {
 }
 
 // ---------- Opening splash ----------
-// The v4 opening film plays on every app open, then fades to the
-// chat. The chat renders underneath while it plays, so nothing waits
-// on it, and it never touches settings or the chosen Face — it is only
-// a full-screen overlay that removes itself. Reduced motion skips it
-// entirely (the CSS hides it too, so it never shows even before this
-// runs). Tap skips it early: the owner never has to wait out the
-// full 10s. If the v4 film fails to load, the v3 opening plays
-// instead; if that fails too, the splash just goes away. On the
-// v5 film, the ending is the hero finale (below); the v3
-// fallback keeps its own ending.
+// The opening plays on every app open, then fades to the chat. The
+// chat renders underneath while it plays, so nothing waits on it,
+// and it never touches settings or the chosen Face — it is only a
+// full-screen overlay that removes itself. Reduced motion skips it
+// entirely (the CSS hides it too, so it never shows even before
+// this runs). Tap skips it early: the owner never has to wait it
+// out.
+//
+// There is no film any more (Nov 25, 2026). The opening used to lead
+// with the v5 film — the crystalline figure on the diner counter,
+// cut on Nov 18 — with the still older v3 sparkle animation as its
+// stall fallback. The website replaced that film, the app never
+// did, and on fresh installs the app "kept playing the old video"
+// (Neil, Nov 25, 2026). Both film files are retired. What remains
+// is the opening Neil choreographed on Nov 23: the hero stage
+// (below) opens directly on the splash — her light gathers, splits,
+// and the Faces condense out of it — over a still backdrop of the
+// film's first beat, light on the crystal, no figure.
 //
 // First ever open reads "Welcome"; every open after that reads
-// "Welcome back" — same film either way, the words are an overlay
-// because the film itself carries no text. The coloring around the
-// animation rotates through ten schemes, one per open, cycling in order: the
+// "Welcome back" — the words are an overlay, as they always were.
+// The coloring around the animation rotates through ten schemes, one per open, cycling in order: the
 // open count lives in localStorage (prism5.splashOpens) and the scheme
 // is SPLASH_SCHEME_IDS[(count - 1) % 10]. The scheme colors live in
 // public/styles.css as [data-scheme] rules on .opening-splash.
@@ -5090,8 +5122,8 @@ const SPLASH_SCHEME_IDS = [
   "checkered-flag",
 ] as const;
 const SPLASH_OPENS_KEY = "prism5.splashOpens";
-// A plain black layer that fades over the splash film, or lifts off
-// the app, so the film never sits inside an element whose opacity
+// A plain black layer that fades over the splash, or lifts off
+// the app, so the splash never sits inside an element whose opacity
 // animates (see .film-curtain in styles.css for why).
 function filmCurtain(z: number): HTMLDivElement {
   const c = document.createElement("div");
@@ -5131,13 +5163,13 @@ function dismissSplashWithCurtain(fast = false): void {
 // Also, the 24 are not animated. They are cutouts that run
 // about." So the choreography is rebuilt around her light:
 //
-// THE FILM plays only its first beat — the shaft of light
-// falling on the crystal on the diner counter — and hands off
-// at HERO_HANDOFF_S, before the crystal's figure can rise out
-// of the gem (that rising begins ~2.4s in; the stage has fully
-// covered the film by then). Prism herself never appears: no
-// figure, no disc, no portrait, anywhere in the opening. Only
-// her light.
+// THE LIGHT BEAT is the stage's own now (Nov 25, 2026): the v5
+// film that used to play the shaft of light falling on the
+// crystal is retired (see the splash section above), so the
+// stage opens on that beat itself — the still backdrop carries
+// the light on the crystal, and the stage's shaft and core take
+// it from there. Prism herself never appears: no figure, no
+// disc, no portrait, anywhere in the opening. Only her light.
 //
 // THE LIGHT comes in on the stage: a shaft falls to the stage's
 // heart and gathers there in a bright core, swelling gently
@@ -5171,18 +5203,15 @@ function dismissSplashWithCurtain(fast = false): void {
 // that fades into the curtain's handover to the Chat front.
 // They arrived as light; they leave as light.
 //
-// The film file itself is untouched, the hero stage is a
-// sibling of the film (never an ancestor, so its fade cannot
-// stall the film's surface — the curtain rule), and the v3
-// fallback film keeps its own ending: the heroes only replace
-// the v5 finale.
-const HERO_HANDOFF_S = 1.8;
+// The hero stage is a sibling of the splash backdrop (never an
+// ancestor, so its fade cannot stall the backdrop's surface —
+// the curtain rule).
 // Stage timeline: the light gathers for ~1.2s, the split runs
 // ~1.2–3.5s, the assembly holds alive, the charge fires at
 // HERO_FLASH_AFTER_MS − 450, the flash-out at
-// HERO_FLASH_AFTER_MS, and the dismiss follows. With the film's
-// 1.8s light beat the whole opening runs ~10s plus the curtain
-// — the same neighbourhood as v61's 5.15s + 5.8s.
+// HERO_FLASH_AFTER_MS, and the dismiss follows. The whole
+// opening runs ~8s plus the curtain — a breath shorter than the
+// old film-led version, which spent its first 1.8s on the film.
 const HERO_FLASH_AFTER_MS = 6600;
 const HERO_DISMISS_AFTER_MS = 8100;
 // How long a figure takes to condense out of the light.
@@ -5284,7 +5313,7 @@ function heroRnd(n: number): number {
   return v - Math.floor(v);
 }
 
-// The film's caption and controls bow out as the light gathers —
+// The splash's caption and controls bow out as the light gathers —
 // the finale is the show, and a settings pill does not belong
 // on it. Tap-to-skip still works everywhere on the splash.
 function fadeSplashChrome(splash: HTMLElement): void {
@@ -5301,7 +5330,7 @@ function fadeSplashChrome(splash: HTMLElement): void {
 let heroStarted = false;
 function runHeroFinale(
   splash: HTMLElement,
-  video: HTMLVideoElement,
+  backdrop: HTMLElement | null,
   dismiss: () => void,
 ): void {
   if (heroStarted) return;
@@ -5491,19 +5520,16 @@ function runHeroFinale(
       built.push({ name, outer, sway, trail, slot, delay, idx: idx++ });
     });
   });
-  // Directly after the film, under the caption and the controls.
-  splash.insertBefore(stage, video.nextSibling);
+  // Directly after the backdrop still, under the caption and the
+  // controls (their z-indexes keep them on top).
+  if (backdrop) splash.insertBefore(stage, backdrop.nextSibling);
+  else splash.appendChild(stage);
   fadeSplashChrome(splash);
   requestAnimationFrame(() => stage.classList.add("is-in"));
-  // Once the stage covers the film, stop the film decoding — its
-  // beat is done, and a hidden decoder helps nobody's battery.
+  // Once the stage covers the backdrop, hide the still — the
+  // stage's own background carries the scene from here.
   window.setTimeout(() => {
-    try {
-      video.pause();
-    } catch {
-      // The film is already gone; nothing to stop.
-    }
-    video.style.visibility = "hidden";
+    if (backdrop) backdrop.style.visibility = "hidden";
   }, 620);
   const base = "translate(-50%, 0px)";
   // Aim a hero's trail along a travel vector: the trail element
@@ -5699,36 +5725,13 @@ function runHeroFinale(
     if (splash.isConnected) dismiss();
   }, HERO_DISMISS_AFTER_MS);
 }
-// Poll the film's clock (rAF, so a stalled or backgrounded film
-// cannot desync the handoff) and start the finale the moment the
-// film's light beat completes — while the crystal is still only
-// a crystal under its shaft of light, before any figure can
-// rise out of it. The v3 fallback never gets the heroes:
-// fellBack() is checked on every frame.
-function watchHeroHandoff(
-  video: HTMLVideoElement,
-  splash: HTMLElement,
-  fellBack: () => boolean,
-  dismiss: () => void,
-): void {
-  const tick = () => {
-    if (!splash.isConnected || splashDismissing || heroStarted) return;
-    if (!fellBack() && video.currentTime >= HERO_HANDOFF_S) {
-      runHeroFinale(splash, video, dismiss);
-      return;
-    }
-    requestAnimationFrame(tick);
-  };
-  requestAnimationFrame(tick);
-}
-
 function playOpeningSplash(returning: boolean): void {
   const splash = document.getElementById("opening-splash");
-  const video = document.getElementById("opening-splash-video") as HTMLVideoElement | null;
+  const backdrop = document.getElementById("opening-splash-poster");
   const greeting = document.getElementById("opening-splash-greeting");
-  if (!splash || !video) return;
+  if (!splash) return;
   if (!playOpening) {
-    // The owner turned the opening off: no film, no 10s wait, no
+    // The owner turned the opening off: no opening, no wait, no
     // open counted — straight into the app. The chooser check still
     // runs (init calls it again after render, when state is loaded).
     splash.remove();
@@ -5755,21 +5758,21 @@ function playOpeningSplash(returning: boolean): void {
   const dismiss = () => {
     dismissSplashWithCurtain();
   };
-  // A tap on the film skips it with a swoosh — except a tap on the
-  // "Don't play again" pill, which already answered with its own
-  // toggle blip. The film ending on its own, the 13s backstop, and
-  // the stall watchdogs dismiss without a sound: no sound without a
+  // A tap on the opening skips it with a swoosh — except a tap on
+  // the "Don't play again" pill, which already answered with its
+  // own toggle blip. The opening ending on its own, and the
+  // backstop below, dismiss without a sound: no sound without a
   // user gesture.
   const dismissByTap = (e: Event) => {
     if (!(e.target as HTMLElement).closest("[data-action]")) playSwoosh();
     dismiss();
   };
   if (returning) {
-    // Coming back from Google (a sign-in or a connect): the film
+    // Coming back from Google (a sign-in or a connect): the opening
     // already played on the way out, and sitting through it again is
     // a dead pause before the thing the owner just did. The splash
     // stays as a static branded cover in the scheme color while the
-    // app loads underneath — no video, no 10s wait — and init
+    // app loads underneath — no animation, no wait — and init
     // dismisses it fast the moment the first render lands.
     // Backstop: that fast dismiss only runs after the first render,
     // and a slow server can delay the render without bound — so the
@@ -5789,10 +5792,10 @@ function playOpeningSplash(returning: boolean): void {
     return;
   }
   splash.addEventListener("click", dismissByTap, { once: true });
-  // Warm the hero finale's full-figure art while the film plays:
-  // 23 heroes at ~120 KB each, and the asset cache keeps them for
-  // later opens. Prism is not among them — she is out of the
-  // opening entirely (Neil, Nov 23, 2026).
+  // Warm the hero finale's full-figure art while the stage's light
+  // gathers: 23 heroes at ~120 KB each, and the asset cache keeps
+  // them for later opens. Prism is not among them — she is out of
+  // the opening entirely (Neil, Nov 23, 2026).
   for (const p of PHOTONS) {
     if (p.name === "Prism") continue;
     const i = new Image();
@@ -5802,65 +5805,26 @@ function playOpeningSplash(returning: boolean): void {
     const i = new Image();
     i.src = `/heroes/${encodeURIComponent(a.name)}.webp`;
   }
-  video.addEventListener("ended", dismiss, { once: true });
-  // If the v5 film fails to load or play, fall back to the v3 opening
-  // instead of a black screen. If that fails too, dismiss — the chat
-  // is already rendered underneath.
-  let fellBack = false;
-  const tryV3Fallback = () => {
-    if (fellBack) {
-      dismiss();
-      return;
-    }
-    fellBack = true;
-    video.src = "/opening-animation-v3.mp4";
-    video.load();
-    const q = video.play();
-    if (q) q.catch(() => dismiss());
-  };
-  video.addEventListener("error", tryV3Fallback);
-  // Fallback: if the ended event never fires, do not trap the owner
-  // behind the splash. The film is 10s, so the cutoff sits past it.
+  // Backstop: if anything in the finale stalls, do not trap the
+  // owner behind the splash. The stage dismisses itself at
+  // HERO_DISMISS_AFTER_MS (~8.1s); this sits safely past it.
   window.setTimeout(dismiss, 13000);
-  // Stall watchdog: play() can resolve while no frames ever arrive
-  // (a slow connection, a stuck range request) — and a stall fires no
-  // error event, so nothing above rescues it until the 13s backstop.
-  // If the film has not advanced past the first frames a few seconds
-  // in, fall back to the v3 film instead of sitting on a black splash.
-  window.setTimeout(() => {
-    if (!splash.isConnected) return;
-    if (video.ended) return;
-    // If the film has not advanced past the first frames in 5s, fall
-    // back — no readyState qualifier: a film can sit buffered at
-    // currentTime 0 with readyState 3 and still never show a frame.
-    if (video.currentTime < 0.5) tryV3Fallback();
-  }, 5000);
-  // Second watch: if the v3 fallback stalls too, take the splash down
-  // at 9s instead of sitting on it until the 13s backstop.
-  window.setTimeout(() => {
-    if (!splash.isConnected) return;
-    if (video.ended) return;
-    if (video.currentTime < 0.5) dismiss();
-  }, 9000);
-  const p = video.play();
-  if (p) p.catch(() => tryV3Fallback());
-  // The hero finale replaces the v5 film's ending: hand off as
-  // the film's light beat completes, while the crystal is still
-  // only light on a counter (see the hero section).
-  watchHeroHandoff(video, splash, () => fellBack, dismiss);
-  // If the video already finished before this ran, dismiss now.
-  if (video.ended) dismiss();
+  // The hero stage IS the opening now (Nov 25, 2026): with the film
+  // retired there is no handoff to wait for, so the stage starts
+  // the moment the splash is up — its own light beat (the shaft,
+  // the gathering core) opens the show over the backdrop still.
+  runHeroFinale(splash, backdrop, dismiss);
 }
 
 // The fast dismiss for an OAuth return: the same black curtain as
-// the film's exit, at a quicker tempo, once the first render has
+// the opening's exit, at a quicker tempo, once the first render has
 // landed. The chooser check runs after, as usual.
 function dismissSplashFast(): void {
   dismissSplashWithCurtain(true);
 }
 
 // ---------- First-open chooser ----------
-// Shown once, after the opening film, only when the account has never
+// Shown once, after the opening, only when the account has never
 // signed in and the owner has never dismissed it. It exists so the
 // account benefits are offered up front instead of hiding at the
 // bottom of Upkeep: the sign-in is the same Google flow as the
@@ -5887,7 +5851,7 @@ function maybeShowChooser(): void {
   // A door already picked on this device: never show it again here.
   if (loadSide() !== "") return;
   // State is not loaded yet (the reduced-motion path dismisses the
-  // film before refreshState finishes): init calls this again after
+  // splash before refreshState finishes): init calls this again after
   // render, so returning here loses nothing.
   if (!state) return;
   // A door already picked on the account — on another device, or on
@@ -5896,8 +5860,8 @@ function maybeShowChooser(): void {
   // cache above; this is the belt to its braces for a state that
   // arrived another way.)
   if ((state as any)?.side === "business" || (state as any)?.side === "personal") return;
-  // The film is still playing: its dismiss calls this again when it
-  // goes away, so the chooser never covers the film.
+  // The opening is still playing: its dismiss calls this again when
+  // it goes away, so the chooser never covers the opening.
   if (document.getElementById("opening-splash")?.isConnected) return;
   chooserShown = true;
   const el = document.createElement("div");
@@ -5923,7 +5887,7 @@ function hideChooser(): void {
 // ---------- Boot ----------
 (async function init() {
   const params = new URLSearchParams(location.search);
-  // A return from Google (app sign-in or any connect) skips the film:
+  // A return from Google (app sign-in or any connect) skips the opening:
   // it already played on the way out, and sitting through it again is
   // a dead pause before the thing the owner just did. The splash stays
   // as a static cover until the first render lands, then goes away
@@ -5993,7 +5957,7 @@ function hideChooser(): void {
       signinResult = r.isNew ? "new" : "back";
       signinName = r.auth?.name || r.auth?.email || "";
       // The chooser must not sit over a freshly signed-in account:
-      // the film is still playing on the way back from Google, so the
+      // the opening is still playing on the way back from Google, so the
       // chooser cannot have shown yet, but if it did, take it down.
       hideChooser();
     } else {
