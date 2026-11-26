@@ -1442,14 +1442,15 @@ function renderChatThread(): string {
       </div>
       <a class="btn small" href="${esc(api.threadExportUrl(p.name))}" download>Export</a>
       <button class="btn small" data-action="${isPinnedFace(p.name) ? "unpin-face" : "pin-face"}" data-photon="${esc(p.name)}">${isPinnedFace(p.name) ? "Unpin" : "Pin"}</button>
-      ${isAtom ? "" : `<details class="thread-menu">
+      <details class="thread-menu">
         <summary aria-label="More options">···</summary>
         <div class="thread-menu-list">
-          <button class="btn small" data-action="customize" data-photon="${esc(p.name)}">Customize</button>
+          ${isAtom ? "" : `<button class="btn small" data-action="customize" data-photon="${esc(p.name)}">Customize</button>
           <button class="btn small call" data-action="call" data-photon="${esc(p.name)}">Call · Upkeep</button>
-          <button class="btn small" data-action="report-prism" data-photon="${esc(p.name)}">Report to Prism 5</button>
+          <button class="btn small" data-action="report-prism" data-photon="${esc(p.name)}">Report to Prism 5</button>`}
+          <button class="btn small" data-action="delete-thread" data-photon="${esc(p.name)}">Delete conversation</button>
         </div>
-      </details>`}
+      </details>
     </div>
     <div class="thread-hero">${portraitImg(160)}</div>
     <div class="messages" id="messages">${msgs}</div>
@@ -4468,6 +4469,29 @@ document.addEventListener("click", async (e) => {
         toast(r?.message || "That didn't unpin. Try again.", "err");
       }
       render();
+    }
+  } else if (action === "delete-thread") {
+    const name = t.dataset.photon || "";
+    if (!name) return;
+    if (t.dataset.armed !== "1") {
+      // First tap arms the button in place, inside the open menu, so
+      // the owner sees exactly what will happen before anything goes.
+      // Nothing is deleted until the second tap.
+      t.dataset.armed = "1";
+      t.textContent = "Tap again — deletes every message";
+      return;
+    }
+    const r = await api.threadDelete(name);
+    if (r && r.ok) {
+      pinnedFaces = Array.isArray(r.pinnedFaces)
+        ? r.pinnedFaces
+        : pinnedFaces.filter((x) => x !== name);
+      activePhoton = null;
+      customizePhoton = null;
+      toast(`Your conversation with ${name} is deleted.`);
+      render();
+    } else {
+      toast(r?.message || "That conversation didn't delete. Try again.", "err");
     }
   } else if (action === "call") {
     callPhoton(t.dataset.photon || "");

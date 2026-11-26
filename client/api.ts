@@ -131,6 +131,13 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ accountId: getAccountId() }),
     }),
+  // Delete a conversation: every stored message with this Face, for
+  // this account only. The Face itself and its customization stay.
+  threadDelete: (photon: string) =>
+    req(`/api/threads/${encodeURIComponent(photon)}/delete`, {
+      method: "POST",
+      body: JSON.stringify({ accountId: getAccountId() }),
+    }),
   // Conversation search: find where something was said across all of
   // this account's Photon and Atom threads. Snippets only.
   searchThreads: (q: string) =>

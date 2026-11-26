@@ -14,6 +14,7 @@ import {
   searchMessages,
   listExportThreads,
   addMessage,
+  deleteThread,
   pinFace,
   unpinFace,
   listPinnedFaces,
@@ -941,6 +942,28 @@ async function handleApi(req: Request, path: string): Promise<Response> {
     return json({
       ok: true,
       photon,
+      pinned: isFacePinned(accountId, photon),
+      pinnedFaces: listPinnedFaces(accountId),
+    });
+  }
+
+  // POST /api/threads/:name/delete — delete this account's whole
+  // conversation with a Photon or an Atom: every stored message, the
+  // thread row, and any pin. Same account and name checks as the pin
+  // route. Deleting an already-empty conversation is a clean no-op
+  // that reports zero removed, so a second tap is harmless.
+  const threadDeleteMatch = path.match(/^\/api\/threads\/([A-Za-z]+)\/delete$/);
+  if (threadDeleteMatch && method === "POST") {
+    const photon = threadDeleteMatch[1];
+    const body = await readBody(req);
+    const accountId = accountIdFrom(req, body);
+    if (!isValidAccountId(accountId)) return bad("accountId required", 400);
+    if (!isChatName(photon)) return bad("unknown photon", 400);
+    const deleted = deleteThread(accountId, photon);
+    return json({
+      ok: true,
+      photon,
+      deleted,
       pinned: isFacePinned(accountId, photon),
       pinnedFaces: listPinnedFaces(accountId),
     });

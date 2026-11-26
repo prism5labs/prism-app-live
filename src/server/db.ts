@@ -734,6 +734,23 @@ export function addMessage(
   ).run(accountId, photon, now, now);
 }
 
+// --- Delete a conversation ---
+// Removes everything this account has stored with one Photon or
+// Atom: every message, the thread row itself, and any pin pointing
+// at it, so the conversation is gone from the thread read, search,
+// export, and the Pinned section at once. Returns how many messages
+// were removed. Other accounts and other Faces are untouched, and
+// the Face's customization (name, voice, look) is a separate store
+// that stays — deleting a conversation is not un-personalizing it.
+export function deleteThread(accountId: string, photon: string): number {
+  const removed = db
+    .query(`DELETE FROM messages WHERE account_id = ? AND photon = ?`)
+    .run(accountId, photon);
+  db.query(`DELETE FROM threads WHERE account_id = ? AND photon = ?`).run(accountId, photon);
+  db.query(`DELETE FROM pinned_faces WHERE account_id = ? AND photon = ?`).run(accountId, photon);
+  return removed.changes;
+}
+
 // --- Pinned Faces ---
 // A pinned Photon or Atom conversation, so the Faces the owner uses
 // most sit at the top of the Chat front. Pinning is idempotent: a

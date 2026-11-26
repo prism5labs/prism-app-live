@@ -266,7 +266,7 @@
 // slab beside Keystone is gone), the back row sits inside the
 // frame, Shopbell no longer peeks bisected between Juniper and
 // Encore, and Jude rides above Zero's head instead of through it.
-const CACHE = "prism5-v77";
+const CACHE = "prism5-v78";
 // Images (portraits, thumbnails, brand art, chat backgrounds, icons)
 // live in their own cache whose name does NOT change with the shell
 // version. Before v52 every shell bump deleted the one cache on
