@@ -424,7 +424,7 @@ function productCardHtml(p: (typeof PRODUCTS)[number]): string {
     <h2 class="card-title">${esc(p.name)}</h2>
     <p class="card-kind">${esc(p.kind)} · ${esc(p.category)}</p>
     <p class="card-tagline">${esc(p.description)}</p>
-    <p><b>How it works:</b> ${isSpark ? "One button, one job. You press it, it does that one job, and you can press it again as often as you like. It never runs out and it never dies." : "One job, fully automated. You do not press anything — it runs on its own, in the background, and does its job without being asked."}</p>
+    <p><b>How it works:</b> ${isSpark ? "One button, one job — press it and the job gets done, as often as you like." : "One job, fully automated — it runs on its own in the background, without being asked."}</p>
     ${cardStats([
       ["Kind", isSpark ? "Spark — one button, one job" : "Plug — runs on its own"],
       ["Category", p.category],
@@ -1596,7 +1596,7 @@ function renderCustomize(): string {
   <section class="customize">
     <button class="back-btn" data-action="custom-back">← ${c.done ? "Back to chat" : "All Supernovas"}</button>
     <h2 class="page-title">Make ${esc(face)} yours</h2>
-    <p class="page-lede">Three quick steps, like the install. Skip any of them. Nothing here blocks chatting, and you can come back and change all of this later.</p>
+    <p class="page-lede">Three quick steps — skip any of them and change any of it later; nothing here blocks chatting.</p>
     <div class="custom-steps">${tabs}</div>
     ${customizeStep === 1 ? renderCustomName(p, c) : customizeStep === 2 ? renderCustomVoice(p, c) : renderCustomLook(p, c)}
     <button class="btn custom-skip-all" data-action="custom-skip-all">Skip all — start chatting</button>
@@ -1817,12 +1817,12 @@ function renderCallScreen(): string {
     <button class="back-btn" data-action="end-call">← Back to chat</button>
     <div class="call-hero">${portraitHtml(portraitNameOf(p), 120)}</div>
     <h2 class="page-title">Call ${esc(face)}</h2>
-    <p class="page-lede">Turn-based voice: you talk, then ${esc(face)} answers out loud. It is not a live phone call — ${esc(face)} can't hear you while speaking.</p>
+    <p class="page-lede">Turn-based voice: you talk, then ${esc(face)} answers out loud — not a live phone call, so ${esc(face)} can't hear you while speaking.</p>
     <p id="call-status" class="call-status" role="status">${esc(callStatusText || "Checking voice…")}</p>
     <p id="call-heard" class="call-heard">${callHeard ? `You said: “${esc(callHeard)}”` : ""}</p>
     <button id="call-mic-btn" class="call-mic${callPhase === "recording" ? " recording" : ""}" data-action="call-mic" ${micDisabled ? "disabled" : ""}>${callPhase === "recording" ? "■ Stop" : "🎙️ Talk"}</button>
     ${blocked ? `<div class="row call-blocked-actions"><button class="btn primary" data-action="goto" data-tab="store" data-scroll="store-upkeep">Get Upkeep in the Store</button></div>` : ""}
-    <p class="fine">Voice is an Upkeep extra, and it needs the server's ElevenLabs key. If either is missing, this screen says so instead of pretending the call works.</p>
+    <p class="fine">Voice is an Upkeep extra that needs the server's ElevenLabs key — if either is missing, this screen says so instead of pretending.</p>
   </section>`;
 }
 
@@ -2021,8 +2021,8 @@ function renderSwitchboardContacts(): string {
     .join("");
   return `<div class="card" id="contacts">
     <h3>Contacts — address book</h3>
-    <p class="fine">Switchboard is email and texts. A Supernova can only send to a contact who approved the connection first, like a friend request. Names come from this book only — an unknown number stays an unknown number, never a guessed name.</p>
-    ${prism ? row(prism) : `<p class="fine">Prism 5 (prism5labstest@gmail.com) — no connection yet. Ask a Supernova to write a report, then tap Report to Prism 5 in chat.</p>`}
+    <p class="fine">Switchboard is email and texts to approved contacts only — names come from this book, and an unknown number stays unknown, never guessed.</p>
+    ${prism ? row(prism) : `<p class="fine">Prism 5 (prism5labstest@gmail.com) — no connection yet; ask a Supernova to write a report, then tap Report to Prism 5 in chat.</p>`}
     ${others.map(row).join("") || `<p class="fine">No other contacts yet.</p>`}
     <form class="contact-form">
       <h4>Add someone by hand</h4>
@@ -2034,7 +2034,7 @@ function renderSwitchboardContacts(): string {
     </form>
     <div class="import-box">
       <h4>Import from your phone</h4>
-      <p class="fine">Pick a .vcf (contacts export) or .csv file (name, email, phone). It is read on this device only. Nothing is sent by importing — tap Request connection on each person to send their request.</p>
+      <p class="fine">Pick a .vcf or .csv file — read on this device only, and nothing is sent until you tap Request connection on a person.</p>
       <label class="btn" for="import-file">Choose a .vcf or .csv file</label>
       <input id="import-file" type="file" accept=".vcf,.csv,text/vcard,text/csv" hidden>
       ${importedContacts.length ? `<p class="fine">${importedContacts.length} contact${importedContacts.length === 1 ? "" : "s"} ready to add.</p>${importRows}` : ""}
@@ -2233,13 +2233,13 @@ function renderMessenger(): string {
   const s = messengerStatusData as any;
   const threads = (messengerThreadsData || []) as any[];
   const pages = (messengerPagesData || []) as any[];
-  const personal = `<p class="fine">Personal Messenger can't be connected — Meta offers messaging for Facebook Pages only, not personal accounts. For a personal thread, paste the messages into chat and your Supernova will read them there.</p>`;
+  const personal = `<p class="fine">Personal Messenger can't be connected — Meta offers messaging for Facebook Pages only, so paste a personal thread into chat and your Supernova will read it there.</p>`;
   const connectForm = `<form id="page-connect-form" class="page-connect-form">
         <h4>Connect your Facebook Page</h4>
-        <p class="fine">Paste a Page access token from Meta's developer console (your Page's settings, under Messenger). It is tested before it is stored, it is kept on the server like your Gmail sign-in, and it is never shown back to you.</p>
+        <p class="fine">Paste a Page access token from Meta's developer console — it is tested before it is stored, kept on the server like your Gmail sign-in, and never shown back.</p>
         <input name="token" type="password" placeholder="Page access token" required autocomplete="off">
         <button class="btn primary" type="submit">Connect this Page</button>
-        <p class="fine">Messages that arrive on the Page come in through the server. Connecting here lets you read threads and reply from the app.</p>
+        <p class="fine">Connecting here lets you read Page threads and reply from the app.</p>
       </form>`;
   if (!s) return `<div class="card" id="messenger"><h3>Messenger</h3><p class="fine">Loading…</p></div>`;
   const usable = pages.length > 0 || s.configured;
@@ -2607,7 +2607,7 @@ function renderConnections(): string {
   const googleControl = googleChecking
     ? ""
     : !googleConfigured
-      ? `<p class="fine">Google sign-in isn't set up on this server yet. It needs a Google OAuth client (client ID, secret, and redirect).</p>`
+      ? `<p class="fine">Google sign-in isn't set up on this server yet — it needs a Google OAuth client.</p>`
       : brokenGmail.length
         ? `<div class="row">${brokenGmail
             .map(
@@ -2633,7 +2633,7 @@ function renderConnections(): string {
   const outlookControl = outlookChecking
     ? ""
     : !microsoftConfigured
-      ? `<p class="fine">Outlook sign-in isn't set up on this server yet. It needs a Microsoft OAuth client (client ID, secret, and redirect).</p>`
+      ? `<p class="fine">Outlook sign-in isn't set up on this server yet — it needs a Microsoft OAuth client.</p>`
       : outlookOn
         ? `<p><span class="owned-badge">Outlook connected</span></p><div class="row"><a class="btn" href="/api/oauth/microsoft/start?accountId=${encodeURIComponent(getAccountId())}&label=${nextOutlookLabel()}">Add another Outlook account</a></div>`
         : `<div class="row"><a class="btn primary" href="/api/oauth/microsoft/start?accountId=${encodeURIComponent(getAccountId())}&label=${nextOutlookLabel()}">Connect Outlook</a></div>`;
@@ -2670,7 +2670,7 @@ function renderConnections(): string {
       <input name="host" type="text" id="imap-custom-host" placeholder="Mail server, e.g. imap.example.com" aria-label="Mail server (other providers only)" hidden>
       <button class="btn primary" type="submit">Connect mailbox</button>
     </form>
-    <p class="fine">Yahoo and Apple Mail need an app-specific password — made in the provider's account settings — not the mailbox password. It is tested before it is stored, kept on the server like a Gmail sign-in, and never shown back. IMAP can read mail and save drafts; it cannot send, so a draft is sent from the mail app.</p>
+    <p class="fine">Yahoo and Apple Mail need an app-specific password from the provider's settings — tested before it is stored, never shown back, and IMAP drafts are sent from the mail app.</p>
     ${imapConnectMsg ? `<p class="${imapConnectOk ? "inbox-connected" : "chat-error"}">${esc(imapConnectMsg)}</p>` : ""}`;
 
   // Facebook Page: connected from the Messenger form below, where the
@@ -2682,7 +2682,7 @@ function renderConnections(): string {
     ? `<p class="fine">Checking your Facebook Page…</p>`
     : pageOn
       ? `<p class="fine">Connected — ${esc(pageName)}. Manage it below, in Messenger.</p>`
-      : `<p class="fine">Not connected — your business Facebook Page connects in the Messenger section below, with a Page access token. Personal Messenger can't be connected: Meta offers messaging for Facebook Pages only.</p>`;
+      : `<p class="fine">Not connected — your business Facebook Page connects in the Messenger section below with a Page access token, since Meta offers messaging for Pages only.</p>`;
   const pageControl = pageChecking
     ? ""
     : pageOn
@@ -2691,7 +2691,7 @@ function renderConnections(): string {
 
   return `<div class="card" id="connections">
     <h2>Connections</h2>
-    <p class="fine">Every account Prism watches, and whether it's connected. The button on a row is the way to connect it.</p>
+    <p class="fine">Every account Prism watches, and whether it's connected — the button on a row connects it.</p>
     <h3>Google</h3>
     ${googleState}
     ${googleControl}
@@ -2704,7 +2704,7 @@ function renderConnections(): string {
     <h3>Facebook Page</h3>
     ${pageState}
     ${pageControl}
-    <p class="fine">Google and Outlook connect from here. Yahoo, Apple Mail, and other mail providers connect above with an app-specific password. Texts and calls are set up on the server, not from the app.</p>
+    <p class="fine">Google and Outlook connect from here, other mail connects above with an app-specific password, and texts and calls are set up on the server.</p>
   </div>`;
 }
 
@@ -2787,7 +2787,7 @@ function renderProfile(): string {
     ? `<p class="fine">Saved. Your Supernovas know you now.</p>`
     : "";
   return `<div class="card" id="about-you"><h3>About you</h3>
-    <p class="fine">Tell your Supernovas who you are, so they know you instead of starting cold. This stays on the server for your account only. It is never shared with anyone else.</p>
+    <p class="fine">Tell your Supernovas who you are — it stays on your account only and is never shared.</p>
     <form id="profile-form" class="profile-form">
       <label class="field-label">What should they call you?
         <input name="displayName" type="text" placeholder="Your name" value="${esc(p.displayName || "")}" maxlength="80">
@@ -2852,7 +2852,7 @@ function renderMemoryImport(): string {
     : "";
   const err = memoryParseError ? `<p class="chat-error">${esc(memoryParseError)}</p>` : "";
   return `<div class="card" id="memory-import"><h3>Memory from another AI</h3>
-    <p class="fine">Bring what you already told another assistant, so you do not start over. Pick a file from your phone. It is read on this device only, and only what you tap Import is sent to the server.</p>
+    <p class="fine">Bring what you already told another assistant, so you do not start over — pick a file from your phone; it is read on this device only, and only what you tap Import is sent.</p>
     <p class="fine">Accepted: a ChatGPT export (.json), a Claude export (.json), a plain list of messages (.json), or notes as Markdown or text (.md, .txt).</p>
     <div class="import-box">
       <label class="btn" for="memory-file">Choose a memory file</label>
@@ -2911,7 +2911,7 @@ function perkBanner(): string {
   if (!perk || !perk.active) return "";
   return `<div class="card perk-card">
     <h2>Your welcome offer — 15% off your first order</h2>
-    <p>Your code is <b>${esc(perk.code)}</b>, good until ${esc(fmtDateOnly(perk.expiresAt))}. It is already filled in at checkout, so the discount is there when the page opens. One order only — after that, the offer is spent.</p>
+    <p>Your code is <b>${esc(perk.code)}</b>, good until ${esc(fmtDateOnly(perk.expiresAt))} — already filled in at checkout, and good for one order only.</p>
   </div>`;
 }
 
@@ -2975,9 +2975,9 @@ function renderStore(): string {
     : `<h3 class="cat-title">Everyday Life</h3><div class="product-grid"><div class="card product-card">
         <h3>Start My Day</h3>
         <p class="kind">Plug</p>
-        <p>A morning briefing that walks your day top to bottom, one item at a time. Confirm each item and it gets done, moved, or cleared, and anything you add during the day joins the plan.</p>
+        <p>A morning briefing that walks your day top to bottom, one item at a time — confirm each item and it gets done, moved, or cleared.</p>
         <p class="price">${storeVariant === "personal" ? "$39.00" : "$59.00"} <span class="fine">(${storeVariant === "personal" ? "$40.17" : "$60.77"} at checkout)</span></p>
-        <p class="fine">Checkout links are being set up — the plug itself is ready. There is no Buy button until its two Stripe links exist.</p>
+        <p class="fine">Checkout links are being set up — there is no Buy button until its two Stripe links exist.</p>
       </div></div>`;
 
   // The Store shows one side at a time. The side comes from the
@@ -3007,10 +3007,10 @@ function renderStore(): string {
         <a class="btn small" href="${esc(buyUrl(SATELLITE.twoYear.url, "satellite-two-year"))}" target="_blank" rel="noopener">$26/mo · 2-year</a>
         <a class="btn small" href="${esc(buyUrl(SATELLITE.annual.url, "satellite-annual"))}" target="_blank" rel="noopener">$363/yr</a>
       </div></div></div>`;
-  const novaRow = `    <div class="poster-row" id="store-nova"><img src="/brand/starburst.jpg" alt="Nova, the helper loading="lazy" decoding="async" for your own day"><div class="pr-txt"><b>Nova</b><span class="desc">Nova is the helper for your own day, not a business. One inbox: new mail that needs you is brought to your chat, and replies are drafted in your words. Your calendar and reminders, a morning briefing, and gentle check-ins that nudge you to get started — never a nag.</span><span class="desc">What Nova opens:</span><ul class="included-list">${PERSONAL_FEATURES.map((f) => `<li>${esc(f.label)}</li>`).join("")}</ul><span class="price">$79.00</span><span class="at">$81.37 at checkout</span>${buyButton(buyUrl(NOVA.url, "nova-personal"), "$81.37", allOwned || ownedProducts.includes("nova"))}<p class="fine">Or pay monthly:</p><div class="row monthly-row">
+  const novaRow = `    <div class="poster-row" id="store-nova"><img src="/brand/starburst.jpg" alt="Nova, the helper loading="lazy" decoding="async" for your own day"><div class="pr-txt"><b>Nova</b><span class="desc">Nova is the helper for your own day, not a business — new mail that needs you comes to your chat with replies drafted in your words, alongside your calendar, reminders, a morning briefing, and gentle check-ins.</span><span class="desc">What Nova opens:</span><ul class="included-list">${PERSONAL_FEATURES.map((f) => `<li>${esc(f.label)}</li>`).join("")}</ul><span class="price">$79.00</span><span class="at">$81.37 at checkout</span>${buyButton(buyUrl(NOVA.url, "nova-personal"), "$81.37", allOwned || ownedProducts.includes("nova"))}<p class="fine">Or pay monthly:</p><div class="row monthly-row">
         <a class="btn small" href="${esc(buyUrl(NOVA.monthly.url, "nova-monthly"))}" target="_blank" rel="noopener">$10/mo</a><span class="fine">$10.00/month ($10.30 at checkout)</span>
-      </div><p class="fine">The business set stays locked on Nova alone — inbox, calendar and files worked in chat, Switchboard email to approved contacts, proactive checks and reminders, more than one account, and a helper who knows your business. Those open with a business Launch — Supernova or Satellite — on the Business side.</p></div></div>`;
-  const personalUpkeepCard = `    <div class="card upkeep-card" id="store-personal-upkeep"><img src="/brand/starburst.jpg" alt="" loading="lazy" decoding="async"><div><h2>Personal Upkeep</h2><p>The care that keeps your personal helper working well: updates as they come out, and help first when you need it. It sits beside Nova. Your first three months come with Nova; after that it is $9 a month, only if you want it. Upkeep itself is the care plan for a business Launch.</p><p class="price">$9.00/month <span class="fine">($9.27 at checkout)</span></p><div class="row">${buyButton(buyUrl(PERSONAL_UPKEEP.url, "personal-upkeep"), "$9.27", allOwned || ownedProducts.includes("personal-upkeep"))}</div></div></div>`;
+      </div><p class="fine">The business set stays locked on Nova alone — it opens with a business Launch, Supernova or Satellite, on the Business side.</p></div></div>`;
+  const personalUpkeepCard = `    <div class="card upkeep-card" id="store-personal-upkeep"><img src="/brand/starburst.jpg" alt="" loading="lazy" decoding="async"><div><h2>Personal Upkeep</h2><p>The care that keeps your personal helper working well — updates as they come out, and help first when you need it; your first three months come with Nova, then $9 a month, only if you want it.</p><p class="price">$9.00/month <span class="fine">($9.27 at checkout)</span></p><div class="row">${buyButton(buyUrl(PERSONAL_UPKEEP.url, "personal-upkeep"), "$9.27", allOwned || ownedProducts.includes("personal-upkeep"))}</div></div></div>`;
   const photonItems = PHOTONS.map((p, i) => ({
     code: machineCode(i),
     name: p.name,
@@ -3031,12 +3031,12 @@ function renderStore(): string {
   }));
   const photonsGroup = `    <details class="store-group" id="store-supernovas" ${storeOpen.supernovas ? "open" : ""}>
       <summary><span class="summary-title">Meet the Supernovas</span><span class="fine">12 Supernovas · tap to hide</span></summary>
-      <p class="page-lede">Each of the twelve is a Supernova on its own. Buy one and it drops into your app, ready to talk. Spin the drum to the one you want, then press DISPENSE — it drops into the tray below, ready to buy.</p>
+      <p class="page-lede">Each of the twelve is a Supernova on its own — spin the drum to the one you want, then press DISPENSE and it drops into the tray below, ready to buy.</p>
       ${machineHtml("store-supernovas", { title: "SUPERNOVAS", priceLine: "$499 one-time", listLabel: "See all 12 Supernovas", dispenseAction: "machine-dispense", kind: "photon", items: photonItems })}
     </details>`;
   const atomsGroup = `<details class="store-group" id="store-novas" ${storeOpen.novas ? "open" : ""}>
       <summary><span class="summary-title">Meet the Novas</span><span class="fine">12 Novas · tap to hide</span></summary>
-      <p class="page-lede">Each of the twelve is a Nova on its own. Buy one and it drops into your app, ready to help with your own day. Spin the drum to the one you want, then press DISPENSE — it drops into the tray below, ready to buy.</p>
+      <p class="page-lede">Each of the twelve is a Nova on its own — spin the drum to the one you want, then press DISPENSE and it drops into the tray below, ready to buy.</p>
       ${machineHtml("store-novas", { title: "NOVAS", priceLine: "$79 outright · or $10/month", listLabel: "See all 12 Novas", dispenseAction: "machine-dispense", kind: "atom", items: atomItems })}
     </details>`;
   const upkeepCard = `    <div class="card upkeep-card" id="store-upkeep"><button class="poster-btn upkeep-poster-btn" data-action="tier-info" data-tier="upkeep" aria-label="More about Upkeep"><img src="/brand/starburst.jpg" alt="" loading="lazy" decoding="async"></button><div><h2>Upkeep</h2><p>${esc(UPKEEP_COPY.body)}</p><p class="price">$29.00/month <span class="fine">($29.87 at checkout)</span></p><div class="row">${buyButton(buyUrl(UPKEEP.url, "upkeep"), "$29.87", state?.upkeep === true)}<button class="btn small more-info" data-action="tier-info" data-tier="upkeep">More info</button></div></div></div>`;
@@ -3046,10 +3046,10 @@ function renderStore(): string {
       <button class="btn${isPersonal ? "" : " primary"}" data-action="side-pick" data-side="business" aria-pressed="${isPersonal ? "false" : "true"}">Business</button>
       <button class="btn${isPersonal ? " primary" : ""}" data-action="side-pick" data-side="personal" aria-pressed="${isPersonal ? "true" : "false"}">Personal</button>
     </div>
-    <div class="store-head"><img src="/brand/starburst.jpg" alt="" loading="lazy" decoding="async"><div><h1 class="page-title">Store</h1><p>${isPersonal ? "A Nova is the helper for your own day." : "A Launch is the helper you talk with in this app."} Pick the helper that fits your day, then pick how you want to pay. The prices are further down, after a plain explanation of how it all works.</p></div></div>
+    <div class="store-head"><img src="/brand/starburst.jpg" alt="" loading="lazy" decoding="async"><div><h1 class="page-title">Store</h1><p>${isPersonal ? "A Nova is the helper for your own day" : "A Launch is the helper you talk with in this app"} — pick the one that fits your day, then how you want to pay; the prices sit further down, after a plain explanation of how it all works.</p></div></div>
     ${perkBanner()}
     ${stripeStatusData
-      ? `<p class="fine stripe-line">${stripeStatusData.configured ? "Automatic unlocks are on — a purchase unlocks as soon as Stripe confirms the payment." : "Automatic unlocks are off — the Stripe webhook isn't set up yet. Purchases still unlock by code (redeem one below) until it is."}</p>`
+      ? `<p class="fine stripe-line">${stripeStatusData.configured ? "Automatic unlocks are on — a purchase unlocks as soon as Stripe confirms the payment." : "Automatic unlocks are off — purchases still unlock by code (redeem one below) until the Stripe webhook is set up."}</p>`
       : `<p class="fine">Checking automatic unlocks…</p>`}
     <div class="chrome-thin"></div>
 
@@ -3084,7 +3084,7 @@ function renderStore(): string {
     ${isPersonal ? "" : upkeepCard}
 
     <h2 class="section-title" id="store-sparks-plugs">Sparks &amp; Plugs</h2>
-    <p class="page-lede">One job each. A Spark is a single button for one job, push it and it does the thing. A Plug is a Spark that runs on its own.</p>
+    <p class="page-lede">One job each — a Spark runs when you push it, a Plug runs on its own.</p>
     <div class="toggle" role="group" aria-label="Personal or Business">
       <button class="toggle-btn ${variant === "personal" ? "active" : ""}" data-action="variant" data-variant="personal">Personal</button>
       <button class="toggle-btn ${variant === "business" ? "active" : ""}" data-action="variant" data-variant="business">Business</button>
@@ -3103,7 +3103,7 @@ function renderStore(): string {
     </details>
     <div class="card" id="store-redeem">
       <h2>Redeem a code</h2>
-      <p>Have a friends-and-family code? Enter it here and everything unlocks. This is the only place to redeem one.</p>
+      <p>Have a friends-and-family code? Enter it here and everything unlocks — this is the only place to redeem one.</p>
       <form id="redeem-form" class="row">
         <input id="redeem-input" type="text" inputmode="numeric" autocomplete="off" placeholder="10-digit code" aria-label="Redeem code">
         <button class="btn primary" type="submit">Redeem</button>
@@ -3154,7 +3154,7 @@ function renderProactive(): string {
   }
   let pushHtml = "";
   if (!push.configured) {
-    pushHtml = `<p class="fine">Phone taps aren't set up on the server yet — it needs VAPID keys. Checks and reminders still run without them.</p>`;
+    pushHtml = `<p class="fine">Phone taps aren't set up on the server yet — checks and reminders still run without them.</p>`;
   } else if (push.subscribed) {
     pushHtml = `<p><span class="owned-badge">Phone taps on</span> This device gets a tap when a check finds something new.</p><button class="btn small" data-action="push-toggle">Turn phone taps off</button>`;
   } else {
@@ -3163,7 +3163,7 @@ function renderProactive(): string {
   return `<div class="card">
     <h2>Checks &amp; reminders</h2>
     <p class="fine">${s.running ? `Checking every ${s.intervalMinutes || 5} minutes while the server is awake.` : "The checker isn't running right now."} ${s.lastCheckAt ? `Last check: ${esc(fmtTime(s.lastCheckAt))}.` : "No check has run yet."} ${s.totalNewFound ? `${s.totalNewFound} new item(s) found so far.` : ""}</p>
-    <p class="fine">Watching Gmail. ${channels.texts ? "Texts and calendar too." : "Texts and calendar checks aren't built yet, so Gmail is all it watches for now."}</p>
+    <p class="fine">Watching Gmail${channels.texts ? " — texts and calendar too." : " — texts and calendar checks aren't built yet."}</p>
     <div class="row"><button class="btn primary" data-action="check-now" ${checkRunning ? "disabled" : ""}>${checkRunning ? "Checking…" : "Check now"}</button></div>
     ${checkHtml}
     <h3>Reminders</h3>
@@ -3322,7 +3322,7 @@ function accountCard(): string {
     if (stateFailed) {
       return `<div class="card">
       <h2>Your account</h2>
-      <p>Prism didn't answer just now, so your Google connection couldn't be checked. Nothing about your account has changed — check your connection and try again.</p>
+      <p>Prism didn't answer just now, so your Google connection couldn't be checked — nothing about your account has changed, so check your connection and try again.</p>
       <div class="row"><button class="btn primary" data-action="retry-state">Check again</button></div>
     </div>`;
     }
@@ -3335,10 +3335,10 @@ function accountCard(): string {
   if (!auth || !auth.signedIn) {
     return `<div class="card">
       <h2>Your account</h2>
-      <p>You are not signed in. Your Supernovas, chats, and purchases live on this device only right now — sign in with Google and they follow you to any device, and they survive a new phone.</p>
+      <p>You are not signed in — your Supernovas, chats, and purchases live on this device only right now, and signing in with Google takes them to any device.</p>
       <p class="fine">Signing in creates your account, and it comes with two things: a story for your first Supernova, and 15% off your first order for 10 days.</p>
       <div class="row"><button class="btn primary" data-action="signin">Sign in with Google</button></div>
-      <p class="fine">We see only your name and email. Nothing else from your Google account is read or kept.</p>
+      <p class="fine">We see only your name and email — nothing else from your Google account is read or kept.</p>
     </div>`;
   }
   const perk = (state as any)?.perk;
@@ -3346,12 +3346,12 @@ function accountCard(): string {
   return `<div class="card">
     <h2>Your account</h2>
     <p>Signed in as <b>${esc(auth.name || auth.email || "")}</b>${auth.email && auth.name ? ` (${esc(auth.email)})` : ""}.</p>
-    <p class="fine">Account since ${esc(fmtDateOnly(auth.since || ""))}. Your Supernovas, chats, and purchases follow this account to any device.</p>
+    <p class="fine">Account since ${esc(fmtDateOnly(auth.since || ""))} — your Supernovas, chats, and purchases follow this account to any device.</p>
     <div class="row"><button class="btn" data-action="signout">Sign out</button></div>
   </div>
   ${perk && perk.active ? `<div class="card perk-card">
     <h2>Your welcome offer — 15% off your first order</h2>
-    <p>Your code is <b>${esc(perk.code)}</b>, good until ${esc(fmtDateOnly(perk.expiresAt))}. It is already filled in at checkout in the Store, so the discount is there when the page opens. One order only.</p>
+    <p>Your code is <b>${esc(perk.code)}</b>, good until ${esc(fmtDateOnly(perk.expiresAt))} — already filled in at checkout in the Store, one order only.</p>
   </div>` : ""}
   ${prismStory ? `<div class="card">
     <h2>How Prism began</h2>
@@ -3364,7 +3364,7 @@ function readabilityCard(): string {
     `<button class="btn${readSize === s ? " primary" : ""}" data-action="read-size" data-size="${s}" aria-pressed="${readSize === s}">${label}</button>`;
   return `<div class="card">
     <h2>Reading</h2>
-    <p class="fine">Bigger text and stronger contrast, for older eyes. Saved on this device, and it follows you across Chat, Connected, the Store, and You.</p>
+    <p class="fine">Bigger text and stronger contrast, for older eyes — saved on this device.</p>
     <h4>Text size</h4>
     <div class="row" role="group" aria-label="Text size">
       ${sizeBtn("normal", "Normal")}${sizeBtn("large", "Large")}${sizeBtn("xl", "Extra-large")}
@@ -3385,7 +3385,7 @@ function readabilityCard(): string {
 function openingCard(): string {
   return `<div class="card">
     <h2>Opening animation</h2>
-    <p class="fine">The opening that plays when the app opens — a shaft of light that gathers and splits into your helpers. Turn it off and the app opens straight in, every time, until you turn it back on. Saved on this device.</p>
+    <p class="fine">The opening that plays when the app opens — turn it off and the app opens straight in, every time.</p>
     <div class="row">
       <button class="btn${playOpening ? " primary" : ""}" data-action="opening-toggle" aria-pressed="${playOpening}">${playOpening ? "Opening animation: on" : "Opening animation: off"}</button>
     </div>
@@ -3402,7 +3402,7 @@ function soundsCard(): string {
   const on = soundsEnabled();
   return `<div class="card">
     <h2>Interface sounds</h2>
-    <p class="fine">Tiny sounds for taps, switches, and screen changes — a click, a toggle blip, a swoosh. Quiet on purpose: they sit under everything else and never get in the way.</p>
+    <p class="fine">Tiny sounds for taps, switches, and screen changes — quiet on purpose, under everything else.</p>
     <div class="row">
       <button class="btn${on ? " primary" : ""}" data-action="sound-toggle" aria-pressed="${on}">${on ? "Interface sounds: on" : "Interface sounds: off"}</button>
     </div>
@@ -3423,7 +3423,7 @@ function nameCard(): string {
   const customName = state?.customName || "";
   return `<div class="card make-yours">
       <h2>Make it yours</h2>
-      <p>Give your assistant a name. It replaces "Prism 5" everywhere in this app until you clear it.</p>
+      <p>Give your assistant a name — it replaces "Prism 5" everywhere in this app until you clear it.</p>
       <form id="name-form" class="row">
         <input id="name-input" type="text" maxlength="40" placeholder="e.g. Megan" value="${esc(customName)}" aria-label="Your assistant's name">
         <button class="btn primary" type="submit">Save name</button>
@@ -3457,15 +3457,15 @@ function novaCard(): string {
   return `<div class="card">
     <h2>Nova — for your own day</h2>
     <p><span class="owned-badge">Yours</span></p>
-    <p class="fine">Your personal helper. It opens the personal set:</p>
+    <p class="fine">Your personal helper — it opens the personal set:</p>
     <ul class="included-list">${PERSONAL_FEATURES.map((f) => `<li>${esc(f.label)}</li>`).join("")}</ul>
     <h3>Gentle, by default</h3>
-    <p class="fine">Check-ins and getting-started nudges are on for Nova owners, from the start. Turn either off here and it stays off.</p>
+    <p class="fine">Check-ins and getting-started nudges are on from the start — turn either off here and it stays off.</p>
     <div class="row">
       <button class="btn${ns.checkIns ? " primary" : ""}" data-action="nova-checkins" aria-pressed="${ns.checkIns ? "true" : "false"}">${ns.checkIns ? "Check-ins: on" : "Check-ins: off"}</button>
       <button class="btn${ns.gettingStartedNudges ? " primary" : ""}" data-action="nova-nudges" aria-pressed="${ns.gettingStartedNudges ? "true" : "false"}">${ns.gettingStartedNudges ? "Getting-started nudges: on" : "Getting-started nudges: off"}</button>
     </div>
-    <p class="fine">Personal Upkeep: ${hasPersonalUpkeep ? "on — $9 a month, keeping your personal helper cared for." : "not on yet. Your first three months come with Nova; after that it is $9 a month in the Store, beside Nova."}</p>
+    <p class="fine">Personal Upkeep: ${hasPersonalUpkeep ? "on — $9 a month, keeping your personal helper cared for." : "not on yet — your first three months come with Nova, then $9 a month in the Store."}</p>
   </div>`;
 }
 
@@ -3489,7 +3489,7 @@ function businessLockedCard(): string {
   if (!hasPersonal || hasBusiness) return "";
   return `<div class="card">
     <h2>The business set — locked</h2>
-    <p class="fine">Nova is for your own day. These stay locked unless you own a business Launch — Supernova or Satellite:</p>
+    <p class="fine">Nova is for your own day — these stay locked unless you own a business Launch:</p>
     <ul class="included-list">${BUSINESS_FEATURES.map((f) => `<li>${esc(f.label)}</li>`).join("")}</ul>
     <div class="row"><button class="btn primary" data-action="goto" data-tab="store">See business Launches in the Store</button></div>
   </div>`;
@@ -3505,7 +3505,7 @@ function sideCard(): string {
   const current = sideOrDefault();
   return `<div class="card">
     <h2>Business or Personal</h2>
-    <p class="fine">Two doors, one app. Business shows the business Launches and prices; Personal shows Nova and personal prices. Switch any time — nothing you own changes.</p>
+    <p class="fine">Two doors, one app — Business shows the business Launches and prices, Personal shows Nova and personal prices, and switching never changes what you own.</p>
     <div class="row" role="group" aria-label="Business or Personal">
       <button class="btn${current === "business" ? " primary" : ""}" data-action="side-pick" data-side="business" aria-pressed="${current === "business" ? "true" : "false"}">For my business</button>
       <button class="btn${current === "personal" ? " primary" : ""}" data-action="side-pick" data-side="personal" aria-pressed="${current === "personal" ? "true" : "false"}">For me, personally</button>
@@ -3529,7 +3529,7 @@ function renderYou(): string {
   return `
   <section>
     <h1 class="page-title">You</h1>
-    <p class="page-lede">Your account, and how the app behaves. Nothing for sale here — buying happens in the Store.</p>
+    <p class="page-lede">Your account, and how the app behaves — nothing for sale here.</p>
 
     ${accountCard()}
 
@@ -3539,7 +3539,7 @@ function renderYou(): string {
       <h2>Your chats</h2>
       <p class="meter-line">${esc(meterLine())}</p>
       ${meterBar()}
-      <p class="fine">Every purchase includes 300 chats a month, free forever. No subscription needed.</p>
+      <p class="fine">Every purchase includes 300 chats a month, free forever — no subscription needed.</p>
     </div>
 
     <div class="card">

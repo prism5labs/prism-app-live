@@ -9,7 +9,7 @@
 export const TIER_COPY = {
   supernova: {
     title: "Supernova",
-    body: "A Supernova is roughly 90,000 lines of instructions, written carefully, tested until it works, and designed to do exactly what it is meant to do. The prompts are written in ways most people do not know how to write them. And one assistant is not one thing. Underneath it are 30 different specialists, plus five tuning dials set specifically so it focuses on what matters to you. When you buy a Supernova, you get all of it, the lines, the specialists, the dials, the testing time, the care, built in.",
+    body: "A Supernova is roughly 90,000 lines of instructions — written carefully, tested until it works, with 30 different specialists underneath and five tuning dials set to what matters to you. When you buy a Supernova, you get all of it: the lines, the specialists, the dials, the testing time, the care, built in.",
     hours: "That is roughly 300 hours of building and testing, about 37 working days, built in.",
   },
   satellite: {
@@ -33,7 +33,7 @@ export const TIER_COPY = {
 export const UPKEEP_COPY = {
   title: "Upkeep",
   priceLine: "$29 a month",
-  body: "Upkeep is the care that keeps your Launch alive: unlimited chat, Launch updates as they come out, priority support, and voice calls in chat — talk out loud, turn by turn. Every purchase already includes 300 chats a month on the standard brain, free forever, no subscription needed. Upkeep is never required to use what you bought.",
+  body: "Upkeep is the care that keeps your Launch alive: unlimited chat, Launch updates as they come out, priority support, and voice calls in chat. Every purchase already includes 300 chats a month, free forever, and Upkeep is never required to use what you bought.",
   included: [
     "Unlimited chat",
     "Launch updates",
@@ -44,4 +44,4 @@ export const UPKEEP_COPY = {
 
 // The free 300 chats a month, in plain words.
 export const FREE_CHATS_COPY =
-  "Every purchase includes 300 chats a month, free forever. No subscription needed.";
+  "Every purchase includes 300 chats a month, free forever — no subscription needed.";

@@ -276,7 +276,11 @@
 // icon below — bump the ?v= with the version on any future icon
 // change — and the server caps icons/favicon at a day and serves
 // the manifest no-cache.
-const CACHE = "prism5-v80";
+// v81: one-sentence sweep (Neil, Nov 26, 2026) — every settings/info
+// row, card note and product description in You, the Store, Connected
+// and Customize cut to a label plus at most one short sentence; the
+// mandated pricing explainer keeps its plain-words paragraphs.
+const CACHE = "prism5-v81";
 // Images (portraits, thumbnails, brand art, chat backgrounds, icons)
 // live in their own cache whose name does NOT change with the shell
 // version. Before v52 every shell bump deleted the one cache on

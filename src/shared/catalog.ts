@@ -162,7 +162,7 @@ export const PRODUCTS: CatalogProduct[] = [
     "name": "Start My Day",
     "kind": "Plug",
     "category": "Everyday Life",
-    "description": "a morning briefing that walks your day top to bottom, one item at a time. Confirm each item and it gets done, moved, or cleared, and anything you add during the day joins the plan.",
+    "description": "a morning briefing that walks your day top to bottom, one item at a time — confirm each item and it gets done, moved, or cleared.",
     "personal": {
       "price": "$39.00",
       "total": "$40.17",
