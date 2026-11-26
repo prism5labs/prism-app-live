@@ -7,6 +7,10 @@
 // a token-based unsubscribe link (no sign-in needed to leave), and a
 // welcome acknowledgement sent from the owner's connected Gmail.
 //
+// The website's "Stay in the loop" form is the second door into the
+// same list (subscribeFromWebsite, source "website") — it replaced a
+// mailto form that stored nothing and welcomed no one (Nov 26, 2026).
+//
 // Sending goes through the OWNER's Gmail (sendFromAny), never the
 // subscriber's — the owner is the sender, the subscriber is the
 // recipient. The welcome is only ever sent once per subscriber
@@ -97,6 +101,53 @@ export function subscribeNewsletter(
   return row;
 }
 
+// Whether this email is currently on the list — subscribed and not
+// unsubscribed. The website signup answers "you're already on the
+// list" from this instead of writing a second row or sending a
+// second welcome.
+export function isSubscribed(email: string): boolean {
+  const row = getSubscriber(email.trim().toLowerCase());
+  return !!row && row.unsubscribedAt === null;
+}
+
+// Subscribe from the website's "Stay in the loop" form (Nov 26,
+// 2026). The form used to compose a mailto in the visitor's own mail
+// app — nothing was stored, no list existed, and no welcome ever
+// arrived. Now the form posts here and the address lands on this
+// same list, source "website", and the welcome drain below sends
+// the acknowledgement. A repeat signup is the same subscription:
+// it answers already = true and writes no second row and no second
+// welcome. A re-subscribe after an unsubscribe rejoins the list
+// (subscribeNewsletter clears the mark; the welcome is not resent —
+// welcome_sent_at still stands from the first time).
+export function subscribeFromWebsite(
+  rawEmail: string,
+): { ok: true; already: boolean; email: string } | { ok: false; error: string } {
+  const clean = String(rawEmail || "").trim().toLowerCase();
+  if (!clean || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clean)) {
+    return { ok: false, error: "invalid_email" };
+  }
+  if (isSubscribed(clean)) return { ok: true, already: true, email: clean };
+  subscribeNewsletter(clean, null, "website");
+  return { ok: true, already: false, email: clean };
+}
+
+// Rate limit for the website signup, in-memory only (the same call
+// the demo-request limiter made): 5 attempts per client address per
+// 10 minutes. The harm in a flood is junk rows and junk welcome
+// mail, and both stay capped.
+const signupAttempts = new Map<string, number[]>();
+
+export function newsletterSignupRateLimited(key: string): boolean {
+  const now = Date.now();
+  const windowMs = 10 * 60 * 1000;
+  const list = (signupAttempts.get(key) || []).filter((t) => now - t < windowMs);
+  if (list.length >= 5) return true;
+  list.push(now);
+  signupAttempts.set(key, list);
+  return false;
+}
+
 // Unsubscribe by token. Returns true when a row was marked, false when
 // the token matches nothing (already gone, or never existed).
 export function unsubscribeNewsletter(token: string): boolean {
@@ -152,13 +203,20 @@ export function isOwnerAccount(accountId: string): boolean {
   return !!row && isOwnerEmail(row.email);
 }
 
-// The welcome acknowledgement, grounded in the landing copy: the
-// newsletter brings exclusive rotating offers of merch and more, and
-// the thank-you is the same 15% off the first order the landing
-// promises on sign-up (code WELCOME15, the sign-in perk, good for 10
-// days from sign-up). Sent from the owner's connected Gmail, plain
-// text, with the unsubscribe link at the foot. On success the row is
-// marked sent so it never goes twice.
+// The welcome acknowledgement. Two shapes, by how the subscriber
+// arrived:
+//  - Google sign-in (the original list): grounded in the landing
+//    copy — the newsletter brings exclusive rotating offers of merch
+//    and more, and the thank-you is the same 15% off the first order
+//    the landing promises on sign-up (code WELCOME15, the sign-in
+//    perk, good for 10 days from sign-up).
+//  - The website form (source "website"): the visitor never signed
+//    in and holds no perk, so this shape promises only what the
+//    site itself promises — one short email when something new is
+//    ready, and the 14-day money-back promise everything carries.
+// Sent from the owner's connected Gmail, plain text, with the
+// unsubscribe link at the foot. On success the row is marked sent
+// so it never goes twice.
 export async function sendNewsletterWelcome(
   ownerId: string,
   sub: NewsletterSubscriber,
@@ -166,15 +224,25 @@ export async function sendNewsletterWelcome(
   const base = config.appUrl.replace(/\/$/, "");
   const unsubscribeUrl = `${base}/api/newsletter/unsubscribe?token=${encodeURIComponent(sub.unsubscribeToken)}`;
   const greeting = sub.name ? `Hi ${sub.name},` : "Hi,";
+  const website = sub.source === "website";
   const body = [
     greeting,
     ``,
     `Welcome to the Prism newsletter — you're in.`,
     ``,
-    `Signing up with Google signed you up for the newsletter, and this is what it brings: exclusive rotating offers of merch and more, straight to your inbox.`,
-    ``,
-    `As a thank-you, here's 15% off your first order. Use code ${PERK_CODE} at checkout — it's good for ${PERK_DAYS} days from when you signed up.`,
-    ``,
+    ...(website
+      ? [
+          `You signed up on prism5labs.com, and this is what it brings: one short email when something new is ready — new assistants, new tales, and offers for subscribers. No noise, ever.`,
+          ``,
+          `Everything we make comes with a 14-day money-back promise: if it isn't right for you, tell us within 14 days and we will refund it. Plain and simple.`,
+          ``,
+        ]
+      : [
+          `Signing up with Google signed you up for the newsletter, and this is what it brings: exclusive rotating offers of merch and more, straight to your inbox.`,
+          ``,
+          `As a thank-you, here's 15% off your first order. Use code ${PERK_CODE} at checkout — it's good for ${PERK_DAYS} days from when you signed up.`,
+          ``,
+        ]),
     `If you'd rather not hear from us, you can unsubscribe any time:`,
     unsubscribeUrl,
     ``,

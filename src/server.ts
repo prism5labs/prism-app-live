@@ -161,6 +161,8 @@ import {
 // user up for the newsletter; this module is the store and the sender.
 import {
   subscribeNewsletter,
+  subscribeFromWebsite,
+  newsletterSignupRateLimited,
   unsubscribeNewsletter,
   listSubscribers,
   isOwnerAccount,
@@ -657,6 +659,23 @@ async function handleApi(req: Request, path: string): Promise<Response> {
     return new Response(null, { status: 204, headers });
   }
 
+  // Website newsletter signup (Nov 26, 2026) — CORS preflight. The
+  // "Stay in the loop" form on prism5labs.com posts cross-origin with
+  // no credentials, so this path gets its own preflight, exactly like
+  // /api/demo-request: exact-origin echo only, POST and content-type
+  // only, no credentials.
+  if (method === "OPTIONS" && path === "/api/newsletter/subscribe") {
+    const origin = corsOriginFor(req);
+    const headers: Record<string, string> = { Vary: "Origin" };
+    if (origin) {
+      headers["Access-Control-Allow-Origin"] = origin;
+      headers["Access-Control-Allow-Methods"] = "POST, OPTIONS";
+      headers["Access-Control-Allow-Headers"] = "content-type";
+      headers["Access-Control-Max-Age"] = "86400";
+    }
+    return new Response(null, { status: 204, headers });
+  }
+
   // Step 10 — POST /api/research — live web search with sources.
   if (path === "/api/research" && method === "POST") {
     return await handleResearch(req);
@@ -717,6 +736,75 @@ async function handleApi(req: Request, path: string): Promise<Response> {
         message: result.already
           ? `Your demo request is already in — we'll text the demo to ${result.display}. Every text includes the opt-out: reply STOP to opt out.`
           : `Your demo request is in — we'll text the demo to ${result.display}. Every text includes the opt-out: reply STOP to opt out.`,
+      }),
+    );
+  }
+
+  // POST /api/newsletter/subscribe — the website's "Stay in the loop"
+  // form. Public on purpose: the visitor has no account. The address
+  // is validated, stored on the newsletter list (source "website",
+  // src/server/newsletter.ts), and the welcome drain is kicked in the
+  // background so the acknowledgement goes out at once — the signup
+  // never waits on mail and never fails on it; a welcome that cannot
+  // send yet stays pending for the hourly drain. A repeat signup
+  // answers already = true and writes no second row. A honeypot
+  // field rides along, exactly as on /api/demo-request: a submission
+  // with anything in it is a bot's, and it gets a quiet ok with no
+  // row and no email.
+  if (path === "/api/newsletter/subscribe" && method === "POST") {
+    const withCors = (res: Response): Response => {
+      const origin = corsOriginFor(req);
+      if (!origin) return res;
+      const headers = new Headers(res.headers);
+      headers.set("Access-Control-Allow-Origin", origin);
+      headers.set("Vary", "Origin");
+      return new Response(res.body, { status: res.status, headers });
+    };
+    const body = await readBody(req);
+    if (typeof body.website === "string" && body.website.trim() !== "") {
+      return withCors(json({ ok: true }));
+    }
+    const ipKey =
+      (req.headers.get("x-forwarded-for") || "").split(",")[0].trim() || "noip";
+    if (newsletterSignupRateLimited(ipKey)) {
+      return withCors(
+        json(
+          {
+            ok: false,
+            error: "too_many_attempts",
+            message: "Too many tries. Wait a few minutes and try again.",
+          },
+          429,
+        ),
+      );
+    }
+    const result = subscribeFromWebsite(String(body.email || ""));
+    if (!result.ok) {
+      return withCors(
+        json(
+          {
+            ok: false,
+            error: result.error,
+            message: "That email doesn't look right — check it and try again.",
+          },
+          400,
+        ),
+      );
+    }
+    if (!result.already) {
+      void sendPendingNewsletterWelcomes().catch((e) =>
+        console.error("newsletter welcome drain failed:", e),
+      );
+    }
+    return withCors(
+      json({
+        ok: true,
+        already: result.already,
+        message: result.already
+          ? "You're already on the list — no need to sign up twice. Welcome back."
+          : "You're on the list — welcome! A short welcome email is on its way to " +
+            result.email +
+            ".",
       }),
     );
   }
