@@ -251,7 +251,17 @@
 // from a transient failure, the card and the row carry a working
 // reconnect button for the exact account, and the header pill reads
 // "Google reconnect needed" once a loaded inbox shows the failure.
-const CACHE = "prism5-v73";
+// CACHE v74: bumped Nov 26, 2026 for the opening film. The opening
+// is a film again — not the retired v5 plate, but a per-Face
+// composite: one animated clip per Face from its own hero art,
+// composited in the HERO_SLOTS formation (gather → split → the
+// living hold → flash → fade to Chat), streamed from
+// /opening-film.mp4. The film is NOT in the shell precache and
+// the fetch handler never stores it; the shell carries the film's
+// gather-beat backdrop still instead of the retired v5 poster.
+// The DOM hero stage it replaces is gone from main.ts and
+// styles.css. Tap-to-skip and the curtain dismissal are unchanged.
+const CACHE = "prism5-v74";
 // Images (portraits, thumbnails, brand art, chat backgrounds, icons)
 // live in their own cache whose name does NOT change with the shell
 // version. Before v52 every shell bump deleted the one cache on
@@ -261,13 +271,13 @@ const CACHE = "prism5-v73";
 // name is only ever changed if the asset strategy itself changes.
 const ASSETS = "prism5-assets-v1";
 // The shell is the app itself plus the opening's backdrop still
-// (the splash is untouchable). The opening films that used to ride
-// along here were retired in v72 — the opening is the hero stage
-// now, no video at all. The twelve chat backgrounds are NOT
-// precached any more (v52): they were ~11 MB of the ~12 MB
-// install, and the fetch handler now caches each one in the asset
-// cache the first time the rotation reaches it.
-const SHELL = ["/", "/index.html", "/styles.css", "/main.js", "/update-gate.js", "/manifest.json", "/opening-v5-poster.jpg"];
+// (the splash is untouchable). The opening film itself is NOT
+// precached (v74): it streams from /opening-film.mp4 on every
+// open and the fetch handler never stores it. The twelve chat
+// backgrounds are NOT precached any more (v52): they were ~11 MB
+// of the ~12 MB install, and the fetch handler now caches each
+// one in the asset cache the first time the rotation reaches it.
+const SHELL = ["/", "/index.html", "/styles.css", "/main.js", "/update-gate.js", "/manifest.json", "/opening-backdrop.jpg"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -295,14 +305,15 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
   if (event.request.method !== "GET") return;
   if (url.pathname.startsWith("/api/") || url.pathname === "/healthz") return;
-  // Range requests (media streaming and seeking — the hero clips
-  // are the remaining video in the app since the opening films
-  // were retired in v72): serve a 206 slice out of the cache when
-  // the whole file is cached, so a clip plays from the installed
-  // copy on reopen even on a slow connection. When the file is not
-  // cached yet, fall through to the network untouched. (The Cache
-  // API cannot store a 206 partial response, so only whole 200s
-  // are ever cached and sliced here.)
+  // Range requests (media streaming and seeking — the opening
+  // film is the app's video now, v74): serve a 206 slice out of
+  // the cache when the whole file is cached, so a clip plays from
+  // the installed copy on reopen even on a slow connection. When
+  // the file is not cached yet, fall through to the network
+  // untouched — the opening film is never cached at all, so its
+  // requests always take that path and stream. (The Cache API
+  // cannot store a 206 partial response, so only whole 200s are
+  // ever cached and sliced here.)
   if (event.request.headers.has("Range")) {
     event.respondWith(
       caches.match(event.request).then(async (cached) => {
@@ -370,7 +381,10 @@ self.addEventListener("fetch", (event) => {
     caches.match(event.request).then((cached) => {
       const network = fetch(event.request)
         .then((res) => {
-          if (res.ok) {
+          // The opening film is never stored (v74): it streams
+          // from the network on every open, so no install carries
+          // its ~1.2 MB in a cache.
+          if (res.ok && url.pathname !== "/opening-film.mp4") {
             const copy = res.clone();
             caches.open(CACHE).then((c) => c.put(event.request, copy)).catch(() => {});
           }

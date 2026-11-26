@@ -23,12 +23,13 @@
 <body>
   <div id="app-bg" class="app-bg" aria-hidden="true"><div class="app-bg-scrim"></div></div>
   <div id="opening-splash" class="opening-splash" aria-hidden="true">
-    <!-- No film any more (Nov 25, 2026): the v5 opening film and its
-         v3 fallback are retired — the app kept playing the old video
-         on fresh installs. The splash backdrop is the film's first
-         beat as a still (light on the crystal, no figure), and the
-         hero stage in main.js carries the opening from there. -->
-    <img id="opening-splash-poster" class="opening-splash-poster" src="/opening-v5-poster.jpg" alt="" aria-hidden="true">
+    <!-- The opening film (Nov 26, 2026): the per-Face composite in
+         main.js streams in over this backdrop — the new film's own
+         gather beat as a still (her light on the bare stage), so
+         the splash is dressed from the first paint, before the
+         film's first frame lands. The v5 film and its poster are
+         retired; see the Opening film section in main.ts. -->
+    <img id="opening-splash-poster" class="opening-splash-poster" src="/opening-backdrop.jpg" alt="" aria-hidden="true">
     <div class="opening-splash-caption" id="opening-splash-caption">
       <span class="opening-splash-eyebrow">Prism 5</span>
       <span class="opening-splash-greeting" id="opening-splash-greeting">Welcome</span>

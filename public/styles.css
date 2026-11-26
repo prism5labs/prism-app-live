@@ -747,13 +747,29 @@ textarea { width: 100%; resize: vertical; }
 .opening-splash[data-scheme="golden-rocket"] { --splash-bg: #4a2c00; --splash-ink: #fff3dc; --splash-accent: #ffb703; --splash-accent2: #0f5257; }
 .opening-splash[data-scheme="starlight-lilac"] { --splash-bg: #221645; --splash-ink: #f0e9ff; --splash-accent: #c4b5fd; --splash-accent2: #f4c95d; }
 .opening-splash[data-scheme="checkered-flag"] { --splash-bg: #1c1c1e; --splash-ink: #fff3dc; --splash-accent: #d62828; --splash-accent2: #f4c95d; }
-/* The splash backdrop: a still of the old film's first beat (light
-   on the crystal), kept after the film itself was retired on
-   Nov 25, 2026. The hero stage covers it within a second. */
+/* The splash backdrop: the opening film's own gather beat as a
+   still (her light on the bare stage), so the splash is dressed
+   from the first paint. The film covers it the moment its first
+   frame lands. */
 .opening-splash-poster {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  display: block;
+}
+/* The opening film itself (client/main.ts seats it over the
+   backdrop): the per-Face composite — gather, split, the living
+   hold, the flash — filling the splash exactly as the hero stage
+   did before it. A sibling of the backdrop, never an ancestor,
+   so nothing about its surface can stall (the curtain rule). */
+.opening-film {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background: #000;
   display: block;
 }
 /* Welcome / welcome back caption: an overlay at the bottom of the
@@ -863,228 +879,6 @@ textarea { width: 100%; resize: vertical; }
 }
 .opening-splash-off:active {
   background: rgba(0, 0, 0, 0.45);
-}
-/* Hero finale (client/main.ts builds it over the film at the
-   handoff): the 23 Novas and Supernovas — Prism not among them —
-   as full-figure heroes with painted full-body art, assembling
-   asymmetrically over an atomic stage: orbit rings, starbursts,
-   a breathing glow, a lit ground. They hold alive for a breath,
-   then flash out as light into a white-gold bloom. Everything
-   moves on transform/opacity only (plus brief brightness pulses
-   on the figures at a flash-in and at the charge). The stage is
-   a sibling of the film, never an ancestor, so its fade-in
-   cannot stall the film's surface (the curtain rule above). All
-   colors come from the active scheme's variables, so the stage
-   matches whichever of the ten colorings this open drew. */
-.opening-hero-stage {
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  overflow: hidden;
-  background:
-    linear-gradient(to top, rgba(0, 0, 0, 0.35), rgba(0, 0, 0, 0) 30%),
-    radial-gradient(115% 80% at 50% 40%, rgba(255, 243, 220, 0.14), rgba(0, 0, 0, 0) 60%),
-    var(--splash-bg, #0f5257);
-  opacity: 0;
-  transition: opacity 0.55s ease;
-}
-.opening-hero-stage.is-in {
-  opacity: 1;
-}
-.opening-hero-glow {
-  position: absolute;
-  left: 47%;
-  top: 38%;
-  width: 135%;
-  aspect-ratio: 1 / 1;
-  border-radius: 50%;
-  background: radial-gradient(circle, var(--splash-accent2, #f4c95d) 0%, rgba(0, 0, 0, 0) 62%);
-  animation: oh-breathe 3.8s ease-in-out infinite alternate;
-}
-@keyframes oh-breathe {
-  from { transform: translate(-50%, -50%) scale(1); opacity: 0.4; }
-  to { transform: translate(-50%, -50%) scale(1.05); opacity: 0.58; }
-}
-/* Her light, and only her light (Neil, Nov 23, 2026): Prism
-   herself never appears in the opening — no figure, no disc,
-   no portrait. What enters is a shaft of light falling to the
-   stage's heart, where it gathers in a bright core; the split
-   sends one ray of that light to each hero's place, and the
-   figures condense out of it where they stand. The old orbit
-   rings are gone: a ring reads as an emblem, and she has none
-   here. */
-.opening-hero-shaft {
-  position: absolute;
-  left: 47%;
-  top: -4%;
-  width: 130px;
-  height: 44%;
-  transform: translateX(-50%);
-  transform-origin: 50% 0;
-  background: linear-gradient(to bottom, rgba(255, 243, 220, 0) 0%, rgba(255, 243, 220, 0.34) 45%, rgba(255, 252, 240, 0.75) 100%);
-  clip-path: polygon(38% 0, 62% 0, 100% 100%, 0 100%);
-  filter: blur(5px);
-  opacity: 0;
-  pointer-events: none;
-}
-.opening-hero-core {
-  position: absolute;
-  left: 47%;
-  top: 38%;
-  width: 150px;
-  aspect-ratio: 1 / 1;
-  transform: translate(-50%, -50%);
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(255, 253, 244, 0.98) 0%, rgba(255, 243, 220, 0.75) 34%, var(--splash-accent2, #f4c95d) 58%, rgba(0, 0, 0, 0) 72%);
-  opacity: 0;
-  pointer-events: none;
-  animation: oh-core-pulse 2.6s ease-in-out infinite alternate;
-}
-@keyframes oh-core-pulse {
-  from { transform: translate(-50%, -50%) scale(1); }
-  to { transform: translate(-50%, -50%) scale(1.08); }
-}
-/* The split: one ray per hero, drawn from the light's heart to
-   the hero's centre by JS (left/top at the heart, width the
-   distance, rotated to the line, scaled open along it). */
-.opening-hero-rays {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-}
-.opening-hero-ray {
-  position: absolute;
-  height: 3px;
-  border-radius: 2px;
-  transform-origin: 0 50%;
-  background: linear-gradient(90deg, rgba(255, 253, 244, 0.95), var(--splash-accent2, #f4c95d) 70%, rgba(255, 243, 220, 0.15));
-  box-shadow: 0 0 9px 2px rgba(255, 243, 220, 0.55);
-  opacity: 0;
-  pointer-events: none;
-}
-/* The lit ground the assembly stands on: an ellipse of scheme
-   light at the stage's feet, lit by JS as the heroes gather. */
-.opening-hero-ground {
-  position: absolute;
-  left: 50%;
-  bottom: -8%;
-  width: 135%;
-  height: 36%;
-  transform: translateX(-50%);
-  border-radius: 50%;
-  background: radial-gradient(ellipse at center, var(--splash-accent2, #f4c95d) 0%, rgba(0, 0, 0, 0) 65%);
-  opacity: 0;
-  pointer-events: none;
-}
-.opening-hero-cast {
-  position: absolute;
-  inset: 0;
-}
-.opening-hero {
-  position: absolute;
-  transform: translate(-50%, 0);
-  will-change: transform, opacity;
-}
-.opening-hero-sway {
-  transform-origin: 50% 92%;
-  will-change: transform;
-}
-.opening-hero img,
-.opening-hero video {
-  position: relative;
-  z-index: 1;
-  display: block;
-  width: 100%;
-  height: auto;
-  filter: drop-shadow(0 10px 22px rgba(0, 0, 0, 0.45));
-}
-/* The light trail: a tapered streak centred on the figure,
-   rotated by JS to the hero's line of travel. It sits behind
-   the figure and burns only while the hero is moving — a
-   streak-in, and the flash-out. */
-.opening-hero-trail {
-  position: absolute;
-  left: 50%;
-  top: 46%;
-  width: 115%;
-  height: 30%;
-  transform: translate(-50%, -50%);
-  border-radius: 50%;
-  background: linear-gradient(90deg, rgba(0, 0, 0, 0), var(--splash-accent2, #f4c95d) 55%, rgba(255, 243, 220, 0.95));
-  opacity: 0;
-  pointer-events: none;
-}
-.opening-hero-bursts {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-}
-.opening-hero-burst {
-  position: absolute;
-  aspect-ratio: 1 / 1;
-  transform: translate(-50%, 50%) scale(0.3);
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(255, 243, 220, 0.95) 0%, var(--splash-accent2, #f4c95d) 45%, rgba(0, 0, 0, 0) 70%);
-  opacity: 0;
-}
-/* The wind made visible: one soft band of light crossing the
-   held assembly (client/main.ts drives its transform/opacity). */
-.opening-hero-wind {
-  position: absolute;
-  top: -12%;
-  bottom: -12%;
-  left: 22%;
-  width: 56%;
-  background: linear-gradient(90deg, rgba(255, 243, 220, 0), rgba(255, 243, 220, 0.5), rgba(255, 243, 220, 0));
-  opacity: 0;
-  pointer-events: none;
-}
-/* The charge and the flash: two full-stage blooms of light.
-   The charge gathers at the assembly's heart just before the
-   flash-out; the flash is the white-gold resolution the heroes
-   leave in, fading out under the curtain's handover. */
-.opening-hero-charge {
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(60% 45% at 50% 55%, rgba(255, 243, 220, 0.9), var(--splash-accent2, #f4c95d) 55%, rgba(0, 0, 0, 0) 78%);
-  opacity: 0;
-  pointer-events: none;
-}
-.opening-hero-flash {
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(85% 70% at 50% 50%, #fffdf4 0%, var(--splash-accent2, #f4c95d) 58%, rgba(0, 0, 0, 0) 85%);
-  opacity: 0;
-  pointer-events: none;
-}
-.opening-hero-sparks {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-}
-.opening-hero-spark {
-  position: absolute;
-  border-radius: 50%;
-  background: var(--splash-ink, #fff3dc);
-  opacity: 0;
-  animation-name: oh-spark-drift;
-  animation-timing-function: linear;
-  animation-iteration-count: infinite;
-  animation-fill-mode: both;
-}
-.opening-hero-spark.is-star {
-  border-radius: 0;
-  background: var(--splash-accent2, #f4c95d);
-  clip-path: polygon(50% 0, 63% 37%, 100% 50%, 63% 63%, 50% 100%, 37% 63%, 0 50%, 37% 37%);
-}
-@keyframes oh-spark-drift {
-  0% { transform: translate(0, 0); opacity: 0; }
-  22% { opacity: 0.95; }
-  70% { opacity: 0.7; }
-  100% { transform: translate(var(--sx, 8px), var(--sy, -18px)); opacity: 0; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .opening-hero-stage { display: none; }
 }
 @media (prefers-reduced-motion: reduce) {
   .opening-splash { display: none; }

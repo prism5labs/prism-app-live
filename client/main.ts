@@ -5143,16 +5143,14 @@ function setupKeyboardDock(): void {
 // this runs). Tap skips it early: the owner never has to wait it
 // out.
 //
-// There is no film any more (Nov 25, 2026). The opening used to lead
-// with the v5 film — the crystalline figure on the diner counter,
-// cut on Nov 18 — with the still older v3 sparkle animation as its
-// stall fallback. The website replaced that film, the app never
-// did, and on fresh installs the app "kept playing the old video"
-// (Neil, Nov 25, 2026). Both film files are retired. What remains
-// is the opening Neil choreographed on Nov 23: the hero stage
-// (below) opens directly on the splash — her light gathers, splits,
-// and the Faces condense out of it — over a still backdrop of the
-// film's first beat, light on the crystal, no figure.
+// The opening is a film again (Nov 26, 2026) — not the retired
+// v5 film (the crystalline figure on the diner counter, cut on
+// Nov 18, whose stale copy kept playing on fresh installs), and
+// not the DOM hero stage that carried the opening for a day, but
+// the per-Face composite built for this choreography: her light
+// gathers, splits, and the 23 Faces condense out of it, hold
+// alive, and flash out — see the Opening film section below. The
+// splash's backdrop still is the new film's own gather beat.
 //
 // First ever open reads "Welcome"; every open after that reads
 // "Welcome back" — the words are an overlay, as they always were.
@@ -5211,165 +5209,35 @@ function dismissSplashWithCurtain(fast = false): void {
   }, fast ? 400 : 750);
 }
 
-// ---------- Opening hero finale ----------
-// Neil, Nov 23, 2026, second word on the opening: the v61 hero
-// assembly was "the right idea, but executed wrong. Prism disc
-// not appear, just her light. Light goes in, splits into the 24.
-// Also, the 24 are not animated. They are cutouts that run
-// about." So the choreography is rebuilt around her light:
+// ---------- Opening film ----------
+// The film is back (Nov 26, 2026) — built the way the whole-plate
+// attempts of Nov 25 could not be: one animated clip per Face,
+// generated from that Face's own hero art and verified by eye,
+// then composited over the painted stage in the HERO_SLOTS
+// formation (the pipeline lives in the opening-film project:
+// composite.py and clips/MANIFEST.md). Her light gathers, splits,
+// the 23 Faces hold alive in their places, then charge and flash
+// out into white — the choreography Neil set on Nov 23, at last
+// with every figure truly moving. Prism herself never appears:
+// she is the light they are born from.
 //
-// THE LIGHT BEAT is the stage's own now (Nov 25, 2026): the v5
-// film that used to play the shaft of light falling on the
-// crystal is retired (see the splash section above), so the
-// stage opens on that beat itself — the still backdrop carries
-// the light on the crystal, and the stage's shaft and core take
-// it from there. Prism herself never appears: no figure, no
-// disc, no portrait, anywhere in the opening. Only her light.
-//
-// THE LIGHT comes in on the stage: a shaft falls to the stage's
-// heart and gathers there in a bright core, swelling gently
-// for a breath.
-//
-// THE SPLIT: the gathered light divides. One ray of it travels
-// to each hero's place — the light moves, the figures never do
-// — and at each ray's end the Face condenses out of the light
-// where they stand: a blaze of white-gold resolving into the
-// painted figure. No hero drops, streaks, or rises in from
-// off-stage; nobody runs about. The cast is the 23 Faces with
-// hero art — the 11 Supernovas and the 12 Novas. The 24th Face
-// is Prism herself, and she is the light they are born from,
-// which is why she is never among them.
-//
-// THE HOLD: the assembly lives. Every figure with an animated
-// clip (HERO_CLIPS, below) plays it, looped; the rest breathe
-// on the sway each figure has always had. The owner's verdict
-// stands over this build in one respect, stated plainly: the
-// image-to-video pipeline was down when this choreography was
-// built (two independent generation attempts, both upstream
-// 502s), so HERO_CLIPS ships EMPTY and every figure currently
-// holds as a still on its sway. The clip mechanism is wired
-// and proven — a clip drops in by adding one file and one
-// HERO_CLIPS line, no other code change — and the generation
-// order is the priority list in public/heroes/manifest.json.
-//
-// THE FLASH-OUT is v61's, unchanged in spirit: the light
-// charges, the figures brighten, and every hero streaks away
-// as light along their own vector into the white-gold flash
-// that fades into the curtain's handover to the Chat front.
-// They arrived as light; they leave as light.
-//
-// The hero stage is a sibling of the splash backdrop (never an
-// ancestor, so its fade cannot stall the backdrop's surface —
-// the curtain rule).
-// Stage timeline: the light gathers for ~1.2s, the split runs
-// ~1.2–3.5s, the assembly holds alive, the charge fires at
-// HERO_FLASH_AFTER_MS − 450, the flash-out at
-// HERO_FLASH_AFTER_MS, and the dismiss follows. The whole
-// opening runs ~8s plus the curtain — a breath shorter than the
-// old film-led version, which spent its first 1.8s on the film.
-const HERO_FLASH_AFTER_MS = 6600;
-const HERO_DISMISS_AFTER_MS = 8100;
-// How long a figure takes to condense out of the light.
-const HERO_CONDENSE_MS = 780;
-// The heart of the stage, where her light gathers: left % and
-// top % of the stage. Juniper leads just below it.
-const HERO_LIGHT_X = 47;
-const HERO_LIGHT_Y = 38;
+// The film is STREAMED from /opening-film.mp4 — it is not in the
+// service worker's precache and the fetch handler never stores
+// it (see public/sw.js), so the install stays light. The splash's
+// backdrop still (the film's own gather beat) is precached
+// instead and covers the moment before the first frame arrives.
+// The film dismisses through the same black curtain as every
+// opening before it: on its own end, on a tap anywhere (the
+// splash's tap-to-skip), or on the backstop in playOpeningSplash.
+// If the film cannot play at all, the opening falls back to the
+// hold still — the full assembly as a poster — for a short
+// breath, then out. Never a stuck splash.
+const OPENING_FILM_SRC = "/opening-film.mp4";
+const OPENING_POSTER_SRC = "/opening-poster.jpg";
+const OPENING_BACKDROP_SRC = "/opening-backdrop.jpg";
 
-// Animated clips for the hold, one per Face, generated from the
-// Face's hero art (image-to-video: subtle lifelike motion —
-// breathing, a shift of stance, fabric and hair in a light
-// breeze — camera locked, figure in place). EMPTY in this
-// build: the video pipeline was unavailable (see the section
-// comment above). When a clip lands it is served from
-// /heroes/clips/<Name>.mp4, masked by the still's own alpha
-// (the builder sets the mask from the hero webp), with the
-// still as its poster and its fallback. Priority order for
-// generation: Juniper, Encore, Keystone, Mabel, Pierce,
-// Shopbell, then the rest by slot size (manifest.json holds
-// the full list).
-const HERO_CLIPS: Record<string, string> = {};
-
-type HeroSlot = {
-  // Centre-x in % of stage width; bottom in % of stage height
-  // (figures are bottom-anchored, so a tall cape or a compact
-  // figure never shifts its ground line); width in % of stage
-  // width; ar is the art's height/width ratio, used to find the
-  // figure's centre for its ray and burst; z is the layer; wave
-  // staggers the split.
-  x: number;
-  b: number;
-  w: number;
-  ar: number;
-  z: number;
-  wave: number;
-};
-// The assembly, laid out by hand to be dynamic, not symmetrical:
-// an off-centre lead, anchors staggered at different heights on
-// each side, a high scattered rank, and two foreground figures
-// cropped by the bottom corners of the frame. (Same stage as
-// v61 — the owner's quarrel was with the execution, not the
-// formation.)
-const HERO_SLOTS: Record<string, HeroSlot> = {
-  Juniper: { x: 47, b: 9, w: 47, ar: 2.06, z: 30, wave: 0 },
-  Encore: { x: 78, b: 24, w: 37, ar: 1.95, z: 27, wave: 1 },
-  Keystone: { x: 16, b: 13, w: 36, ar: 1.88, z: 27, wave: 1 },
-  Barnstormer: { x: 89, b: 42, w: 30, ar: 1.97, z: 26, wave: 1 },
-  Blueprint: { x: 11, b: 40, w: 29, ar: 2.1, z: 26, wave: 1 },
-  Shopbell: { x: 64, b: 33, w: 31, ar: 2.01, z: 23, wave: 2 },
-  Calendra: { x: 29, b: 32, w: 30, ar: 1.89, z: 23, wave: 2 },
-  Goldstar: { x: 56, b: 53, w: 28, ar: 2.03, z: 24, wave: 2 },
-  Vesper: { x: 85, b: 59, w: 25, ar: 2.04, z: 22, wave: 2 },
-  Zero: { x: 19, b: 57, w: 26, ar: 1.95, z: 22, wave: 2 },
-  Proof: { x: 37, b: 56, w: 25, ar: 2.13, z: 21, wave: 2 },
-  Mabel: { x: 5, b: 0, w: 34, ar: 1.98, z: 34, wave: 3 },
-  Pierce: { x: 96, b: 0, w: 33, ar: 2.18, z: 34, wave: 3 },
-  Hazel: { x: 68, b: 65, w: 21, ar: 1.93, z: 18, wave: 3 },
-  Willa: { x: 29, b: 69, w: 21, ar: 2.0, z: 18, wave: 3 },
-  Ruby: { x: 91, b: 71, w: 20, ar: 2.0, z: 17, wave: 3 },
-  Jude: { x: 12, b: 71, w: 21, ar: 2.05, z: 18, wave: 3 },
-  Sadie: { x: 58, b: 77, w: 18, ar: 2.31, z: 16, wave: 3 },
-  Bea: { x: 36, b: 81, w: 18, ar: 2.07, z: 16, wave: 3 },
-  Flora: { x: 75, b: 81, w: 18, ar: 2.13, z: 16, wave: 3 },
-  Iris: { x: 47, b: 72, w: 20, ar: 2.07, z: 17, wave: 3 },
-  Clive: { x: 21, b: 85, w: 17, ar: 2.07, z: 15, wave: 3 },
-  Nora: { x: 87, b: 87, w: 17, ar: 3.03, z: 15, wave: 3 },
-};
-// Split order inside each wave (the stagger index). Wave 0 is
-// Juniper alone, born first from the heart of the light.
-const HERO_WAVES: string[][] = [
-  ["Juniper"],
-  ["Encore", "Keystone", "Barnstormer", "Blueprint"],
-  ["Shopbell", "Calendra", "Goldstar", "Vesper", "Zero", "Proof"],
-  [
-    "Mabel",
-    "Pierce",
-    "Hazel",
-    "Willa",
-    "Ruby",
-    "Jude",
-    "Sadie",
-    "Bea",
-    "Flora",
-    "Iris",
-    "Clive",
-    "Nora",
-  ],
-];
-// The light gathers first (the shaft and core animate in over
-// ~1.1s); the waves split out of it on these delays.
-const HERO_WAVE_DELAY = [1250, 1520, 1820, 2180];
-const HERO_WAVE_STAGGER = [0, 70, 60, 50];
-
-// Small deterministic scatter for the sparkle field, so every open
-// lays the same sky (no Math.random in a boot path).
-function heroRnd(n: number): number {
-  const v = Math.sin(n * 127.1) * 43758.5453;
-  return v - Math.floor(v);
-}
-
-// The splash's caption and controls bow out as the light gathers —
-// the finale is the show, and a settings pill does not belong
+// The splash's caption and controls bow out as the film starts —
+// the film is the show, and a settings pill does not belong
 // on it. Tap-to-skip still works everywhere on the splash.
 function fadeSplashChrome(splash: HTMLElement): void {
   splash
@@ -5382,403 +5250,45 @@ function fadeSplashChrome(splash: HTMLElement): void {
     });
 }
 
-let heroStarted = false;
-function runHeroFinale(
+let filmStarted = false;
+function runOpeningFilm(
   splash: HTMLElement,
   backdrop: HTMLElement | null,
   dismiss: () => void,
 ): void {
-  if (heroStarted) return;
-  heroStarted = true;
-  const stage = document.createElement("div");
-  stage.className = "opening-hero-stage";
-  stage.setAttribute("aria-hidden", "true");
-  const glow = document.createElement("div");
-  glow.className = "opening-hero-glow";
-  stage.appendChild(glow);
-  // Her light: a shaft falling in, and the bright core where it
-  // gathers. Two plain elements of light — no figure, no disc,
-  // no emblem.
-  const shaft = document.createElement("div");
-  shaft.className = "opening-hero-shaft";
-  stage.appendChild(shaft);
-  const core = document.createElement("div");
-  core.className = "opening-hero-core";
-  stage.appendChild(core);
-  const ground = document.createElement("div");
-  ground.className = "opening-hero-ground";
-  stage.appendChild(ground);
-  const raysBox = document.createElement("div");
-  raysBox.className = "opening-hero-rays";
-  stage.appendChild(raysBox);
-  const castBox = document.createElement("div");
-  castBox.className = "opening-hero-cast";
-  stage.appendChild(castBox);
-  const burstsBox = document.createElement("div");
-  burstsBox.className = "opening-hero-bursts";
-  stage.appendChild(burstsBox);
-  const wind = document.createElement("div");
-  wind.className = "opening-hero-wind";
-  stage.appendChild(wind);
-  const charge = document.createElement("div");
-  charge.className = "opening-hero-charge";
-  stage.appendChild(charge);
-  const flash = document.createElement("div");
-  flash.className = "opening-hero-flash";
-  stage.appendChild(flash);
-  const sparksBox = document.createElement("div");
-  sparksBox.className = "opening-hero-sparks";
-  stage.appendChild(sparksBox);
-  // Drifting sparkle and a few still starbursts, laid over the
-  // assembly for the whole finale.
-  for (let i = 0; i < 18; i++) {
-    const s = document.createElement("i");
-    const star = i % 3 === 0;
-    s.className = star ? "opening-hero-spark is-star" : "opening-hero-spark";
-    s.style.left = `${6 + heroRnd(i + 1) * 88}%`;
-    s.style.top = `${6 + heroRnd(i + 31) * 78}%`;
-    const size = star ? 12 + heroRnd(i + 61) * 12 : 3 + heroRnd(i + 61) * 3.5;
-    s.style.width = `${size}px`;
-    s.style.height = `${size}px`;
-    s.style.setProperty("--sx", `${((heroRnd(i + 91) - 0.5) * 26).toFixed(0)}px`);
-    s.style.setProperty("--sy", `${(-(10 + heroRnd(i + 121) * 22)).toFixed(0)}px`);
-    s.style.animationDelay = `${(heroRnd(i + 151) * 2400).toFixed(0)}ms`;
-    s.style.animationDuration = `${(2300 + heroRnd(i + 181) * 1300).toFixed(0)}ms`;
-    sparksBox.appendChild(s);
-  }
-  // The stage is full-screen, so the window's size is the
-  // stage's size (the stage is not in the document yet, and a
-  // hidden tab can report a 0 client size — the window is the
-  // honest measure either way).
-  const W = window.innerWidth || stage.clientWidth;
-  const H = window.innerHeight || stage.clientHeight;
-  // The heart of the light, in stage pixels.
-  const hx = (HERO_LIGHT_X / 100) * W;
-  const hy = (HERO_LIGHT_Y / 100) * H;
-  type Built = {
-    name: string;
-    outer: HTMLElement;
-    sway: HTMLElement;
-    trail: HTMLElement;
-    slot: HeroSlot;
-    delay: number;
-    idx: number;
-  };
-  const built: Built[] = [];
-  let idx = 0;
-  HERO_WAVES.forEach((names, wave) => {
-    names.forEach((name, inWave) => {
-      const slot = HERO_SLOTS[name];
-      if (!slot) return;
-      const delay = HERO_WAVE_DELAY[wave] + inWave * HERO_WAVE_STAGGER[wave];
-      const outer = document.createElement("div");
-      outer.className = "opening-hero";
-      outer.dataset.hero = name;
-      outer.style.left = `${slot.x}%`;
-      outer.style.bottom = `${slot.b}%`;
-      outer.style.width = `${slot.w}%`;
-      outer.style.zIndex = String(slot.z);
-      // The light trail rides behind the figure: it burns only
-      // at the flash-out now — entrances are the light's work,
-      // done by the rays, and no figure travels.
-      const trail = document.createElement("div");
-      trail.className = "opening-hero-trail";
-      outer.appendChild(trail);
-      // The sway rides a child element, so the living hold never
-      // fights the condense and flash-out transforms on the outer.
-      const sway = document.createElement("div");
-      sway.className = "opening-hero-sway";
-      const stillSrc = `/heroes/${encodeURIComponent(name)}.webp`;
-      const clipSrc = HERO_CLIPS[name];
-      if (clipSrc) {
-        // The animated clip, masked by the still's own alpha so
-        // the figure keeps its exact silhouette and place; the
-        // still is its poster and, on any error, its replacement.
-        const vid = document.createElement("video");
-        vid.src = clipSrc;
-        vid.poster = stillSrc;
-        vid.muted = true;
-        vid.loop = true;
-        vid.autoplay = true;
-        vid.playsInline = true;
-        vid.preload = "auto";
-        vid.setAttribute("aria-hidden", "true");
-        const mask = `url("${stillSrc}")`;
-        vid.style.webkitMaskImage = mask;
-        vid.style.maskImage = mask;
-        vid.style.webkitMaskSize = "100% 100%";
-        vid.style.maskSize = "100% 100%";
-        vid.addEventListener("error", () => {
-          const img = document.createElement("img");
-          img.src = stillSrc;
-          img.alt = "";
-          img.decoding = "async";
-          vid.replaceWith(img);
-        });
-        sway.appendChild(vid);
-      } else {
-        const img = document.createElement("img");
-        img.src = stillSrc;
-        img.alt = "";
-        img.decoding = "async";
-        img.addEventListener("error", () => {
-          outer.style.visibility = "hidden";
-        });
-        sway.appendChild(img);
-      }
-      outer.appendChild(sway);
-      castBox.appendChild(outer);
-      // This hero's centre, in stage pixels — where their ray
-      // ends and their burst blooms.
-      const heroWp = (slot.w / 100) * W;
-      const heroHp = heroWp * slot.ar;
-      const cx = (slot.x / 100) * W;
-      const cy = H - (slot.b / 100) * H - heroHp / 2;
-      // THE SPLIT, for this hero: one ray of her light runs from
-      // the heart to the hero's centre, opening along its line
-      // and spent as it arrives.
-      const ray = document.createElement("div");
-      ray.className = "opening-hero-ray";
-      ray.dataset.hero = name;
-      ray.style.left = `${HERO_LIGHT_X}%`;
-      ray.style.top = `${HERO_LIGHT_Y}%`;
-      const dist = Math.hypot(cx - hx, cy - hy);
-      const ang = (Math.atan2(cy - hy, cx - hx) * 180) / Math.PI;
-      ray.style.width = `${dist.toFixed(0)}px`;
-      const rayBase = `translate(0, -50%) rotate(${ang.toFixed(1)}deg)`;
-      raysBox.appendChild(ray);
-      ray.animate(
-        [
-          { transform: `${rayBase} scaleX(0)`, opacity: 0 },
-          { opacity: 0.95, offset: 0.25 },
-          { transform: `${rayBase} scaleX(1)`, opacity: 0.9, offset: 0.75 },
-          { transform: `${rayBase} scaleX(1)`, opacity: 0 },
-        ],
-        { duration: 340, delay, easing: "ease-out", fill: "both" },
-      );
-      // The burst at the ray's end: the light arriving, out of
-      // which the figure condenses.
-      const burst = document.createElement("div");
-      burst.className = "opening-hero-burst";
-      burst.style.left = `${slot.x}%`;
-      burst.style.bottom = `${(slot.b + (heroHp / 2 / H) * 100).toFixed(1)}%`;
-      burst.style.width = `${slot.w * 1.7}%`;
-      burstsBox.appendChild(burst);
-      burst.animate(
-        [
-          { transform: "translate(-50%, 50%) scale(0.3)", opacity: 0 },
-          { opacity: 0.9, offset: 0.25 },
-          { transform: "translate(-50%, 50%) scale(1.5)", opacity: 0 },
-        ],
-        { duration: 560, delay: delay + 120, easing: "ease-out", fill: "both" },
-      );
-      built.push({ name, outer, sway, trail, slot, delay, idx: idx++ });
-    });
-  });
+  if (filmStarted) return;
+  filmStarted = true;
+  const vid = document.createElement("video");
+  vid.className = "opening-film";
+  vid.src = OPENING_FILM_SRC;
+  vid.poster = OPENING_BACKDROP_SRC;
+  vid.muted = true;
+  vid.autoplay = true;
+  vid.playsInline = true;
+  vid.preload = "auto";
+  vid.setAttribute("aria-hidden", "true");
   // Directly after the backdrop still, under the caption and the
-  // controls (their z-indexes keep them on top).
-  if (backdrop) splash.insertBefore(stage, backdrop.nextSibling);
-  else splash.appendChild(stage);
+  // controls (their z-indexes keep them on top) — the same seat
+  // the hero stage took before it.
+  if (backdrop) splash.insertBefore(vid, backdrop.nextSibling);
+  else splash.appendChild(vid);
   fadeSplashChrome(splash);
-  requestAnimationFrame(() => stage.classList.add("is-in"));
-  // Once the stage covers the backdrop, hide the still — the
-  // stage's own background carries the scene from here.
-  window.setTimeout(() => {
-    if (backdrop) backdrop.style.visibility = "hidden";
-  }, 620);
-  const base = "translate(-50%, 0px)";
-  // Aim a hero's trail along a travel vector: the trail element
-  // is centred on the figure and rotated to the vector, then
-  // stretched and faded by the caller's keyframes.
-  const aimTrail = (b: Built, dxPx: number, dyPx: number) => {
-    const ang = (Math.atan2(dyPx, dxPx) * 180) / Math.PI;
-    b.trail.style.transform = `translate(-50%, -50%) rotate(${ang.toFixed(1)}deg)`;
+  let fellBack = false;
+  const fallback = () => {
+    if (fellBack) return;
+    fellBack = true;
+    // The film could not play (a dead connection, a file the
+    // browser cannot decode): the opening becomes its own hold
+    // still — the full assembly as a poster — for a short breath,
+    // then out through the curtain as usual.
+    vid.remove();
+    if (backdrop instanceof HTMLImageElement) backdrop.src = OPENING_POSTER_SRC;
+    window.setTimeout(dismiss, 3500);
   };
-  // HER LIGHT COMES IN: the shaft falls and the core gathers,
-  // swelling at the stage's heart. Nothing else is on the stage
-  // yet — the light is alone, as she is.
-  shaft.animate(
-    [
-      { transform: "translateX(-50%) scaleY(0.25)", opacity: 0 },
-      { opacity: 0.85, offset: 0.45 },
-      { transform: "translateX(-50%) scaleY(1)", opacity: 0.8 },
-    ],
-    { duration: 1050, delay: 60, easing: "ease-out", fill: "both" },
-  );
-  core.animate(
-    [
-      { transform: "translate(-50%, -50%) scale(0.45)", opacity: 0 },
-      { opacity: 1, offset: 0.55 },
-      { transform: "translate(-50%, -50%) scale(1)", opacity: 0.95 },
-    ],
-    { duration: 1000, delay: 140, easing: "ease-out", fill: "both" },
-  );
-  for (const b of built) {
-    // BORN OF THE SPLIT: the figure condenses where it stands —
-    // a blaze of her light resolving into the painted figure.
-    // The figure never travels; only the light did.
-    b.outer.animate(
-      [
-        {
-          transform: `${base} scale(0.92)`,
-          opacity: 0,
-          filter: "brightness(3.4) blur(7px)",
-        },
-        { opacity: 1, offset: 0.35 },
-        {
-          transform: `${base} scale(1)`,
-          opacity: 1,
-          filter: "brightness(1) blur(0px)",
-        },
-      ],
-      {
-        duration: HERO_CONDENSE_MS,
-        delay: b.delay + 130,
-        easing: "ease-out",
-        fill: "both",
-      },
-    );
-    // The living hold: from the moment the figure has condensed,
-    // a slow breathing rise and fall with the faintest wind sway
-    // — every figure on its own period and phase, a few pixels
-    // at most, transforms only, cheap on any phone GPU. A figure
-    // with an animated clip plays the clip as well; the sway is
-    // the stage's breath under both.
-    const swayAmp = 1.4 + (b.idx % 3) * 0.5;
-    b.sway.animate(
-      [
-        { transform: "translateY(0px) rotate(0deg)" },
-        {
-          transform: `translateY(${(-swayAmp).toFixed(1)}px) rotate(${(0.18 + (b.idx % 4) * 0.07).toFixed(2)}deg)`,
-          offset: 0.38,
-        },
-        {
-          transform: `translateY(${(swayAmp * 0.7).toFixed(1)}px) rotate(${(-0.16 - (b.idx % 3) * 0.06).toFixed(2)}deg)`,
-          offset: 0.72,
-        },
-        { transform: "translateY(0px) rotate(0deg)" },
-      ],
-      {
-        duration: 2900 + ((b.idx * 149) % 1800),
-        delay: b.delay + 130 + HERO_CONDENSE_MS,
-        iterations: Infinity,
-        easing: "ease-in-out",
-      },
-    );
-  }
-  // The ground lights as the split lands.
-  ground.animate([{ opacity: 0 }, { opacity: 0.55 }], {
-    duration: 1500,
-    delay: 1150,
-    easing: "ease-out",
-    fill: "both",
-  });
-  // One soft band of light drifts across the held assembly, the
-  // wind made visible, while the group breathes.
-  wind.animate(
-    [
-      { transform: "translateX(-65%) rotate(10deg)", opacity: 0 },
-      { opacity: 0.12, offset: 0.35 },
-      { transform: "translateX(65%) rotate(10deg)", opacity: 0 },
-    ],
-    { duration: 2100, delay: 4300, easing: "ease-in-out", fill: "both" },
-  );
-  // The charge: just before the flash-out, the stage's heart
-  // surges — the core of her light flares, the glow swells, and
-  // the whole assembly brightens, gathering the light it is
-  // about to leave as.
-  window.setTimeout(() => {
-    if (!splash.isConnected) return;
-    charge.animate([{ opacity: 0 }, { opacity: 0.55 }], {
-      duration: 450,
-      easing: "ease-in",
-      fill: "both",
-    });
-    glow.animate(
-      [
-        { transform: "translate(-50%, -50%) scale(1)", opacity: 0.58 },
-        { transform: "translate(-50%, -50%) scale(1.22)", opacity: 0.95 },
-      ],
-      { duration: 450, easing: "ease-in", fill: "both" },
-    );
-    core.animate(
-      [
-        { transform: "translate(-50%, -50%) scale(1)", opacity: 0.95 },
-        { transform: "translate(-50%, -50%) scale(1.4)", opacity: 1 },
-      ],
-      { duration: 450, easing: "ease-in", fill: "both" },
-    );
-    for (const b of built) {
-      b.sway.animate([{ filter: "brightness(1)" }, { filter: "brightness(1.3)" }], {
-        duration: 450,
-        easing: "ease-in",
-        fill: "both",
-      });
-    }
-  }, HERO_FLASH_AFTER_MS - 450);
-  // THE FLASH-OUT: every hero streaks away as light along their
-  // own vector — up and out, each in a different direction, the
-  // centre of the assembly first and the edges a ripple behind —
-  // with their trails burning, into the white-gold flash. The
-  // gathered light goes with them.
-  window.setTimeout(() => {
-    if (!splash.isConnected) return;
-    shaft.animate([{ opacity: 0.8 }, { opacity: 0 }], {
-      duration: 800,
-      delay: 100,
-      easing: "ease-out",
-      fill: "both",
-    });
-    core.animate(
-      [
-        { transform: "translate(-50%, -50%) scale(1.4)", opacity: 1 },
-        { transform: "translate(-50%, -50%) scale(1.9)", opacity: 0 },
-      ],
-      { duration: 800, delay: 100, easing: "ease-out", fill: "both" },
-    );
-    for (const b of built) {
-      const dxu = (b.slot.x - 50) / 50;
-      const ex = dxu * W * 1.3;
-      const ey = -(0.6 + ((100 - b.slot.b) / 100) * 0.65) * H * 1.15;
-      aimTrail(b, ex, ey);
-      const dist = Math.hypot(dxu, (b.slot.b - 38) / 60);
-      const delay = Math.round(dist * 240);
-      b.outer.animate(
-        [
-          { transform: `${base} scale(1.04)`, opacity: 1 },
-          { opacity: 1, offset: 0.5 },
-          {
-            transform: `${base} translate(${ex.toFixed(0)}px, ${ey.toFixed(0)}px) scale(0.88)`,
-            opacity: 0,
-          },
-        ],
-        { duration: 560, delay, easing: "cubic-bezier(.55,.06,.85,.4)", fill: "both" },
-      );
-      b.trail.animate(
-        [
-          { opacity: 0, scale: "0.4 1" },
-          { opacity: 0.9, offset: 0.35 },
-          { opacity: 0, scale: "1.7 1" },
-        ],
-        { duration: 560, delay, easing: "ease-out", fill: "both" },
-      );
-    }
-    // The flash itself: a white-gold bloom at the assembly's
-    // heart that peaks as the last heroes leave, then fades —
-    // the fade rule — into the curtain's handover.
-    flash.animate(
-      [
-        { opacity: 0 },
-        { opacity: 0.95, offset: 0.18 },
-        { opacity: 0.55, offset: 0.45 },
-        { opacity: 0 },
-      ],
-      { duration: 1250, delay: 150, easing: "ease-out", fill: "both" },
-    );
-  }, HERO_FLASH_AFTER_MS);
-  window.setTimeout(() => {
-    if (splash.isConnected) dismiss();
-  }, HERO_DISMISS_AFTER_MS);
+  vid.addEventListener("ended", () => dismiss());
+  vid.addEventListener("error", fallback);
+  const played = vid.play();
+  if (played) played.catch(fallback);
 }
 function playOpeningSplash(returning: boolean): void {
   const splash = document.getElementById("opening-splash");
@@ -5847,28 +5357,14 @@ function playOpeningSplash(returning: boolean): void {
     return;
   }
   splash.addEventListener("click", dismissByTap, { once: true });
-  // Warm the hero finale's full-figure art while the stage's light
-  // gathers: 23 heroes at ~120 KB each, and the asset cache keeps
-  // them for later opens. Prism is not among them — she is out of
-  // the opening entirely (Neil, Nov 23, 2026).
-  for (const p of PHOTONS) {
-    if (p.name === "Prism") continue;
-    const i = new Image();
-    i.src = `/heroes/${encodeURIComponent(p.name)}.webp`;
-  }
-  for (const a of ATOMS) {
-    const i = new Image();
-    i.src = `/heroes/${encodeURIComponent(a.name)}.webp`;
-  }
-  // Backstop: if anything in the finale stalls, do not trap the
-  // owner behind the splash. The stage dismisses itself at
-  // HERO_DISMISS_AFTER_MS (~8.1s); this sits safely past it.
+  // Backstop: if the film stalls (a connection that never delivers
+  // a frame), do not trap the owner behind the splash. The film
+  // runs ~9.6s and dismisses itself on its end; this sits safely
+  // past it.
   window.setTimeout(dismiss, 13000);
-  // The hero stage IS the opening now (Nov 25, 2026): with the film
-  // retired there is no handoff to wait for, so the stage starts
-  // the moment the splash is up — its own light beat (the shaft,
-  // the gathering core) opens the show over the backdrop still.
-  runHeroFinale(splash, backdrop, dismiss);
+  // The film IS the opening: it starts the moment the splash is
+  // up, over the backdrop still of its own first beat.
+  runOpeningFilm(splash, backdrop, dismiss);
 }
 
 // The fast dismiss for an OAuth return: the same black curtain as
