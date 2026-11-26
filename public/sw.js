@@ -241,7 +241,17 @@
 // Supernovas appear beside their Novas again. The cache bump makes
 // existing installs fetch the new shell instead of serving the
 // cached one, and clears any older cache entries on activate.
-const CACHE = "prism5-v72";
+// CACHE v73: bumped Nov 26, 2026 for the dead-Google-sign-in fix.
+// When Google revokes a stored Gmail grant (the OAuth consent screen
+// still in Testing mode expires refresh tokens after 7 days), the
+// Connected tab's card said "sign-in ran out" while the header pill
+// and the connections row still claimed "Google connected" — and the
+// card pointed at a reconnect button that did not exist in that
+// state. Now: the server tells a revoked token (invalid_grant) apart
+// from a transient failure, the card and the row carry a working
+// reconnect button for the exact account, and the header pill reads
+// "Google reconnect needed" once a loaded inbox shows the failure.
+const CACHE = "prism5-v73";
 // Images (portraits, thumbnails, brand art, chat backgrounds, icons)
 // live in their own cache whose name does NOT change with the shell
 // version. Before v52 every shell bump deleted the one cache on

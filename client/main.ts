@@ -2443,12 +2443,28 @@ function emailCard(acct: any, provider: "gmail" | "outlook" | "imap"): string {
   const msgs = [...(acct.messages || [])]
     .sort((a: any, b: any) => Number(b.unread === true) - Number(a.unread === true))
     .slice(0, EMAIL_SUMMARY_CAP);
-  const errorHtml =
-    acct.error === "token_failed" || acct.error === "auth_failed"
-      ? `<p class="chat-error">That account's sign-in ran out, so the inbox wouldn't open. Reconnect it from the button above — nothing was lost.</p>`
-      : acct.error
-        ? `<p class="chat-error">That inbox didn't answer just now. <button class="btn small" data-action="inbox-retry">Try again</button></p>`
+  // A dead sign-in gets its remedy right here in the card: a reconnect
+  // button for THIS account. (The old copy pointed at "the button
+  // above", but the connections row shows no button at all when it
+  // believes everything is connected — a dead end.) Gmail's sign-in
+  // is the unified Google consent, so reconnecting here also restores
+  // Calendar and Drive; Outlook's button restarts its own sign-in.
+  // IMAP has no OAuth to restart — its remedy is the connect form
+  // above, where the app-specific password is re-entered.
+  const ranOut = acct.error === "token_failed" || acct.error === "auth_failed";
+  const reconnectHref =
+    provider === "gmail"
+      ? `/api/oauth/google/start?accountId=${encodeURIComponent(getAccountId())}&label=${encodeURIComponent(label)}`
+      : provider === "outlook"
+        ? `/api/oauth/microsoft/start?accountId=${encodeURIComponent(getAccountId())}&label=${encodeURIComponent(label)}`
         : "";
+  const errorHtml = ranOut
+    ? provider === "imap"
+      ? `<p class="chat-error">That account's sign-in ran out, so the inbox wouldn't open. Reconnect it from the button above — nothing was lost.</p>`
+      : `<p class="chat-error">That account's sign-in ran out, so the inbox wouldn't open — nothing was lost.</p><div class="row"><a class="btn primary" href="${reconnectHref}">Reconnect this account</a></div>`
+    : acct.error
+      ? `<p class="chat-error">That inbox didn't answer just now. <button class="btn small" data-action="inbox-retry">Try again</button></p>`
+      : "";
   // Gmail and Outlook have no disconnect in the app; an IMAP account
   // does, because its app-specific password must be removable here.
   // The provider name rides on the card, and the webmail link goes to
@@ -2567,18 +2583,42 @@ function renderConnections(): string {
   const calOn = cal?.connected === true;
   const drvOn = drv?.connected === true;
   const googleEmail = gmailOn ? String(accounts[0].email || "") : "";
+  // A stored account whose sign-in Google has revoked still counts as
+  // "on" by record — the row must not call that connected. Any Gmail
+  // account whose last read came back token_failed / auth_failed is
+  // broken, whatever the records say, and the row's job is to offer
+  // the reconnect, not the badge.
+  const brokenGmail = accounts.filter(
+    (a: any) => a.error === "token_failed" || a.error === "auth_failed",
+  );
+  const gmailState = brokenGmail.length
+    ? `Gmail — sign-in ran out${
+        brokenGmail.length === 1 && brokenGmail[0].email
+          ? ` for ${esc(String(brokenGmail[0].email))}`
+          : ""
+      }; reconnect needed`
+    : gmailOn
+      ? `Gmail — connected${googleEmail ? ` as ${esc(googleEmail)}` : ""}`
+      : "Gmail — not connected";
   const googleState = googleChecking
     ? `<p class="fine">Checking your Google connection…</p>`
-    : `<p class="fine">${gmailOn ? `Gmail — connected${googleEmail ? ` as ${esc(googleEmail)}` : ""}` : "Gmail — not connected"} · Calendar — ${calOn ? "connected" : "not connected"} · Drive — ${drvOn ? "connected" : "not connected"}</p>`;
+    : `<p class="fine">${gmailState} · Calendar — ${calOn ? "connected" : "not connected"} · Drive — ${drvOn ? "connected" : "not connected"}</p>`;
   const googleControl = googleChecking
     ? ""
     : !googleConfigured
       ? `<p class="fine">Google sign-in isn't set up on this server yet. It needs a Google OAuth client (client ID, secret, and redirect).</p>`
-      : gmailOn && calOn && drvOn
-        ? `<p><span class="owned-badge">Google connected</span></p>`
-        : gmailOn
-          ? `<div class="row"><a class="btn primary" href="/api/oauth/google/start-extra?accountId=${encodeURIComponent(getAccountId())}">Connect Calendar &amp; Drive</a></div>`
-          : `<div class="row"><a class="btn primary" href="/api/oauth/google/start?accountId=${encodeURIComponent(getAccountId())}&label=${nextGmailLabel()}">Connect Google</a></div>`;
+      : brokenGmail.length
+        ? `<div class="row">${brokenGmail
+            .map(
+              (a: any, i: number) =>
+                `<a class="${i === 0 ? "btn primary" : "btn"}" href="/api/oauth/google/start?accountId=${encodeURIComponent(getAccountId())}&label=${encodeURIComponent(String(a.label || ""))}">Reconnect ${esc(String(a.email || "Google"))}</a>`,
+            )
+            .join("")}</div>`
+        : gmailOn && calOn && drvOn
+          ? `<p><span class="owned-badge">Google connected</span></p>`
+          : gmailOn
+            ? `<div class="row"><a class="btn primary" href="/api/oauth/google/start-extra?accountId=${encodeURIComponent(getAccountId())}">Connect Calendar &amp; Drive</a></div>`
+            : `<div class="row"><a class="btn primary" href="/api/oauth/google/start?accountId=${encodeURIComponent(getAccountId())}&label=${nextGmailLabel()}">Connect Google</a></div>`;
 
   // Outlook: one row, one button, as many accounts as the owner likes.
   const outlookChecking = inboxesLoading && !outlookAccounts.length;
@@ -3747,13 +3787,26 @@ async function refreshState(): Promise<boolean> {
 }
 
 // The Google connection, in plain words, from what the app actually
-// knows right now. Four states, never a silent endless "connecting":
-// checking (state still loading), connected, not connected, and
-// unreachable (the server did not answer). The header pill and the
-// You account card both read this, so the two can never disagree.
-type GoogleConnection = "checking" | "connected" | "not-connected" | "unreachable";
+// knows right now. Five states, never a silent endless "connecting":
+// checking (state still loading), connected, not connected,
+// unreachable (the server did not answer), and reconnect (the app
+// sign-in is fine, but a Gmail grant the Connected tab has actually
+// tried came back dead — the pill must not say "connected" over a
+// mailbox that will not open). The header pill and the You account
+// card both read this, so the two can never disagree. The reconnect
+// state only fires on evidence: inbox results loaded this session
+// that carry a token failure. With no inbox data yet, the pill
+// reports the sign-in, as before.
+type GoogleConnection = "checking" | "connected" | "not-connected" | "unreachable" | "reconnect";
 function googleConnectionState(): GoogleConnection {
   if (!state) return stateFailed ? "unreachable" : "checking";
+  const accts = (state as any)?.inboxAccounts as any[] | undefined;
+  if (
+    Array.isArray(accts) &&
+    accts.some((a: any) => a?.error === "token_failed" || a?.error === "auth_failed")
+  ) {
+    return "reconnect";
+  }
   return (state as any)?.auth?.signedIn ? "connected" : "not-connected";
 }
 
@@ -3768,11 +3821,13 @@ function syncGoogleState(): void {
   const label =
     s === "connected"
       ? "Google connected"
-      : s === "not-connected"
-        ? "Google not connected"
-        : s === "unreachable"
-          ? "Google unreachable"
-          : "Checking Google…";
+      : s === "reconnect"
+        ? "Google reconnect needed"
+        : s === "not-connected"
+          ? "Google not connected"
+          : s === "unreachable"
+            ? "Google unreachable"
+            : "Checking Google…";
   if (el.dataset.state === s && el.textContent === label) return;
   el.dataset.state = s;
   el.classList.add("is-changing");

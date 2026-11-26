@@ -144,11 +144,20 @@ export async function handleOAuthCallback(
   }
 }
 
-async function freshAccessToken(accountId: string, label: string): Promise<string | null> {
+// A refresh attempt ends one of three ways: a usable access token,
+// "auth_failed" — Google refused the refresh token itself
+// (invalid_grant: expired or revoked; no retry will revive it, only a
+// fresh sign-in issues a new one), or "token_failed" — the exchange
+// itself failed (network, Google 5xx, bad reply) and a later try may
+// well succeed. Callers surface the two differently: auth_failed is
+// the "sign-in ran out" state, token_failed is a try-again state.
+type FreshToken = { token: string } | { error: "auth_failed" | "token_failed" };
+
+async function freshAccessToken(accountId: string, label: string): Promise<FreshToken> {
   const acct = getGmailAccount(accountId, label);
-  if (!acct) return null;
+  if (!acct) return { error: "token_failed" };
   if (acct.access_token && acct.token_expiry && acct.token_expiry > Date.now() + 60_000) {
-    return acct.access_token;
+    return { token: acct.access_token };
   }
   try {
     const tokens = await exchangeToken({
@@ -159,10 +168,11 @@ async function freshAccessToken(accountId: string, label: string): Promise<strin
     });
     const expiry = Date.now() + (tokens.expires_in || 3600) * 1000;
     updateGmailAccessToken(accountId, label, tokens.access_token, expiry);
-    return tokens.access_token;
+    return { token: tokens.access_token };
   } catch (e) {
     console.error("Gmail token refresh failed:", e);
-    return null;
+    const dead = e instanceof Error && /invalid_grant/.test(e.message);
+    return { error: dead ? "auth_failed" : "token_failed" };
   }
 }
 
@@ -191,8 +201,19 @@ export async function listInbox(
 }> {
   const acct = getGmailAccount(accountId, label);
   if (!acct) return { connected: false, messages: [] };
-  const token = await freshAccessToken(accountId, label);
-  if (!token) return { connected: false, email: acct.email, messages: [], error: "token_failed" };
+  const fresh = await freshAccessToken(accountId, label);
+  if ("error" in fresh) {
+    // A dead refresh token is the sign-in-ran-out state; a transient
+    // exchange failure gets its own code so the card offers a retry
+    // instead of claiming the sign-in is gone.
+    return {
+      connected: false,
+      email: acct.email,
+      messages: [],
+      error: fresh.error === "auth_failed" ? "auth_failed" : "refresh_failed",
+    };
+  }
+  const token = fresh.token;
   // The list and the unread count are independent: ask for both at
   // once instead of queuing them, and fetch every message's metadata
   // in parallel too — the old serial loop made the inbox load feel
@@ -259,8 +280,9 @@ export async function getMessage(
 }> {
   const acct = getGmailAccount(accountId, label);
   if (!acct) return { ok: false, error: "not_connected" };
-  const token = await freshAccessToken(accountId, label);
-  if (!token) return { ok: false, error: "token_failed" };
+  const fresh = await freshAccessToken(accountId, label);
+  if ("error" in fresh) return { ok: false, error: fresh.error };
+  const token = fresh.token;
   const res = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${encodeURIComponent(id)}?format=full`, {
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -337,8 +359,9 @@ export async function saveDraft(
 ): Promise<{ ok: boolean; draftId?: string; error?: string }> {
   const acct = getGmailAccount(accountId, label);
   if (!acct) return { ok: false, error: "not_connected" };
-  const token = await freshAccessToken(accountId, label);
-  if (!token) return { ok: false, error: "token_failed" };
+  const fresh = await freshAccessToken(accountId, label);
+  if ("error" in fresh) return { ok: false, error: fresh.error };
+  const token = fresh.token;
   const mime = [
     `To: ${to}`,
     `Subject: ${subject}`,
@@ -370,8 +393,9 @@ export async function sendEmail(
 ): Promise<{ ok: boolean; messageId?: string; error?: string }> {
   const acct = getGmailAccount(accountId, label);
   if (!acct) return { ok: false, error: "not_connected" };
-  const token = await freshAccessToken(accountId, label);
-  if (!token) return { ok: false, error: "token_failed" };
+  const fresh = await freshAccessToken(accountId, label);
+  if ("error" in fresh) return { ok: false, error: fresh.error };
+  const token = fresh.token;
   const mime = [
     `To: ${to}`,
     `Subject: ${subject}`,
@@ -415,7 +439,7 @@ export async function sendFromAny(
     // A token failure on one account is not worth trying the next with
     // the same stale credentials; a hard send failure is worth one retry
     // on the next connected account.
-    if (r.error === "token_failed") return { ok: false, error: "token_failed" };
+    if (r.error === "token_failed" || r.error === "auth_failed") return { ok: false, error: r.error };
   }
   return { ok: false, error: "send_failed" };
 }
