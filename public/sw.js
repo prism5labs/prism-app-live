@@ -228,7 +228,20 @@
 // sounds are unchanged. Animated per-Face clips are wired
 // (HERO_CLIPS in main.js) but ship empty — the image-to-video
 // pipeline was down at build time; see public/heroes/manifest.json.
-const CACHE = "prism5-v71";
+// CACHE v72: bumped Nov 25, 2026 for three fixes Neil hit on his
+// phone after a fresh reinstall. (1) The old opening video is gone:
+// the v5 film and its v3 fallback are retired from the app — the
+// splash now opens straight into the hero stage (her light, the
+// Faces) over a still backdrop, and both film files leave the
+// precache and the repo, so no install can play the old video
+// again. (2) The Business / Personal switch now sits on the Chat
+// front itself, not only in the Store and You → Settings. (3) The
+// Chat front reads the owned-Supernovas list under its real state
+// key ("supernovas", not the stale "photons"), so an owner's
+// Supernovas appear beside their Novas again. The cache bump makes
+// existing installs fetch the new shell instead of serving the
+// cached one, and clears any older cache entries on activate.
+const CACHE = "prism5-v72";
 // Images (portraits, thumbnails, brand art, chat backgrounds, icons)
 // live in their own cache whose name does NOT change with the shell
 // version. Before v52 every shell bump deleted the one cache on
@@ -237,25 +250,20 @@ const CACHE = "prism5-v71";
 // refreshed in the background by the fetch handler below, and the
 // name is only ever changed if the asset strategy itself changes.
 const ASSETS = "prism5-assets-v1";
-// The shell is the app itself plus the opening films (the splash is
-// untouchable, and its films must be local or it stalls). The twelve
-// chat backgrounds are NOT precached any more (v52): they were ~11 MB
-// of the ~12 MB install, and the fetch handler now caches each one in
-// the asset cache the first time the rotation reaches it.
-const SHELL = ["/", "/index.html", "/styles.css", "/main.js", "/update-gate.js", "/manifest.json", "/opening-animation-v3.mp4", "/opening-v5-poster.jpg"];
+// The shell is the app itself plus the opening's backdrop still
+// (the splash is untouchable). The opening films that used to ride
+// along here were retired in v72 — the opening is the hero stage
+// now, no video at all. The twelve chat backgrounds are NOT
+// precached any more (v52): they were ~11 MB of the ~12 MB
+// install, and the fetch handler now caches each one in the asset
+// cache the first time the rotation reaches it.
+const SHELL = ["/", "/index.html", "/styles.css", "/main.js", "/update-gate.js", "/manifest.json", "/opening-v5-poster.jpg"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches
       .open(CACHE)
-      .then((c) =>
-        // The shell first; the film after it, best effort — a slow or
-        // failed film fetch must not fail the whole install and leave
-        // the old worker in place. The film is fetched plain (no
-        // Range), so it stores as a whole 200 the Range handler below
-        // can slice from.
-        c.addAll(SHELL).then(() => c.add("/opening-v5.mp4").catch(() => {})),
-      )
+      .then((c) => c.addAll(SHELL))
       .then(() => self.skipWaiting()),
   );
 });
@@ -277,15 +285,14 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
   if (event.request.method !== "GET") return;
   if (url.pathname.startsWith("/api/") || url.pathname === "/healthz") return;
-  // Range requests (video streaming and seeking): serve a 206 slice
-  // out of the cache when the whole file is cached, so the opening
-  // film plays from the installed copy on reopen even on a slow
-  // connection. Before this the Range requests bypassed the worker
-  // entirely, so every reopen streamed the 3.7 MB film off the
-  // network — on a slow connection it stalled and the splash sat
-  // black. When the file is not cached yet, fall through to the
-  // network untouched. (The Cache API cannot store a 206 partial
-  // response, so only whole 200s are ever cached and sliced here.)
+  // Range requests (media streaming and seeking — the hero clips
+  // are the remaining video in the app since the opening films
+  // were retired in v72): serve a 206 slice out of the cache when
+  // the whole file is cached, so a clip plays from the installed
+  // copy on reopen even on a slow connection. When the file is not
+  // cached yet, fall through to the network untouched. (The Cache
+  // API cannot store a 206 partial response, so only whole 200s
+  // are ever cached and sliced here.)
   if (event.request.headers.has("Range")) {
     event.respondWith(
       caches.match(event.request).then(async (cached) => {
