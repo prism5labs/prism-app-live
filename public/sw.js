@@ -261,7 +261,12 @@
 // gather-beat backdrop still instead of the retired v5 poster.
 // The DOM hero stage it replaces is gone from main.ts and
 // styles.css. Tap-to-skip and the curtain dismissal are unchanged.
-const CACHE = "prism5-v74";
+// v75: the same film, framing fix pass — masks are cut from each
+// clip's own silhouette (Juniper's cape renders whole; the black
+// slab beside Keystone is gone), the back row sits inside the
+// frame, Shopbell no longer peeks bisected between Juniper and
+// Encore, and Jude rides above Zero's head instead of through it.
+const CACHE = "prism5-v75";
 // Images (portraits, thumbnails, brand art, chat backgrounds, icons)
 // live in their own cache whose name does NOT change with the shell
 // version. Before v52 every shell bump deleted the one cache on
