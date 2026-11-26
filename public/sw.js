@@ -268,7 +268,15 @@
 // Encore, and Jude rides above Zero's head instead of through it.
 // v79: new app icon — the Card Mark (cream stock, teal disc, cream
 // prism, from the printed card), chosen by Neil Nov 26, 2026.
-const CACHE = "prism5-v79";
+// v80: icon cache fix — the icon URLs never changed at v79 while
+// the server sent them with a 30-day Cache-Control, so phones kept
+// the retired pyramid icon from their HTTP cache through reinstalls
+// (reported by Neil Nov 26, 2026). Icon addresses are now versioned
+// (?v=<this version>) in manifest.json, index.html and the push
+// icon below — bump the ?v= with the version on any future icon
+// change — and the server caps icons/favicon at a day and serves
+// the manifest no-cache.
+const CACHE = "prism5-v80";
 // Images (portraits, thumbnails, brand art, chat backgrounds, icons)
 // live in their own cache whose name does NOT change with the shell
 // version. Before v52 every shell bump deleted the one cache on
@@ -414,7 +422,7 @@ self.addEventListener("push", (event) => {
   } catch {}
   const options = {
     body: data.body,
-    icon: "/icons/icon-192.png",
+    icon: "/icons/icon-192.png?v=80",
     tag: "prism5-proactive",
   };
   // The picture that goes with the message: shown big in the notification

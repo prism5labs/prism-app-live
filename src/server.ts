@@ -2178,6 +2178,23 @@ async function serveStatic(req: Request, path: string): Promise<Response> {
     // the service worker's asset cache serves them first anyway.
     headers["cache-control"] = "public, max-age=2592000";
   }
+  if (rel === "favicon.ico" || rel.startsWith("icons/")) {
+    // The install icons and the favicon are exempt from the
+    // month-long image cache above (Nov 26, 2026): that header is
+    // what kept phones serving the retired pyramid icon long after
+    // the Card Mark shipped at v79, because the icon URLs never
+    // changed and a reinstall does not bust an HTTP cache. Icon
+    // addresses are also versioned (?v=<sw version>) in
+    // manifest.json and index.html; a day is the longest a stale
+    // icon can now survive even if a version bump is ever missed.
+    headers["cache-control"] = "public, max-age=86400";
+  }
+  if (rel === "manifest.json") {
+    // The manifest names the icon URLs; like sw.js it always
+    // revalidates, so a new icon set is picked up on the next visit
+    // instead of whenever a cached copy happens to expire.
+    headers["cache-control"] = "no-cache";
+  }
   // Text assets travel gzipped when the client accepts it (lightweight
   // pass, Nov 23, 2026): the shell's HTML/CSS/JS is the cold-open cost
   // on every first visit and every version bump, and gzip takes roughly
