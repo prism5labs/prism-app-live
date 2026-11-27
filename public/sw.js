@@ -304,7 +304,14 @@
 // retry, first touch unmutes); the dismissal backstop moves
 // to 26 s to sit past the longer film. The film still
 // streams, never precached.
-const CACHE = "prism5-v83";
+// v84: the Assemble film re-encoded phone-weight (Neil,
+// Nov 26, 2026: the v83 master played "choppy choppy choppy"
+// on his phone). /opening-film.mp4 is the same Assemble cut
+// at CRF 27 — 5.2 MB / 1.84 Mbps in place of the 15.7 MB /
+// 5.58 Mbps master, same 720×1280 H.264 High yuv420p
+// faststart encode family. Poster, backdrop, the 26 s
+// backstop and sound behaviour unchanged.
+const CACHE = "prism5-v84";
 // Images (portraits, thumbnails, brand art, chat backgrounds, icons)
 // live in their own cache whose name does NOT change with the shell
 // version. Before v52 every shell bump deleted the one cache on
