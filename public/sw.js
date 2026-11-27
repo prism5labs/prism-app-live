@@ -311,7 +311,7 @@
 // 5.58 Mbps master, same 720×1280 H.264 High yuv420p
 // faststart encode family. Poster, backdrop, the 26 s
 // backstop and sound behaviour unchanged.
-const CACHE = "prism5-v84";
+const CACHE = "prism5-v85";
 // Images (portraits, thumbnails, brand art, chat backgrounds, icons)
 // live in their own cache whose name does NOT change with the shell
 // version. Before v52 every shell bump deleted the one cache on
