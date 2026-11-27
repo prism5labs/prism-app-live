@@ -311,7 +311,15 @@
 // 5.58 Mbps master, same 720×1280 H.264 High yuv420p
 // faststart encode family. Poster, backdrop, the 26 s
 // backstop and sound behaviour unchanged.
-const CACHE = "prism5-v85";
+// v86: the Atomic Pavilion reskin (Neil, Nov 27, 2026: "the
+// prism app to resemble the aesthetic of the website"). The
+// app wears the website's design language — cream stock
+// texture, teal enamel buttons with chrome rims, paper cards
+// under a chrome strip, the Card Mark in the header, Patua
+// One over Libre Franklin, the red kept for labels. CSS,
+// fonts link, header mark and three small brand plates only;
+// no behaviour changes, the opening film untouched.
+const CACHE = "prism5-v86";
 // Images (portraits, thumbnails, brand art, chat backgrounds, icons)
 // live in their own cache whose name does NOT change with the shell
 // version. Before v52 every shell bump deleted the one cache on

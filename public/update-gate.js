@@ -44,7 +44,7 @@
       "position:fixed;inset:0;z-index:99999;display:flex;align-items:center;" +
       "justify-content:center;text-align:center;padding:24px;" +
       "background:#01313E;color:#FFF3DC;" +
-      "font-family:Nunito,system-ui,sans-serif;font-weight:700;font-size:18px;" +
+      "font-family:Libre Franklin,system-ui,sans-serif;font-weight:700;font-size:18px;" +
       "letter-spacing:.02em;opacity:0;transition:opacity .6s ease;";
     document.body.appendChild(veilEl);
     // Fade in on the next frame so the transition runs.
