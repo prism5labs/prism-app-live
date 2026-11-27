@@ -5418,9 +5418,9 @@ function playOpeningSplash(returning: boolean): void {
   splash.addEventListener("click", dismissByTap, { once: true });
   // Backstop: if the film stalls (a connection that never delivers
   // a frame), do not trap the owner behind the splash. The film
-  // runs ~21.1s and dismisses itself on its end; this sits safely
+  // runs ~22.6s and dismisses itself on its end; this sits safely
   // past it.
-  window.setTimeout(dismiss, 24000);
+  window.setTimeout(dismiss, 26000);
   // The film IS the opening: it starts the moment the splash is
   // up, over the backdrop still of its own first beat.
   runOpeningFilm(splash, backdrop, dismiss);

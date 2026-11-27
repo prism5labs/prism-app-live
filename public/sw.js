@@ -291,7 +291,20 @@
 // retries muted if autoplay-with-sound is refused, and the first
 // touch unmutes); the dismissal backstop moves to 24 s to sit
 // past the longer film. The film still streams, never precached.
-const CACHE = "prism5-v82";
+// v83: the ASSEMBLE opening (Neil, Nov 26, 2026: "That's the
+// opening — ship it") — /opening-film.mp4 is now the Assemble
+// cut built to Neil's original description: crash landings and
+// speed bursts, the whole company arrayed in the rotunda, and
+// Prism and Mabel converging to a grasp that ignites into the
+// Card Mark, 22.6 s of real generated footage. It replaces the
+// v82 cinema journey, which lives on as the Labs Page Reel.
+// The poster is the assembled company under the dome; the
+// precached backdrop is the film's rotunda line-up. Sound
+// behaviour unchanged (plays with sound where allowed, muted
+// retry, first touch unmutes); the dismissal backstop moves
+// to 26 s to sit past the longer film. The film still
+// streams, never precached.
+const CACHE = "prism5-v83";
 // Images (portraits, thumbnails, brand art, chat backgrounds, icons)
 // live in their own cache whose name does NOT change with the shell
 // version. Before v52 every shell bump deleted the one cache on
