@@ -5170,11 +5170,12 @@ function setupKeyboardDock(): void {
 // The opening is a film again (Nov 26, 2026) — not the retired
 // v5 film (the crystalline figure on the diner counter, cut on
 // Nov 18, whose stale copy kept playing on fresh installs), and
-// not the DOM hero stage that carried the opening for a day, but
-// the per-Face composite built for this choreography: her light
-// gathers, splits, and the 23 Faces condense out of it, hold
-// alive, and flash out — see the Opening film section below. The
-// splash's backdrop still is the new film's own gather beat.
+// not the DOM hero stage that carried the opening for a day. The
+// first film in this seat was a per-Face composite; Neil cut it
+// the same evening ("paper stick figures") and the seat now
+// carries the CINEMA film: one continuous journey through the
+// Labs, filmed the Loremaster way — see the Opening film section
+// below. The splash's backdrop still is the new film's own hall.
 //
 // First ever open reads "Welcome"; every open after that reads
 // "Welcome back" — the words are an overlay, as they always were.
@@ -5234,27 +5235,31 @@ function dismissSplashWithCurtain(fast = false): void {
 }
 
 // ---------- Opening film ----------
-// The film is back (Nov 26, 2026) — built the way the whole-plate
-// attempts of Nov 25 could not be: one animated clip per Face,
-// generated from that Face's own hero art and verified by eye,
-// then composited over the painted stage in the HERO_SLOTS
-// formation (the pipeline lives in the opening-film project:
-// composite.py and clips/MANIFEST.md). Her light gathers, splits,
-// the 23 Faces hold alive in their places, then charge and flash
-// out into white — the choreography Neil set on Nov 23, at last
-// with every figure truly moving. Prism herself never appears:
-// she is the light they are born from.
+// CINEMA v2 (shipped Nov 26, 2026, Neil: "That's the opening —
+// ship it") — real generated cinematic footage, nothing
+// composited: one continuous journey through the Labs. The camera
+// glides the great hall, passes through the glowing doors into
+// Nova's garage (she rises from her creeper and gives the passing
+// camera her wry, listening look), through the Supernova lawyer's
+// office as she opens the frosted-glass door and ushers the
+// camera in, and into the rotunda, where the great glass prism
+// catches the dome's sunlight, ignites, and blooms to white —
+// resolving into the Card Mark, held, then a slow fade to cream.
+// 21.1 s, 720×1280. The build record lives in the opening-cinema
+// project (BUILD-V2.md). Sound: the Egmont coda spine with real
+// effects forward — the film plays WITH sound wherever the
+// browser allows it (see runOpeningFilm).
 //
 // The film is STREAMED from /opening-film.mp4 — it is not in the
 // service worker's precache and the fetch handler never stores
 // it (see public/sw.js), so the install stays light. The splash's
-// backdrop still (the film's own gather beat) is precached
+// backdrop still (a frame of the film's own hall) is precached
 // instead and covers the moment before the first frame arrives.
 // The film dismisses through the same black curtain as every
 // opening before it: on its own end, on a tap anywhere (the
 // splash's tap-to-skip), or on the backstop in playOpeningSplash.
 // If the film cannot play at all, the opening falls back to the
-// hold still — the full assembly as a poster — for a short
+// hold still — the lit prism as a poster — for a short
 // breath, then out. Never a stuck splash.
 const OPENING_FILM_SRC = "/opening-film.mp4";
 const OPENING_POSTER_SRC = "/opening-poster.jpg";
@@ -5286,7 +5291,12 @@ function runOpeningFilm(
   vid.className = "opening-film";
   vid.src = OPENING_FILM_SRC;
   vid.poster = OPENING_BACKDROP_SRC;
-  vid.muted = true;
+  // The opening plays WITH sound (Neil, Nov 26, 2026): the film
+  // starts unmuted, and if the browser refuses autoplay with
+  // sound the play below retries muted rather than not at all —
+  // and the first tap or keypress anywhere unmutes it, so a
+  // muted start still finds its voice at the owner's first touch.
+  vid.muted = false;
   vid.autoplay = true;
   vid.playsInline = true;
   vid.preload = "auto";
@@ -5320,8 +5330,24 @@ function runOpeningFilm(
   };
   vid.addEventListener("ended", () => dismiss());
   vid.addEventListener("error", fallback);
+  const unmute = () => {
+    vid.muted = false;
+  };
+  window.addEventListener("pointerdown", unmute, { once: true });
+  window.addEventListener("keydown", unmute, { once: true });
   const played = vid.play();
-  if (played) played.catch(fallback);
+  if (played) {
+    played.catch(() => {
+      // Autoplay with sound was refused: start muted (the gesture
+      // listeners above unmute at the first touch) — and only if
+      // even a muted start is refused does the poster fallback run.
+      if (fellBack) return;
+      vid.muted = true;
+      const retried = vid.play();
+      if (retried) retried.catch(fallback);
+      else fallback();
+    });
+  }
 }
 function playOpeningSplash(returning: boolean): void {
   const splash = document.getElementById("opening-splash");
@@ -5392,9 +5418,9 @@ function playOpeningSplash(returning: boolean): void {
   splash.addEventListener("click", dismissByTap, { once: true });
   // Backstop: if the film stalls (a connection that never delivers
   // a frame), do not trap the owner behind the splash. The film
-  // runs ~9.6s and dismisses itself on its end; this sits safely
+  // runs ~21.1s and dismisses itself on its end; this sits safely
   // past it.
-  window.setTimeout(dismiss, 13000);
+  window.setTimeout(dismiss, 24000);
   // The film IS the opening: it starts the moment the splash is
   // up, over the backdrop still of its own first beat.
   runOpeningFilm(splash, backdrop, dismiss);

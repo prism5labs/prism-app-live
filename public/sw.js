@@ -280,7 +280,18 @@
 // row, card note and product description in You, the Store, Connected
 // and Customize cut to a label plus at most one short sentence; the
 // mandated pricing explainer keeps its plain-words paragraphs.
-const CACHE = "prism5-v81";
+// v82: the CINEMA opening (Neil, Nov 26, 2026: "That's the
+// opening — ship it") — /opening-film.mp4 is now the cinema film:
+// one continuous journey through the Labs (hall → Nova's garage →
+// the lawyer's office → the rotunda's prism igniting into the
+// Card Mark), 21.1 s of real generated footage replacing the
+// per-Face composite Neil cut the same evening. The poster is the
+// lit prism; the precached backdrop is a frame of the film's own
+// hall. The film plays WITH sound where the browser allows (it
+// retries muted if autoplay-with-sound is refused, and the first
+// touch unmutes); the dismissal backstop moves to 24 s to sit
+// past the longer film. The film still streams, never precached.
+const CACHE = "prism5-v82";
 // Images (portraits, thumbnails, brand art, chat backgrounds, icons)
 // live in their own cache whose name does NOT change with the shell
 // version. Before v52 every shell bump deleted the one cache on
