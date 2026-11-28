@@ -893,31 +893,6 @@ function meterBar(): string {
   return `<div class="meter-bar"><div class="meter-fill" style="width:${pct}%"></div></div>`;
 }
 
-function photonCard(p: any, size = 150): string {
-  const owned = p.owned;
-  // The owner's chosen look set tints this Photon's card, so the
-  // choice is visible before the chat is even opened.
-  const look = lookSetById(customFor(p.name).lookSet || "");
-  // Picture-led (Nov 22, 2026 declutter): the portrait and the name
-  // carry the card; the tagline lives on the character card in the
-  // Store, not on the front.
-  return `<button class="photon-card${look ? ` look-${look.id}` : ""}" data-action="open-photon" data-photon="${esc(p.name)}" ${
-    owned ? "" : "disabled"
-  }>
-    ${portraitHtml(portraitNameOf(p), size)}
-    <span class="photon-name">${esc(superLabel(p))}</span>
-  </button>`;
-}
-
-// An Atom's card on the Chat front, mirroring a Photon's: tap opens
-// the Atom's thread through the same openThread path.
-function atomCard(a: (typeof ATOMS)[number], size = 150): string {
-  return `<button class="photon-card" data-action="open-atom" data-atom="${esc(a.name)}">
-    ${atomPortraitHtml(a.name, size)}
-    <span class="photon-name">${esc(novaLabel(a))}</span>
-  </button>`;
-}
-
 // ---------- Start My Day — the morning briefing Plug ----------
 // The briefing walks the day top to bottom, one item at a time. The
 // server is the source of truth: every confirm re-fetches, so the next
@@ -1090,12 +1065,15 @@ function renderDayBriefing(): string {
 }
 
 // ---------- Chat front page ----------
-// One home screen, one job (redesign, Nov 19, 2026): your Faces and
-// your day, and nothing else competing with them. The hero image, the
-// name form, the usage meter, the upsell line and the mission strip
-// all left this screen — the name and the meter live under You now,
-// and buying lives in the Store. The empty state has one way forward:
-// the Store tab, which is the one place to get a Face.
+// One home screen, one job (redesign, Nov 19, 2026): your day, and
+// nothing else competing with it. The hero image, the name form, the
+// usage meter, the upsell line and the mission strip all left this
+// screen — the name and the meter live under You now, and buying
+// lives in the Store. The roster left too (Neil, Nov 28, 2026): the
+// front no longer presents each character — Meet the Supernovas /
+// Meet the Novas in the Store is where each Face is presented. The
+// empty state has one way forward: the Store tab, which is the one
+// place to get a Face.
 // ---------- Vending machines ----------
 // The rosters live in two rotating-drum merchandisers now (Nov 22,
 // 2026), modelled on the classic rotating-drum cabinet Neil picked
@@ -1112,10 +1090,11 @@ function renderDayBriefing(): string {
 // when the visitor works it, and the turn is instant under reduced
 // motion. In the Store, DISPENSE drops the selected Face's ordinary
 // store card into the bay — the buy flow itself is unchanged, and
-// the Store stays the only place to buy or redeem. On the Chat
-// front, DISPENSE opens the selected Face's thread, exactly what
-// tapping its card has always done, and the cards in the drum keep
-// that same tap. The current selection is remembered per machine
+// the Store stays the only place to buy or redeem. The machines are
+// the Store's alone now (Neil, Nov 28, 2026): the Chat front carried
+// the same two machines for owned Faces until that day, and the
+// roster came off the homepage — presenting each character is what
+// Meet them is for. The current selection is remembered per machine
 // across re-renders, the same way storeOpen is.
 const machineIndex: Record<string, number> = {};
 
@@ -1281,56 +1260,26 @@ function renderChatFront(): string {
   const ownedNovas = ATOMS.filter(
     (a) => ownsEveryAtom || (state?.ownedNovas || []).includes(a.name),
   );
-  const supernovaShelf =
-    owned.length > 0
-      ? `<h2 class="front-strip-label">Your Supernovas</h2>` +
-        machineHtml("front-supernovas", {
-          title: "SUPERNOVAS",
-          priceLine: "",
-          listLabel: `See all ${owned.length} of your Supernovas`,
-          dispenseAction: "machine-dispense-chat",
-          kind: "photon",
-          items: owned.map((p: any, i: number) => ({
-            code: machineCode(i),
-            name: faceNameOf(p),
-            openName: p.name,
-            role: PHOTONS.find((x) => x.name === p.name)?.tagline || "",
-            price: "",
-            pack: photonCard(p, 84),
-          })),
-        })
-      : "";
-  const novaShelf =
-    ownedNovas.length > 0
-      ? `<h2 class="front-strip-label">Your Novas</h2>` +
-        machineHtml("front-novas", {
-          title: "NOVAS",
-          priceLine: "",
-          listLabel: `See all ${ownedNovas.length} of your Novas`,
-          dispenseAction: "machine-dispense-chat",
-          kind: "atom",
-          items: ownedNovas.map((a, i: number) => ({
-            code: machineCode(i),
-            name: a.name,
-            openName: a.name,
-            role: a.tagline,
-            price: "",
-            pack: atomCard(a, 84),
-          })),
-        })
-      : "";
-  // Both shelves show when both are owned; the side the owner is on
-  // (the switch at the top of this front) puts its shelf first.
+  // No roster on the front (Neil, Nov 28, 2026): the homepage does
+  // not say each character — the vending machines that paraded every
+  // owned Face here, one compartment per character with its name,
+  // tagline and a "See all N" name list, are gone. Presenting each
+  // character is what Meet the Supernovas / Meet the Novas in the
+  // Store is for, and those machines stay there. An owner gets one
+  // plain card pointing at them; the front itself keeps the day —
+  // the greeting, Start My Day, Pinned, notes and search above.
   const ownedHtml =
-    supernovaShelf || novaShelf
-      ? sideOrDefault() === "personal"
-        ? novaShelf + supernovaShelf
-        : supernovaShelf + novaShelf
+    owned.length > 0 || ownedNovas.length > 0
+      ? `<div class="card empty-panel">
+          <div class="card-head"><img class="mark" src="/brand/gem.jpg" alt=""><h2>Your Faces</h2></div>
+          <p class="fine">Each Nova and Supernova is presented in the Store, one by one.</p>
+          <button class="btn store-outline store-btn" data-action="goto" data-tab="store">Meet them in the Store</button>
+        </div>`
       : `<div class="card empty-panel">
           <div class="card-head"><img class="mark" src="/brand/gem.jpg" alt=""><h2>Nothing to talk to yet.</h2></div>
           <button class="btn store-outline store-btn" data-action="goto" data-tab="store">Browse the Store</button>
         </div>`;
-  // The Business / Personal switch, on the shelf view itself (Nov 25,
+  // The Business / Personal switch, on the front itself (Nov 25,
   // 2026): before this it lived only at the top of the Store and down
   // in You → Settings, so an owner on the Chat front had to hunt for
   // it. Same side-pick action as everywhere else — the choice
@@ -4046,7 +3995,6 @@ const SWOOSH_ACTIONS = new Set([
   "back-to-front",
   "open-photon",
   "open-atom",
-  "machine-dispense-chat",
   "card-chat",
   "card-chat-atom",
   "chooser-skip",
@@ -4354,21 +4302,6 @@ document.addEventListener("click", async (e) => {
       void root.offsetWidth;
       root.classList.add("dispensing");
       window.setTimeout(() => root.classList.remove("dispensing"), 950);
-    }
-  } else if (action === "machine-dispense-chat") {
-    // Chat front: dispensing a Face opens its thread — the same
-    // destinations the cards themselves have always opened.
-    const root = t.closest(".machine") as HTMLElement | null;
-    const id = t.dataset.machine || "";
-    const panels = root
-      ? ([...root.querySelectorAll(".machine-panel")] as HTMLElement[])
-      : [];
-    const sel = panels[machineIndex[id] || 0];
-    const name = sel?.dataset.openName || "";
-    if (name) {
-      dayOpen = false;
-      if (root?.dataset.kind === "atom") openThread(name);
-      else openPhoton(name);
     }
   } else if (action === "product-info") {
     openProductCard(t.dataset.slug || "", t);
