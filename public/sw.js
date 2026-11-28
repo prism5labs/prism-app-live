@@ -340,7 +340,16 @@
 // where they were. The Store's Meet sections are unchanged. The
 // cache bump makes existing installs fetch the new bundle instead
 // of serving the cached one.
-const CACHE = "prism5-v89";
+// v90: Elevation Fix #1 ships live (Nov 28, 2026, Neil's ruling) —
+// the material system is completed in the stylesheet: fields are
+// paper wells, rows and chips wear stock, Store group headers are
+// labelled plates, the meter is a brass-and-enamel gauge, and the
+// Store machine's cabinet is enamel plate under a dark glaze with
+// a glassed window and bevelled keys, where flat gradients stood
+// before. Stylesheet only; no behaviour changes. The cache bump
+// makes existing installs fetch the new bundle instead of serving
+// the cached one.
+const CACHE = "prism5-v90";
 // Images (portraits, thumbnails, brand art, chat backgrounds, icons)
 // live in their own cache whose name does NOT change with the shell
 // version. Before v52 every shell bump deleted the one cache on
