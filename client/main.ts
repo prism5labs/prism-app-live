@@ -137,6 +137,15 @@ async function loadThreadNote(name: string): Promise<void> {
   const r = await api.threadNote(name);
   threadNote = r && r.ok && typeof r.note === "string" ? r.note : "";
 }
+// Every conversation carrying a note for this account, most recently
+// noted first — the Chat front's notes view, so a note can be found
+// again from the front instead of only inside its own thread.
+let threadNotesList: { name: string; note: string; updated_at: string }[] = [];
+
+async function loadThreadNotesList(): Promise<void> {
+  const r = await api.threadNotes();
+  if (r && r.ok && Array.isArray(r.notes)) threadNotesList = r.notes;
+}
 // Conversation search on the Chat front: the last query and its
 // results. Results are null until a search has run, so the front can
 // tell "not searched yet" apart from "searched, nothing found".
@@ -1350,6 +1359,19 @@ function renderChatFront(): string {
         .join("") +
       `</div>`
     : "";
+  // The notes view across Faces: every conversation carrying a note,
+  // each row opening that thread. Like the Pinned strip above, the
+  // card simply isn't there when there is nothing to show.
+  const notesHtml = threadNotesList.length
+    ? `<div class="card" id="thread-notes">
+        <h3>Your notes</h3>
+        ${threadNotesList
+          .map(
+            (n) => `<button class="inbox-msg" data-action="search-open-thread" data-photon="${esc(String(n.name || ""))}"><span class="inbox-subject">${esc(labelForName(String(n.name || "")))}</span><span class="inbox-snippet">${esc(String(n.note || ""))}</span><span class="inbox-meta">Note · ${esc(fmtWhen(String(n.updated_at || "")))}</span></button>`,
+          )
+          .join("")}
+      </div>`
+    : "";
   const searchResultsHtml =
     conversationSearchResults === null
       ? ""
@@ -1357,7 +1379,7 @@ function renderChatFront(): string {
         ? `<p class="fine">No conversations found for &ldquo;${esc(conversationSearchQuery)}&rdquo;.</p>`
         : conversationSearchResults
             .map(
-              (r: any) => `<button class="inbox-msg" data-action="search-open-thread" data-photon="${esc(String(r.photon || ""))}"><span class="inbox-subject">${esc(labelForName(String(r.photon || "")))}</span><span class="inbox-snippet">${esc(String(r.snippet || ""))}</span><span class="inbox-meta">${esc(r.role === "user" ? "You" : labelForName(String(r.photon || "")))} · ${esc(fmtWhen(String(r.created_at || "")))}</span></button>`,
+              (r: any) => `<button class="inbox-msg" data-action="search-open-thread" data-photon="${esc(String(r.photon || ""))}"><span class="inbox-subject">${esc(labelForName(String(r.photon || "")))}</span><span class="inbox-snippet">${esc(String(r.snippet || ""))}</span><span class="inbox-meta">${esc(r.role === "user" ? "You" : r.role === "note" ? "Your note" : labelForName(String(r.photon || "")))} · ${esc(fmtWhen(String(r.created_at || "")))}</span></button>`,
             )
             .join("");
   const searchHtml = `
@@ -1381,6 +1403,7 @@ function renderChatFront(): string {
       ? `<button class="day-strip" data-action="day-start"><img src="/brand/gem.jpg" alt=""><span>Start My Day</span></button>`
       : ""}
     ${pinnedHtml}
+    ${notesHtml}
     ${searchHtml}
     ${ownedHtml}
   </section>`;
@@ -3772,6 +3795,7 @@ async function refreshState(): Promise<boolean> {
     state = r;
     stateFailed = false;
     await loadPinnedFaces();
+    await loadThreadNotesList();
     // The side lives on the account: the account wins over the device
     // cache. When the account has no side yet but this device picked
     // one (while signed out, or on a device that never synced), push
@@ -4489,6 +4513,7 @@ document.addEventListener("click", async (e) => {
         if (r && r.ok) {
           threadNote = typeof r.note === "string" ? r.note : next.trim().slice(0, 500);
           toast(threadNote ? "Note saved." : "Note cleared.");
+          await loadThreadNotesList();
         } else {
           toast(r?.message || "That note didn't save. Try again.", "err");
         }
@@ -4515,6 +4540,7 @@ document.addEventListener("click", async (e) => {
       activePhoton = null;
       customizePhoton = null;
       toast(`Your conversation with ${name} is deleted.`);
+      await loadThreadNotesList();
       render();
     } else {
       toast(r?.message || "That conversation didn't delete. Try again.", "err");

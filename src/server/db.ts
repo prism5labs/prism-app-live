@@ -839,6 +839,50 @@ export function deleteThreadNote(accountId: string, name: string): void {
   db.query(`DELETE FROM thread_notes WHERE account_id = ? AND name = ?`).run(accountId, name);
 }
 
+export type ThreadNoteEntry = {
+  name: string;
+  note: string;
+  updated_at: string;
+};
+
+// Every conversation carrying a note for this account, most recently
+// updated first — the index behind the app's notes view across Faces.
+// The table only ever holds non-empty notes (an empty save deletes
+// the row); the note != '' guard keeps that true regardless.
+export function listThreadNotes(accountId: string): ThreadNoteEntry[] {
+  const rows = db
+    .query(
+      `SELECT name, note, updated_at FROM thread_notes
+       WHERE account_id = ? AND note != ''
+       ORDER BY updated_at DESC, name ASC`,
+    )
+    .all(accountId) as any[];
+  return rows.map((r) => ({ name: r.name, note: r.note, updated_at: r.updated_at }));
+}
+
+// Note matches for conversation search: the same account-scoped,
+// case-insensitive substring match as searchMessages, run over the
+// note text. A hit is shaped exactly like a message hit — the note's
+// updated_at stands as its timestamp and the role is "note" — so the
+// search route can merge both kinds and the client renders a note hit
+// beside message hits, with the same snippet window around the match.
+export function searchThreadNotes(accountId: string, query: string): MessageSearchResult[] {
+  const pattern = `%${escapeLike(query)}%`;
+  const rows = db
+    .query(
+      `SELECT name, note, updated_at FROM thread_notes
+       WHERE account_id = ? AND note COLLATE NOCASE LIKE ? ESCAPE '\\'
+       ORDER BY updated_at DESC`,
+    )
+    .all(accountId, pattern) as any[];
+  return rows.map((r) => ({
+    photon: r.name,
+    role: "note",
+    snippet: searchSnippet(r.note, query),
+    created_at: r.updated_at,
+  }));
+}
+
 // --- Pinned Faces ---
 // A pinned Photon or Atom conversation, so the Faces the owner uses
 // most sit at the top of the Chat front. Pinning is idempotent: a

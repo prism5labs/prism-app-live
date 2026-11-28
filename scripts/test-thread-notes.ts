@@ -7,6 +7,13 @@
 //   4. Unknown name 400, missing account 400 on get and set.
 //   5. Deleting a conversation clears its note.
 //   6. Client wiring: note API path and Note control.
+//   7. Conversation search finds notes: a note-only hit returns the
+//      conversation (role "note", snippet windowed on the match),
+//      case-insensitively, account-isolated, merged newest first
+//      with message hits; a cleared note stops matching.
+//   8. The notes view across Faces: GET /api/threads/notes lists
+//      every noted conversation for the account only, most recently
+//      updated first; cleared and deleted conversations leave it.
 //
 // Run: bun scripts/test-thread-notes.ts (spawns the real server on
 // :3137 against a throwaway DATA_DIR; no network, no brain needed).
@@ -87,6 +94,26 @@ function seedMessage(accountId: string, photon: string, content: string) {
   db.close();
 }
 
+function seedMessageAt(accountId: string, photon: string, content: string, createdAt: string) {
+  const db = new Database(join(DATA_DIR, "app.db"));
+  db.query(`INSERT INTO messages (account_id, photon, role, content, created_at) VALUES (?, ?, ?, ?, ?)`).run(accountId, photon, "user", content, createdAt);
+  db.query(`INSERT INTO threads (account_id, photon, created_at, updated_at) VALUES (?, ?, ?, ?) ON CONFLICT(account_id, photon) DO UPDATE SET updated_at = excluded.updated_at`).run(accountId, photon, createdAt, createdAt);
+  db.close();
+}
+
+async function search(accountId: string, q: string): Promise<any> {
+  const res = await fetch(`http://localhost:${APP_PORT}/api/threads/search?accountId=${accountId}&q=${encodeURIComponent(q)}`);
+  return { status: res.status, body: await res.json().catch(() => null) };
+}
+
+async function listNotes(accountId: string | null): Promise<any> {
+  const url = accountId
+    ? `http://localhost:${APP_PORT}/api/threads/notes?accountId=${accountId}`
+    : `http://localhost:${APP_PORT}/api/threads/notes`;
+  const res = await fetch(url);
+  return { status: res.status, body: await res.json().catch(() => null) };
+}
+
 await rm(DATA_DIR, { recursive: true, force: true });
 const proc = await startApp();
 try {
@@ -152,6 +179,48 @@ try {
   const noAccSet = await setNote(null, "Prism", "hi");
   check("missing account: set is 400 accountId required", noAccSet.status === 400 && noAccSet.body?.error === "accountId required", `${noAccSet.status} ${JSON.stringify(noAccSet.body)}`);
 
+  // --- Search finds notes ---
+  await setNote(ACCOUNT, "Juniper", "Quixotic deadline for the mural");
+  const noteHit = await search(ACCOUNT, "quixotic");
+  const noteResults = noteHit.body?.results || [];
+  check("search: note-only query finds the conversation", noteHit.status === 200 && noteResults.length === 1 && noteResults[0].photon === "Juniper" && noteResults[0].role === "note", `${noteHit.status} ${JSON.stringify(noteResults)}`);
+  check("search: note hit snippet windows the match", noteResults.length === 1 && noteResults[0].snippet.includes("Quixotic deadline"), JSON.stringify(noteResults));
+  check("search: note hit carries only the message-hit fields", noteResults.length === 1 && !("content" in noteResults[0]) && Object.keys(noteResults[0]).sort().join(",") === "created_at,photon,role,snippet", JSON.stringify(noteResults.map((r: any) => Object.keys(r))));
+  const noteHitUpper = await search(ACCOUNT, "QUIXOTIC");
+  check("search: note match is case-insensitive", noteHitUpper.status === 200 && (noteHitUpper.body?.results || []).length === 1, JSON.stringify(noteHitUpper.body?.results));
+  const noteHitOther = await search(OTHER, "quixotic");
+  check("search: other account cannot find this account's note", noteHitOther.status === 200 && (noteHitOther.body?.results || []).length === 0, JSON.stringify(noteHitOther.body?.results));
+  await setNote(OTHER, "Juniper", "Quixotic plans of my own");
+  const otherOwn = await search(OTHER, "quixotic");
+  const accountOwn = await search(ACCOUNT, "quixotic");
+  check("search: each account finds only its own note", (otherOwn.body?.results || []).length === 1 && ((otherOwn.body.results[0].snippet || "").includes("my own")) && (accountOwn.body?.results || []).length === 1, `${JSON.stringify(otherOwn.body?.results)} ${JSON.stringify(accountOwn.body?.results)}`);
+  // A message hit and a note hit for one query merge newest first.
+  seedMessageAt(ACCOUNT, "Prism", "A quixotic message from long ago", "2020-01-01T00:00:00.000Z");
+  const merged = await search(ACCOUNT, "quixotic");
+  const mergedResults = merged.body?.results || [];
+  check("search: note and message hits merge, newest first", mergedResults.length === 2 && mergedResults[0].role === "note" && mergedResults[0].photon === "Juniper" && mergedResults[1].role === "user" && mergedResults[1].photon === "Prism", JSON.stringify(mergedResults));
+  await setNote(ACCOUNT, "Juniper", "");
+  const afterClearSearch = await search(ACCOUNT, "quixotic");
+  const afterClearResults = afterClearSearch.body?.results || [];
+  check("search: cleared note no longer matches", afterClearResults.length === 1 && afterClearResults.every((r: any) => r.role !== "note"), JSON.stringify(afterClearResults));
+  await setNote(OTHER, "Juniper", "");
+
+  // --- Notes view across Faces ---
+  const emptyList = await listNotes(OTHER);
+  check("notes view: account with no notes gets an empty list", emptyList.status === 200 && emptyList.body?.ok === true && Array.isArray(emptyList.body?.notes) && emptyList.body.notes.length === 0, `${emptyList.status} ${JSON.stringify(emptyList.body)}`);
+  const list1 = await listNotes(ACCOUNT);
+  const list1Notes = list1.body?.notes || [];
+  check("notes view: lists every noted conversation with its note", list1.status === 200 && list1Notes.length === 2 && list1Notes.some((n: any) => n.name === "Prism" && n.note === "Account A note") && list1Notes.some((n: any) => n.name === "Mabel" && n.note === "Garden project"), JSON.stringify(list1Notes));
+  check("notes view: entries carry name, note, updated_at", list1Notes.length === 2 && list1Notes.every((n: any) => typeof n.name === "string" && typeof n.note === "string" && n.note.length > 0 && typeof n.updated_at === "string"), JSON.stringify(list1Notes));
+  await Bun.sleep(10);
+  await setNote(ACCOUNT, "Mabel", "Garden project");
+  const list2 = await listNotes(ACCOUNT);
+  const list2Notes = list2.body?.notes || [];
+  check("notes view: most recently updated first", list2Notes.length === 2 && list2Notes[0].name === "Mabel", JSON.stringify(list2Notes));
+  check("notes view: cleared notes do not appear", !list2Notes.some((n: any) => n.name === "Juniper"), JSON.stringify(list2Notes));
+  const noAccList = await listNotes(null);
+  check("notes view: missing account is 400 accountId required", noAccList.status === 400 && noAccList.body?.error === "accountId required", `${noAccList.status} ${JSON.stringify(noAccList.body)}`);
+
   // Deleting a conversation clears its note
   seedMessage(ACCOUNT, "Prism", "A message to delete");
   const delRes = await fetch(`http://localhost:${APP_PORT}/api/threads/Prism/delete`, {
@@ -163,6 +232,8 @@ try {
   check("delete: conversation deletes", delRes.status === 200 && delBody?.ok === true, `${delRes.status} ${JSON.stringify(delBody)}`);
   const afterDelete = await getNote(ACCOUNT, "Prism");
   check("delete: note is cleared with conversation", afterDelete.status === 200 && afterDelete.body?.note === "", JSON.stringify(afterDelete.body));
+  const listAfterDelete = await listNotes(ACCOUNT);
+  check("delete: conversation leaves the notes view", !(listAfterDelete.body?.notes || []).some((n: any) => n.name === "Prism"), JSON.stringify(listAfterDelete.body?.notes));
   // Other Face note untouched by delete
   const mabelAfter = await getNote(ACCOUNT, "Mabel");
   check("delete: other Face note untouched", mabelAfter.body?.note === "Garden project", JSON.stringify(mabelAfter.body));
@@ -179,10 +250,16 @@ try {
   check("client: note is loaded with the thread", main.includes("loadThreadNote(name)") || main.includes("loadThreadNote"));
   const apiClient = readFileSync(join(ROOT, "client", "api.ts"), "utf8");
   check("client: api carries thread note endpoints", apiClient.includes("/note") && apiClient.includes("setThreadNote") && apiClient.includes("threadNote"));
+  check("client: api carries the notes list endpoint", apiClient.includes("threadNotes") && apiClient.includes("/api/threads/notes"));
+  check("client: notes view renders on the Chat front", main.includes("Your notes") && main.includes("threadNotesList") && main.includes("loadThreadNotesList"));
+  check("client: search renders note hits as your note", main.includes("Your note") && main.includes('"note"'));
   const server = readFileSync(join(ROOT, "src", "server.ts"), "utf8");
   check("server: thread note routes are mounted", server.includes("/note") && server.includes("getThreadNote") && server.includes("setThreadNote"));
+  check("server: notes list route is mounted", server.includes('"/api/threads/notes"') && server.includes("listThreadNotes"));
+  check("server: search merges note hits", server.includes("searchThreadNotes(accountId, query)"));
   const db = readFileSync(join(ROOT, "src", "server", "db.ts"), "utf8");
   check("db: thread_notes table and helpers exist", db.includes("thread_notes") && db.includes("getThreadNote") && db.includes("setThreadNote") && db.includes("deleteThreadNote"));
+  check("db: note list and note search helpers exist", db.includes("listThreadNotes") && db.includes("searchThreadNotes"));
 }
 
 console.log(`\n${passed} passed, ${failed} failed`);

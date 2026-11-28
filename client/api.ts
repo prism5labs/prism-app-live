@@ -140,6 +140,10 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ accountId: getAccountId(), note }),
     }),
+  // Every conversation carrying a note for this account — the Chat
+  // front's notes view across Faces.
+  threadNotes: () =>
+    req(`/api/threads/notes?accountId=${encodeURIComponent(getAccountId())}`),
   // Delete a conversation: every stored message with this Face, for
   // this account only. The Face itself and its customization stay.
   threadDelete: (photon: string) =>

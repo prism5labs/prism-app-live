@@ -22,6 +22,8 @@ import {
   getThreadNote,
   setThreadNote,
   deleteThreadNote,
+  listThreadNotes,
+  searchThreadNotes,
   incrementMeter,
   meterState,
   redeemFreeCode,
@@ -961,13 +963,31 @@ async function handleApi(req: Request, path: string): Promise<Response> {
   // would otherwise swallow "search" as a Photon name. Same account
   // resolution as the thread export route. The query is required and
   // must be at least 2 characters; results are account-scoped
-  // snippets only, never full message bodies.
+  // snippets only, never full message bodies. Private thread notes
+  // are searched too: a query that hits only a conversation's note
+  // returns that conversation, its hit marked role "note", merged
+  // with the message hits newest first under the same cap.
   if (path === "/api/threads/search" && method === "GET") {
     const accountId = accountIdFrom(req, {});
     if (!isValidAccountId(accountId)) return bad("accountId required", 400);
     const query = (url.searchParams.get("q") || "").trim();
     if (query.length < 2) return bad("search query must be at least 2 characters", 400);
-    return json({ ok: true, query, results: searchMessages(accountId, query) });
+    const messageResults = searchMessages(accountId, query);
+    const results = [...messageResults, ...searchThreadNotes(accountId, query)]
+      .sort((a, b) => (a.created_at < b.created_at ? 1 : a.created_at > b.created_at ? -1 : 0))
+      .slice(0, 50);
+    return json({ ok: true, query, results });
+  }
+
+  // GET /api/threads/notes — every conversation carrying one of this
+  // account's private notes, most recently noted first: the index
+  // behind the Chat front's notes view across Faces. Mounted BEFORE
+  // /api/threads/:name for the same reason as search above — "notes"
+  // would otherwise be swallowed as a Photon name.
+  if (path === "/api/threads/notes" && method === "GET") {
+    const accountId = accountIdFrom(req, {});
+    if (!isValidAccountId(accountId)) return bad("accountId required", 400);
+    return json({ ok: true, notes: listThreadNotes(accountId) });
   }
 
   // GET /api/threads/:name — a Photon or an Atom name; the thread store
