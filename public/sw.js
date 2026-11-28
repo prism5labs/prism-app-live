@@ -326,7 +326,13 @@
 // server migration carries existing threads, ownership and stored
 // backstory rows from Jude to Vera. The cache bump makes existing
 // installs fetch the new bundle instead of serving the cached one.
-const CACHE = "prism5-v87";
+// v88: Thread notes ship live (Nov 28, 2026, Neil's ruling) —
+// every conversation carries one private note, set from the
+// thread head; search now matches note text as well as messages,
+// and a "Your notes" card on the Chat front lists every noted
+// Face in one place. The cache bump makes existing installs fetch
+// the new bundle instead of serving the cached one.
+const CACHE = "prism5-v88";
 // Images (portraits, thumbnails, brand art, chat backgrounds, icons)
 // live in their own cache whose name does NOT change with the shell
 // version. Before v52 every shell bump deleted the one cache on
