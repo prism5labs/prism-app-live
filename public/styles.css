@@ -2908,6 +2908,8 @@ section > .fine, .stripe-line { color: var(--ground-dim); }
     linear-gradient(180deg, #C22736, var(--cherry) 55%, var(--cherry-dark));
   border: 1px solid rgba(255,205,160,.6);
   border-radius: 13px;
+  display: block;
+  margin-top: 12px;
   font-size: 15px;
   letter-spacing: .18em;
   padding: 13px 0 12px;

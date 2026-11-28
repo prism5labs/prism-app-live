@@ -1195,10 +1195,10 @@ function machineHtml(
           <span class="machine-coin" aria-hidden="true"></span>
           <button class="btn machine-step-btn" data-action="machine-next" data-machine="${id}" aria-label="Next in ${esc(opts.title)}">Next →</button>
         </div>
-        <button class="machine-dispense-btn" data-action="${opts.dispenseAction}" data-machine="${id}">DISPENSE</button>
         <div class="machine-plate">${logoHtml(12)}<span>Prism 5 Labs</span></div>
       </div>
     </div>
+    <button class="machine-dispense-btn" data-action="${opts.dispenseAction}" data-machine="${id}">DISPENSE</button>
     ${bay}
     <details class="machine-list">
       <summary>${esc(opts.listLabel)}</summary>
