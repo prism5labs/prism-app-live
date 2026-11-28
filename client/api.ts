@@ -131,6 +131,15 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ accountId: getAccountId() }),
     }),
+  // Private note on a conversation: one short note per Face, for
+  // this account only. An empty note clears it.
+  threadNote: (photon: string) =>
+    req(`/api/threads/${encodeURIComponent(photon)}/note?accountId=${encodeURIComponent(getAccountId())}`),
+  setThreadNote: (photon: string, note: string) =>
+    req(`/api/threads/${encodeURIComponent(photon)}/note`, {
+      method: "POST",
+      body: JSON.stringify({ accountId: getAccountId(), note }),
+    }),
   // Delete a conversation: every stored message with this Face, for
   // this account only. The Face itself and its customization stay.
   threadDelete: (photon: string) =>

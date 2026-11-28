@@ -187,6 +187,13 @@ CREATE TABLE IF NOT EXISTS pinned_faces (
   created_at TEXT NOT NULL,
   PRIMARY KEY (account_id, photon)
 );
+CREATE TABLE IF NOT EXISTS thread_notes (
+  account_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  note TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (account_id, name)
+);
 `);
 
 // --- Imported-memory columns added Nov 18, 2026 (memory import fix) ---
@@ -798,7 +805,38 @@ export function deleteThread(accountId: string, photon: string): number {
     .run(accountId, photon);
   db.query(`DELETE FROM threads WHERE account_id = ? AND photon = ?`).run(accountId, photon);
   db.query(`DELETE FROM pinned_faces WHERE account_id = ? AND photon = ?`).run(accountId, photon);
+  db.query(`DELETE FROM thread_notes WHERE account_id = ? AND name = ?`).run(accountId, photon);
   return removed.changes;
+}
+
+// --- Thread notes ---
+// One short private note per account per Photon or Atom conversation,
+// so the owner can remember what they were working on with that Face.
+// The note is trimmed and capped at 500 characters; an empty note
+// deletes the row, which is the clear path.
+export function getThreadNote(accountId: string, name: string): string {
+  const row = db
+    .query(`SELECT note FROM thread_notes WHERE account_id = ? AND name = ?`)
+    .get(accountId, name) as { note: string } | null;
+  return row?.note ?? "";
+}
+
+export function setThreadNote(accountId: string, name: string, note: string): string {
+  const stored = String(note ?? "").trim().slice(0, 500);
+  if (!stored) {
+    deleteThreadNote(accountId, name);
+    return "";
+  }
+  const now = new Date().toISOString();
+  db.query(
+    `INSERT INTO thread_notes (account_id, name, note, updated_at) VALUES (?, ?, ?, ?)
+     ON CONFLICT(account_id, name) DO UPDATE SET note = excluded.note, updated_at = excluded.updated_at`,
+  ).run(accountId, name, stored, now);
+  return stored;
+}
+
+export function deleteThreadNote(accountId: string, name: string): void {
+  db.query(`DELETE FROM thread_notes WHERE account_id = ? AND name = ?`).run(accountId, name);
 }
 
 // --- Pinned Faces ---

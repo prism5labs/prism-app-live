@@ -131,6 +131,12 @@ async function loadPinnedFaces(): Promise<void> {
   const r = await api.pinned();
   if (r && r.ok && Array.isArray(r.pinned)) pinnedFaces = r.pinned;
 }
+let threadNote = "";
+
+async function loadThreadNote(name: string): Promise<void> {
+  const r = await api.threadNote(name);
+  threadNote = r && r.ok && typeof r.note === "string" ? r.note : "";
+}
 // Conversation search on the Chat front: the last query and its
 // results. Results are null until a search has run, so the front can
 // tell "not searched yet" apart from "searched, nothing found".
@@ -1439,8 +1445,10 @@ function renderChatThread(): string {
         <h2>${esc(face)}</h2>
         <span class="thread-tag">${esc(p.tagline)}</span>
         ${customized ? `<span class="thread-voice">Voice: ${esc(voiceNameOf(p.name))}</span>` : ""}
+        ${threadNote ? `<span class="thread-note">Note: ${esc(threadNote)}</span>` : ""}
       </div>
       <a class="btn small" href="${esc(api.threadExportUrl(p.name))}" download>Export</a>
+      <button class="btn small" data-action="edit-thread-note" data-photon="${esc(p.name)}">Note</button>
       <button class="btn small" data-action="${isPinnedFace(p.name) ? "unpin-face" : "pin-face"}" data-photon="${esc(p.name)}">${isPinnedFace(p.name) ? "Unpin" : "Pin"}</button>
       <details class="thread-menu">
         <summary aria-label="More options">···</summary>
@@ -1624,6 +1632,7 @@ async function openThread(name: string) {
   activePhoton = name;
   customizePhoton = null;
   threadMessages = [];
+  threadNote = "";
   threadLoading = true;
   render();
   const r = await api.thread(name);
@@ -1634,6 +1643,7 @@ async function openThread(name: string) {
     threadMessages = [];
   }
   await loadPinnedFaces();
+  await loadThreadNote(name);
   render();
   scrollMessages();
 }
@@ -4470,6 +4480,21 @@ document.addEventListener("click", async (e) => {
       }
       render();
     }
+  } else if (action === "edit-thread-note") {
+    const name = t.dataset.photon || "";
+    if (name) {
+      const next = window.prompt(`Private note for ${name} — clear it to remove the note:`, threadNote);
+      if (next !== null) {
+        const r = await api.setThreadNote(name, next);
+        if (r && r.ok) {
+          threadNote = typeof r.note === "string" ? r.note : next.trim().slice(0, 500);
+          toast(threadNote ? "Note saved." : "Note cleared.");
+        } else {
+          toast(r?.message || "That note didn't save. Try again.", "err");
+        }
+        render();
+      }
+    }
   } else if (action === "delete-thread") {
     const name = t.dataset.photon || "";
     if (!name) return;
@@ -4486,6 +4511,7 @@ document.addEventListener("click", async (e) => {
       pinnedFaces = Array.isArray(r.pinnedFaces)
         ? r.pinnedFaces
         : pinnedFaces.filter((x) => x !== name);
+      threadNote = "";
       activePhoton = null;
       customizePhoton = null;
       toast(`Your conversation with ${name} is deleted.`);

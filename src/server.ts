@@ -19,6 +19,9 @@ import {
   unpinFace,
   listPinnedFaces,
   isFacePinned,
+  getThreadNote,
+  setThreadNote,
+  deleteThreadNote,
   incrementMeter,
   meterState,
   redeemFreeCode,
@@ -1033,6 +1036,30 @@ async function handleApi(req: Request, path: string): Promise<Response> {
       pinned: isFacePinned(accountId, photon),
       pinnedFaces: listPinnedFaces(accountId),
     });
+  }
+
+  // GET /api/threads/:name/note — this account's private note on a
+  // Photon or Atom conversation. Same account and name checks as pin.
+  const threadNoteGetMatch = path.match(/^\/api\/threads\/([A-Za-z]+)\/note$/);
+  if (threadNoteGetMatch && method === "GET") {
+    const photon = threadNoteGetMatch[1];
+    const accountId = accountIdFrom(req, {});
+    if (!isValidAccountId(accountId)) return bad("accountId required", 400);
+    if (!isChatName(photon)) return bad("unknown photon", 400);
+    return json({ ok: true, name: photon, note: getThreadNote(accountId, photon) });
+  }
+
+  // POST /api/threads/:name/note — set, edit, or clear (empty note)
+  // this account's private note on a conversation.
+  const threadNoteMatch = path.match(/^\/api\/threads\/([A-Za-z]+)\/note$/);
+  if (threadNoteMatch && method === "POST") {
+    const photon = threadNoteMatch[1];
+    const body = await readBody(req);
+    const accountId = accountIdFrom(req, body);
+    if (!isValidAccountId(accountId)) return bad("accountId required", 400);
+    if (!isChatName(photon)) return bad("unknown photon", 400);
+    const note = setThreadNote(accountId, photon, String(body.note ?? ""));
+    return json({ ok: true, name: photon, note });
   }
 
   // POST /api/threads/:name/delete — delete this account's whole
