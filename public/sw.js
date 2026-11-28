@@ -349,7 +349,20 @@
 // before. Stylesheet only; no behaviour changes. The cache bump
 // makes existing installs fetch the new bundle instead of serving
 // the cached one.
-const CACHE = "prism5-v90";
+// v91: The Atomic Showroom ships live (Nov 28, 2026, Neil's ruling)
+// — the approved redesign: the phone becomes a 1950s showroom
+// cabinet (deep-teal enamel frame, cream stock plaques, chrome cap
+// rails, brass hardware, dark glass). Patua One and Libre Franklin
+// are self-hosted under /fonts/ and the Google Fonts dependency is
+// gone, so the wordmark never re-faces on a cold load. Content
+// swaps instantly while panels cross-fade in one 600ms beat, no
+// dead air; the waiting mark is a small brass atom ("<Face> is on
+// it…") that fades out as the reply lands. The Store machine's
+// DISPENSE bar spans the cabinet full-width under the window, as
+// drawn. Function, copy and pricing unchanged. The cache bump
+// makes existing installs fetch the new bundle instead of serving
+// the cached one.
+const CACHE = "prism5-v91";
 // Images (portraits, thumbnails, brand art, chat backgrounds, icons)
 // live in their own cache whose name does NOT change with the shell
 // version. Before v52 every shell bump deleted the one cache on
