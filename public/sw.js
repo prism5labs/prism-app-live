@@ -332,7 +332,15 @@
 // and a "Your notes" card on the Chat front lists every noted
 // Face in one place. The cache bump makes existing installs fetch
 // the new bundle instead of serving the cached one.
-const CACHE = "prism5-v88";
+// v89: Homepage cleanup ships live (Nov 28, 2026, Neil's ruling) —
+// the two front-page vending machines ("Your Supernovas" /
+// "Your Novas" character-by-character drums, LCD tagline readouts,
+// keypads and name lists) are off the Chat front; a plain
+// "Your Faces" card with a "Meet them in the Store" button stands
+// where they were. The Store's Meet sections are unchanged. The
+// cache bump makes existing installs fetch the new bundle instead
+// of serving the cached one.
+const CACHE = "prism5-v89";
 // Images (portraits, thumbnails, brand art, chat backgrounds, icons)
 // live in their own cache whose name does NOT change with the shell
 // version. Before v52 every shell bump deleted the one cache on
