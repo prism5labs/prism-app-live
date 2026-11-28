@@ -1080,14 +1080,47 @@ textarea { width: 100%; resize: vertical; }
   flex: none;
   margin-top: 2px;
 }
-/* Streaming reply: three dots while the brain thinks, then words as they land. */
-.typing { display: inline-flex; gap: 4px; align-items: center; padding: 4px 0; }
-.typing span { width: 6px; height: 6px; border-radius: 50%; background: currentColor; opacity: 0.35; animation: typing-bounce 1.2s infinite; }
-.typing span:nth-child(2) { animation-delay: 0.2s; }
-.typing span:nth-child(3) { animation-delay: 0.4s; }
-@keyframes typing-bounce { 0%, 60%, 100% { transform: translateY(0); opacity: 0.35; } 30% { transform: translateY(-4px); opacity: 0.9; } }
+/* Streaming reply: the waiting atom while the brain thinks, then
+   words as they land. A brass ring in the showroom's register, one
+   electron riding it, the core breathing softly — pure CSS, no
+   assets. It fades out over 600ms when the first words arrive
+   (.waiting-out, set by appendStreamingText) — never a snap. */
+.waiting { display: inline-flex; gap: 9px; align-items: center; padding: 3px 0; transition: opacity 600ms var(--ease, ease); }
+.waiting-out { opacity: 0; }
+.waiting-line { font-size: var(--t-secondary); color: var(--ink-soft); font-style: italic; }
+.atom { position: relative; width: 24px; height: 24px; flex: none; }
+.atom-core {
+  position: absolute; left: 50%; top: 50%;
+  width: 6px; height: 6px; border-radius: 50%;
+  transform: translate(-50%, -50%);
+  background: radial-gradient(circle at 35% 30%, #F4D47C, var(--gold-deep) 75%);
+  box-shadow: 0 0 5px rgba(217,164,65,.55);
+  animation: atom-breathe 2.4s ease-in-out infinite;
+}
+.atom-ring {
+  position: absolute; inset: 1px;
+  border: 1.5px solid rgba(154,116,34,.8);
+  border-radius: 50%;
+  animation: atom-orbit 2.8s linear infinite;
+}
+.atom-electron {
+  position: absolute; left: 50%; top: -2.5px;
+  width: 5px; height: 5px; border-radius: 50%;
+  transform: translateX(-50%);
+  background: var(--gold-deep);
+  box-shadow: 0 0 4px rgba(217,164,65,.7);
+}
+@keyframes atom-orbit {
+  from { transform: rotate(0deg) rotateX(68deg); }
+  to { transform: rotate(360deg) rotateX(68deg); }
+}
+@keyframes atom-breathe {
+  0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: .85; }
+  50% { transform: translate(-50%, -50%) scale(1.25); opacity: 1; }
+}
 @media (prefers-reduced-motion: reduce) {
-  .typing span { animation: none; opacity: 0.6; }
+  .atom-ring, .atom-core { animation: none; }
+  .waiting { transition: none; }
 }
 .composer { display: flex; gap: 8px; align-items: center; }
 .composer input { border-radius: 999px; }
@@ -2281,3 +2314,831 @@ input:focus, textarea:focus, select:focus {
 html.read-contrast .app-header-tag { color: var(--ink-soft); }
 html.read-contrast .nav-btn { color: var(--ink-soft); }
 html.read-contrast .nav-btn.active { color: var(--teal-deep); }
+
+/* =====================================================================
+   ATOMIC SHOWROOM — Nov 28, 2026
+   The full redesign, built from the approved design (~/workspace/
+   prism-redesign/: "The Atomic Showroom"). The phone is a 1950s
+   showroom cabinet: a deep-teal enamel frame (fascia, tab bar,
+   machine) lit by one spotlight, and everything the visitor reads
+   sits on cream stock plaques inside it. The Nov 27 reskin built
+   the materials and Fix #1 completed them component by component;
+   this block gives the app the design's *arrangement* — enamel
+   ground, stock panels, chrome cap rails, brass hardware — from
+   the same plates and tokens the house already owns. The brand
+   faces are self-hosted now (below), so the wordmark is itself
+   from the first paint. Function, copy and pricing are untouched;
+   the v1 sounds are untouched; a chosen Photon look still keeps
+   its own skin inside its thread (the guards at the end).
+   ===================================================================== */
+
+/* ---------- The brand faces, self-hosted ------------------------ */
+@font-face {
+  font-family: "Patua One";
+  src: url("/fonts/PatuaOne-400.woff2") format("woff2");
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Libre Franklin";
+  src: url("/fonts/LibreFranklin-Variable.woff2") format("woff2");
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+:root {
+  --teal-abyss: #01222B;
+  --gold-deep: #9A7422;
+  --stock: #FFFDF6;
+  --ground-pale: #D8E4DC;
+  --ground-dim: #C4D4C9;
+  --ground-faint: #A9BFB2;
+}
+
+/* ---------- The showroom ground ----------------------------------
+   The wall behind everything: deep enamel under one spotlight.
+   The room art still rotates behind the chat (syncAppBackground),
+   now under a dark glaze, so it reads as the showroom's lit wall
+   rather than a cream-washed poster. */
+body {
+  background-color: var(--teal-abyss);
+  background-image:
+    radial-gradient(120% 46% at 50% -4%, rgba(239,198,92,.18), rgba(239,198,92,0) 60%),
+    linear-gradient(180deg, rgba(1,34,43,.52) 0%, rgba(1,34,43,.78) 34%, rgba(1,25,32,.92) 100%),
+    var(--plate-enamel);
+  background-size: auto, auto, 520px auto;
+  background-repeat: no-repeat, no-repeat, repeat;
+  background-position: top center;
+}
+.app-bg { background-color: var(--teal-abyss); }
+.app-bg-scrim {
+  background: linear-gradient(180deg, rgba(1,34,43,.40) 0%, rgba(1,34,43,.70) 34%, rgba(1,25,32,.90) 100%);
+}
+/* Inside a Photon's chosen look the room keeps the light it was
+   designed against: the cream scrim returns for the thread's stay. */
+body:has(.thread.look-signal-red) .app-bg-scrim,
+body:has(.thread.look-ledger-lake) .app-bg-scrim,
+body:has(.thread.look-night-watch) .app-bg-scrim {
+  background: linear-gradient(
+    color-mix(in srgb, #FFF6E0 78%, transparent),
+    color-mix(in srgb, #FFF6E0 88%, transparent)
+  );
+}
+
+/* ---------- Fascia: the enamel header cabinet -------------------- */
+.app-top {
+  background-image:
+    linear-gradient(180deg, rgba(255,255,255,.10), rgba(255,255,255,0) 38%, rgba(0,0,0,.28)),
+    var(--plate-enamel);
+  background-size: cover;
+  background-position: center 30%;
+  background-color: var(--teal-deep);
+  border-radius: 0;
+  box-shadow: 0 10px 24px -8px rgba(0,10,14,.65);
+}
+.app-header {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) auto;
+  grid-template-areas: "mark name pill" "mark sub pill";
+  column-gap: 12px;
+  row-gap: 2px;
+  align-items: center;
+  padding: 14px max(16px, env(safe-area-inset-left)) 12px max(16px, env(safe-area-inset-right));
+}
+.app-header-mark {
+  grid-area: mark;
+  width: 44px; height: 44px;
+  border: 2px solid var(--butter);
+  box-shadow: 0 0 0 2px rgba(1,34,43,.55), 0 3px 8px rgba(0,0,0,.45), inset 0 0 0 2px rgba(255,255,255,.6);
+}
+.app-header-name {
+  grid-area: name;
+  min-width: 0;
+  align-self: end;
+  font-size: 21px;
+  color: var(--cream);
+  text-shadow: 0 1px 3px rgba(0,0,0,.5);
+}
+.app-header-tag {
+  grid-area: sub;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  align-self: start;
+  margin-left: 0;
+  text-align: left;
+  font-size: 10.5px;
+  letter-spacing: .22em;
+  color: var(--gold-hi);
+}
+@media (max-width: 420px) { .app-header-tag { display: block; } }
+/* The Google state is the fascia's status pill: dark glass, a gold
+   rim, and a lamp that carries the state — gold lit, green when
+   connected, dull when not. */
+.google-state {
+  grid-area: pill;
+  margin-left: 0;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 11px;
+  border-radius: var(--r-pill);
+  background: rgba(1,25,32,.55);
+  border: 1px solid rgba(239,198,92,.45);
+  color: #F3E7C8;
+  font-size: 11.5px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.14);
+}
+.google-state::before {
+  width: 8px; height: 8px;
+  margin-right: 0;
+  vertical-align: 0;
+  background: radial-gradient(circle at 35% 35%, #FFE9A8, var(--butter) 55%, var(--gold-deep));
+  box-shadow: 0 0 7px rgba(239,198,92,.85);
+}
+.google-state[data-state="connected"]::before {
+  background: radial-gradient(circle at 35% 35%, #D8FFD2, #57C46A 55%, #2E7D3B);
+  box-shadow: 0 0 7px rgba(110,220,130,.8);
+}
+.google-state[data-state="not-connected"]::before {
+  background: radial-gradient(circle at 35% 35%, #CFC8B4, #8E8875 60%, #5E594C);
+  box-shadow: none;
+}
+.chrome-thin {
+  margin: 0;
+  box-shadow: 0 1px 0 rgba(239,198,92,.55), 0 6px 10px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.6);
+}
+
+/* ---------- Tab bar: the lower fascia ---------------------------- */
+.nav {
+  background-image: linear-gradient(0deg, rgba(0,0,0,.25), rgba(255,255,255,.07) 45%, rgba(255,255,255,0)), var(--plate-enamel);
+  background-size: cover;
+  background-position: center 70%;
+  background-color: var(--teal-abyss);
+  border-radius: 0;
+  box-shadow: 0 -10px 24px -8px rgba(0,10,14,.65);
+}
+.nav::before { border-radius: 0; box-shadow: 0 -1px 0 rgba(239,198,92,.55), inset 0 1px 0 rgba(255,255,255,.6); }
+.nav-btn { color: var(--ground-faint); }
+.nav-btn.active { color: var(--cream); box-shadow: inset 0 -3px 0 var(--butter), 0 1px 0 rgba(0,0,0,0); }
+.nav-btn.active svg { color: var(--gold-hi); }
+
+/* ---------- Page heads on the enamel ----------------------------- */
+.view .page-title {
+  color: var(--cream);
+  font-size: 1.94rem;
+  line-height: 1.05;
+  text-shadow: 0 2px 10px rgba(0,0,0,.45);
+}
+.page-lede { color: var(--ground-pale); font-size: var(--t-secondary); }
+.view .section-title { color: var(--gold-hi); letter-spacing: .2em; }
+section > .fine, .stripe-line { color: var(--ground-dim); }
+#messages h4, #contacts h4, #calendar h4, #drive h4 {
+  font-family: "Patua One", Georgia, serif;
+  font-weight: 400;
+  color: var(--cream);
+}
+
+/* ---------- Panels: the cap rail sits inset, as drawn ------------ */
+.card { border-radius: var(--r-sheet); border-color: var(--card-line); }
+.card::before { left: 14px; right: 14px; height: 5px; border-radius: 0 0 4px 4px; }
+.card-sheet { border-radius: var(--r-sheet); position: relative; }
+.card-sheet::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 14px; right: 14px; height: 5px;
+  background: var(--plate-chrome) center / cover;
+  border-radius: 0 0 4px 4px;
+  box-shadow: 0 1px 2px rgba(1,49,62,.3), inset 0 1px 0 rgba(255,255,255,.65);
+  pointer-events: none;
+}
+
+/* ---------- The segmented switch: a dark track, a stock segment -- */
+.store-side-switch, .front-side-switch {
+  display: flex;
+  gap: 0;
+  padding: 4px;
+  border-radius: var(--r-pill);
+  background: rgba(1,25,32,.6);
+  border: 1px solid rgba(239,198,92,.4);
+  box-shadow: inset 0 2px 6px rgba(0,0,0,.55), 0 1px 0 rgba(255,255,255,.08);
+}
+.store-side-switch .btn, .front-side-switch .btn {
+  flex: 1;
+  background: none;
+  border-color: transparent;
+  box-shadow: none;
+  text-shadow: none;
+  color: var(--ground-faint);
+  font-family: "Patua One", Georgia, serif;
+  font-weight: 400;
+  font-size: 15px;
+}
+.store-side-switch .btn:hover, .front-side-switch .btn:hover { background: none; filter: none; transform: none; }
+.store-side-switch .btn.primary, .front-side-switch .btn.primary {
+  background-image: var(--tex-cream);
+  background-color: var(--cream);
+  color: var(--teal-deep);
+  box-shadow: 0 2px 6px rgba(0,0,0,.4), inset 0 1px 0 #fff;
+  filter: none;
+}
+.store-side-switch .btn.primary:hover, .front-side-switch .btn.primary:hover {
+  background-image: var(--tex-cream);
+  background-color: var(--cream);
+  filter: brightness(1.02);
+}
+.toggle {
+  padding: 4px;
+  gap: 0;
+  border-radius: var(--r-pill);
+  background: rgba(1,25,32,.6);
+  border: 1px solid rgba(239,198,92,.4);
+  box-shadow: inset 0 2px 6px rgba(0,0,0,.55), 0 1px 0 rgba(255,255,255,.08);
+}
+.toggle-btn {
+  background: none;
+  border-color: transparent;
+  box-shadow: none;
+  text-shadow: none;
+  color: var(--ground-faint);
+  font-family: "Patua One", Georgia, serif;
+  font-weight: 400;
+  font-size: 15px;
+}
+.toggle-btn.active {
+  background-image: var(--tex-cream);
+  background-color: var(--cream);
+  color: var(--teal-deep);
+  box-shadow: 0 2px 6px rgba(0,0,0,.4), inset 0 1px 0 #fff;
+  text-shadow: none;
+}
+
+/* ---------- Chat front: the owner's desk -------------------------- */
+.front { text-align: left; }
+.front-body { padding: 10px 0 0; text-align: left; }
+.greeting {
+  font-size: 2rem;
+  line-height: 1.05;
+  color: var(--cream);
+  text-shadow: 0 2px 10px rgba(0,0,0,.45);
+  margin: 0;
+}
+.greeting-accent { color: var(--cream); }
+.front-strip-label {
+  margin: 24px 0 8px;
+  font-family: "Libre Franklin", sans-serif;
+  font-size: var(--t-label);
+  font-weight: 700;
+  letter-spacing: .2em;
+  text-transform: uppercase;
+  color: var(--gold-hi);
+}
+.pinned-list { display: flex; flex-direction: column; gap: 8px; }
+.btn.pinned-row {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  background-color: var(--stock);
+  background-image: var(--tex-cream);
+  background-size: 340px;
+  color: var(--teal-deep);
+  border: 1px solid var(--card-line);
+  border-radius: var(--r-card);
+  box-shadow: var(--bevel), 0 2px 6px rgba(0,20,26,.18);
+  text-shadow: none;
+  text-align: left;
+  font-family: "Patua One", Georgia, serif;
+  font-weight: 400;
+  font-size: 15.5px;
+  padding: 12px 13px;
+}
+.btn.pinned-row::after { content: "›"; margin-left: auto; color: var(--gold-deep); font-size: 19px; }
+.btn.pinned-row:hover { background-color: #FFF6DC; filter: none; transform: none; }
+.day-strip {
+  width: 100%;
+  margin: 16px 0 0;
+  border-color: var(--card-line);
+  border-radius: var(--r-card);
+  box-shadow: var(--bevel), var(--lift);
+  font-family: "Patua One", Georgia, serif;
+  font-weight: 400;
+}
+
+/* ---------- Thread: plaque, letter, enamel composer --------------- */
+.thread-head { border-bottom: none; padding: var(--space-4) var(--space-4) 0; flex-wrap: wrap; row-gap: var(--space-2); }
+.thread-title { flex: 1 1 150px; }
+.thread-head .thread-menu { margin-left: auto; }
+.thread-head .back-btn {
+  background-color: var(--stock);
+  background-image: var(--tex-cream);
+  background-size: 340px;
+  border: 1px solid var(--card-line);
+  border-radius: var(--r-pill);
+  box-shadow: var(--bevel), 0 2px 5px rgba(0,15,20,.3);
+  color: var(--teal-deep);
+  padding: 8px 12px;
+  font-size: 12px;
+}
+.thread-title h2 {
+  font-family: "Patua One", Georgia, serif;
+  font-weight: 400;
+  font-size: 1.1rem;
+  color: var(--cream);
+  text-shadow: 0 1px 4px rgba(0,0,0,.5);
+}
+.thread-tag, .thread-voice, .thread-note { color: var(--ground-dim); }
+/* Export / Note / Pin wear the design's stock chips, not enamel. */
+.thread-head .btn.small {
+  background-color: var(--stock);
+  background-image: var(--tex-cream);
+  background-size: 340px;
+  color: var(--teal-deep);
+  border: 1px solid var(--card-line);
+  border-radius: var(--r-pill);
+  box-shadow: var(--bevel), 0 2px 5px rgba(0,15,20,.3);
+  text-shadow: none;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 8px 10px;
+  min-height: 0;
+}
+.thread-head .btn.small:hover { background-color: #FFF6DC; filter: none; transform: none; }
+.thread-menu summary {
+  background-color: var(--stock);
+  background-image: var(--tex-cream);
+  background-size: 340px;
+  border: 1px solid var(--card-line);
+  border-radius: var(--r-pill);
+  box-shadow: var(--bevel), 0 2px 5px rgba(0,15,20,.3);
+  color: var(--teal-deep);
+  font-size: 13px;
+  padding: 7px 11px;
+}
+/* The portrait presides from a stock plaque, framed like the
+   design's nameplate portrait. */
+.thread-hero {
+  margin: var(--space-4) var(--space-4) 0;
+  padding: 10px;
+  justify-content: stretch;
+  background-color: var(--stock);
+  background-image: var(--tex-cream);
+  background-size: 340px;
+  border: 1px solid var(--card-line);
+  border-radius: var(--r-sheet);
+  box-shadow: var(--bevel), var(--lift);
+}
+.thread-hero .portrait {
+  flex: 1;
+  width: 100%;
+  height: 218px;
+  max-width: none;
+  max-height: none;
+  border-radius: 12px;
+  border: 1px solid rgba(154,116,34,.55);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.35), 0 4px 14px rgba(0,20,26,.3);
+}
+.thread-hero .portrait img { object-position: center 22%; }
+/* The conversation is one letter sheet of stock. */
+.thread .messages {
+  background-color: var(--stock);
+  background-image: var(--tex-cream);
+  background-size: 340px;
+  border: 1px solid var(--card-line);
+  border-radius: var(--r-sheet);
+  box-shadow: var(--bevel), var(--lift);
+  margin: var(--space-4) var(--space-4) 0;
+  max-width: none;
+}
+.msg.bot .portrait {
+  width: 34px;
+  height: 34px;
+  box-shadow: 0 0 0 2px var(--butter), 0 2px 5px rgba(0,0,0,.25);
+}
+/* The composer is an enamel instrument panel at the column's foot. */
+.composer-dock {
+  background-image: linear-gradient(180deg, rgba(255,255,255,.10), rgba(2,43,54,.14) 55%, rgba(0,0,0,.22)), var(--plate-enamel);
+  background-size: cover;
+  background-position: center 25%;
+  background-color: var(--teal-deep);
+  border-top: 1px solid rgba(239,198,92,.4);
+  box-shadow: 0 -10px 24px -12px rgba(0,10,14,.65);
+}
+.composer-dock .research-row input { border-radius: var(--r-pill); }
+
+/* ---------- Store: showroom wall, brass prices, the seal ---------- */
+.store-head p { color: var(--ground-pale); }
+.store-head img {
+  border: 1px solid rgba(154,116,34,.55);
+  border-radius: 8px;
+  box-shadow: 0 4px 10px rgba(0,20,26,.3);
+}
+.poster-row {
+  background-color: var(--stock);
+  background-image: var(--tex-cream);
+  background-size: 340px;
+  border: 1px solid var(--card-line);
+  border-radius: var(--r-card);
+  box-shadow: var(--bevel), var(--lift);
+  padding: 14px;
+}
+.poster-row img {
+  border: 1px solid rgba(154,116,34,.55);
+  border-radius: 8px;
+  box-shadow: 0 4px 10px rgba(0,20,26,.3);
+}
+.poster-row b {
+  font-family: "Patua One", Georgia, serif;
+  font-weight: 400;
+  font-size: 1.19rem;
+  color: var(--teal-deep);
+}
+.poster-row .price {
+  display: inline-block;
+  background: linear-gradient(165deg, #F4D47C 0%, var(--butter) 45%, #B98A2E 80%, #8F6A1F 100%);
+  color: #2E2000;
+  padding: 7px 13px 6px;
+  border-radius: 10px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.75), inset 0 -2px 4px rgba(90,60,0,.45), 0 3px 8px rgba(0,15,20,.35);
+}
+.poster-row .at { display: block; margin-top: 5px; }
+/* The lead Launch hangs framed and spotlit, as drawn: a dark
+   showroom frame, the poster whole inside it. */
+#store-supernova.poster-row, #store-nova.poster-row { flex-direction: column; align-items: stretch; }
+#store-supernova .poster-btn {
+  background: linear-gradient(160deg, #2A2A2E, #101013 60%, #1C1C20);
+  padding: 9px;
+  border-radius: 14px;
+  border: 1px solid rgba(239,198,92,.5);
+  box-shadow: 0 24px 44px -14px rgba(0,0,0,.75), inset 0 1px 0 rgba(255,255,255,.25);
+}
+#store-supernova .poster-btn img {
+  width: 100%;
+  height: 300px;
+  object-fit: cover;
+  object-position: center 18%;
+  border: none;
+  border-radius: 7px;
+  box-shadow: none;
+  display: block;
+}
+#store-nova > img {
+  width: 100%;
+  height: 300px;
+  object-fit: cover;
+  object-position: center 18%;
+  border: none;
+  border-radius: 7px;
+  box-shadow: 0 24px 44px -14px rgba(0,0,0,.75);
+  background: linear-gradient(160deg, #2A2A2E, #101013 60%, #1C1C20);
+  padding: 9px;
+}
+/* The money-back seal strip (markup in renderStore). */
+.seal-strip {
+  margin: var(--space-3) 0 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 10px 14px;
+  border-radius: var(--r-card);
+  background-image: linear-gradient(180deg, rgba(255,255,255,.14), rgba(0,0,0,.15)), var(--plate-enamel);
+  background-size: cover;
+  border: 1px solid rgba(239,198,92,.5);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.25), var(--lift);
+  color: var(--cream);
+}
+.seal-strip img {
+  width: 44px; height: 44px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex: none;
+  border: 2px solid var(--butter);
+  box-shadow: 0 2px 6px rgba(0,0,0,.4);
+}
+.seal-line1 { font-family: "Patua One", Georgia, serif; font-size: 15.5px; line-height: 1.15; }
+.seal-line2 { font-size: 12px; color: var(--ground-pale); margin-top: 2px; }
+.photon-store .photon-name {
+  font-family: "Patua One", Georgia, serif;
+  font-weight: 400;
+  color: var(--teal-deep);
+}
+.addon-row {
+  background-color: var(--card);
+  background-image: var(--tex-cream);
+  background-size: 340px;
+  border-color: var(--card-line);
+  border-radius: var(--r-card);
+  box-shadow: var(--bevel);
+}
+.pricing-explainer {
+  background-color: var(--card);
+  background-image: var(--tex-cream);
+  background-size: 340px;
+  border-color: var(--card-line);
+  border-radius: var(--r-sheet);
+  box-shadow: var(--bevel), var(--lift);
+}
+
+/* ---------- The machine: the flagship appliance -------------------
+   A dark cabinet now, as drawn — the marquee printed on stock, the
+   drum behind glass, the LCD in a brass frame, keys with travel,
+   one cherry DISPENSE bar, and the bay lit from inside. */
+.machine {
+  background: linear-gradient(170deg, #3A3A40, #141417 55%, #232327);
+  border: 1px solid rgba(239,198,92,.45);
+  border-radius: 24px;
+  padding: 10px;
+  box-shadow: 0 30px 55px -16px rgba(0,0,0,.8), inset 0 1px 0 rgba(255,255,255,.3);
+}
+.machine-marquee {
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 2px;
+  border: 1px solid rgba(154,116,34,.6);
+  border-radius: 12px;
+  box-shadow: inset 0 0 22px rgba(217,164,65,.28), 0 3px 8px rgba(0,0,0,.35);
+  padding: 11px 14px 10px;
+}
+.machine-marquee-brand { font-size: 10.5px; letter-spacing: .3em; }
+.machine-marquee-title { margin-left: 0; font-size: 27px; line-height: 1.05; letter-spacing: .06em; }
+.machine-marquee-price { font-size: 11.5px; font-weight: 600; color: var(--ink-soft); }
+.machine-window {
+  background: linear-gradient(155deg, #0A2E35, #04161B 70%);
+  box-shadow: inset 0 0 0 1px rgba(239,198,92,.35), inset 0 6px 18px rgba(0,0,0,.7);
+  border-radius: 12px;
+}
+.machine-lcd {
+  background: linear-gradient(180deg, #0B2422, #071916);
+  border: 2px solid #8F6A1F;
+  box-shadow: inset 0 0 0 1px rgba(239,198,92,.35), inset 0 4px 12px rgba(0,0,0,.8), 0 2px 5px rgba(0,0,0,.4);
+  border-radius: 9px;
+}
+.lcd-code { color: var(--gold-hi); letter-spacing: .18em; font-size: 11px; }
+.lcd-name { color: #FFF3D6; }
+.lcd-role { color: #CDBD8A; }
+.lcd-price { color: #FFE9A8; }
+.machine-key {
+  background-color: var(--cream);
+  background-image: var(--tex-cream);
+  background-size: 340px;
+  color: var(--teal-deep);
+  border: 1px solid rgba(154,116,34,.55);
+  border-radius: 8px;
+  box-shadow: 0 3px 0 #8F6A1F, 0 5px 7px rgba(0,0,0,.4), inset 0 1px 0 #fff;
+  padding: 8px 0 7px;
+  font-size: 12.5px;
+}
+.machine-key.active {
+  background: linear-gradient(165deg, #F4D47C, var(--butter) 60%, #B98A2E);
+  color: #2E2000;
+  border-color: rgba(154,116,34,.55);
+  box-shadow: 0 3px 0 #6E5312, 0 5px 7px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.8);
+}
+.machine .machine-step-btn {
+  background-color: var(--stock);
+  background-image: var(--tex-cream);
+  background-size: 340px;
+  color: var(--teal-deep);
+  border: 1px solid var(--card-line);
+  box-shadow: var(--bevel), 0 2px 5px rgba(0,15,20,.3);
+  text-shadow: none;
+}
+.machine-dispense-btn {
+  background-image: linear-gradient(180deg, rgba(255,255,255,.25), rgba(255,255,255,0) 45%, rgba(0,0,0,.25)),
+    linear-gradient(180deg, #C22736, var(--cherry) 55%, var(--cherry-dark));
+  border: 1px solid rgba(255,205,160,.6);
+  border-radius: 13px;
+  font-size: 15px;
+  letter-spacing: .18em;
+  padding: 13px 0 12px;
+  width: 100%;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.4), inset 0 -3px 6px rgba(0,0,0,.35), 0 6px 14px rgba(0,0,0,.45);
+  text-shadow: 0 1px 3px rgba(0,0,0,.4);
+}
+.machine-dispense-btn:active {
+  transform: translateY(1px);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.4), inset 0 -1px 3px rgba(0,0,0,.35), 0 3px 8px rgba(0,0,0,.4);
+}
+.machine-bay {
+  background: linear-gradient(180deg, #05181D, #0A272E);
+  box-shadow: inset 0 8px 18px rgba(0,0,0,.85), inset 0 0 0 1px rgba(239,198,92,.25);
+  border-radius: 12px;
+  padding: 10px;
+}
+.machine-bay-flap { background: rgba(255,243,220,.08); }
+.machine-list summary { color: var(--gold-hi); }
+
+/* ---------- Connected: the switchboard, and the readers ----------- */
+.switchboard-strip {
+  background-color: var(--card);
+  background-image: var(--tex-cream);
+  background-size: 340px;
+  border: 1px solid var(--card-line);
+  border-radius: var(--r-card);
+  box-shadow: var(--bevel), var(--lift);
+  padding: 10px 12px;
+  margin-bottom: 12px;
+}
+.inbox-connected { border-radius: var(--r-card); box-shadow: var(--bevel); }
+.owned-badge {
+  background: linear-gradient(165deg, #F4D47C, var(--butter) 60%, #B98A2E);
+  color: #2E2000;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.75), inset 0 -2px 4px rgba(90,60,0,.35), 0 2px 5px rgba(0,15,20,.3);
+}
+/* A message or a file, opened to read, is a letter on stock — the
+   words never sit on the enamel wall. */
+.doc-head .card-title { color: var(--cream); text-shadow: 0 2px 10px rgba(0,0,0,.45); }
+.doc-meta { color: var(--ground-dim); }
+.email-body, .drive-content {
+  background-color: var(--stock);
+  background-image: var(--tex-cream);
+  background-size: 340px;
+  border: 1px solid var(--card-line);
+  border-radius: var(--r-sheet);
+  box-shadow: var(--bevel), var(--lift);
+  padding: 24px 16px;
+  color: var(--ink);
+}
+
+/* ---------- The remaining rooms ----------------------------------- */
+.chooser {
+  background-color: var(--teal-abyss);
+  background-image:
+    radial-gradient(120% 46% at 50% -4%, rgba(239,198,92,.18), rgba(239,198,92,0) 60%),
+    linear-gradient(180deg, rgba(1,34,43,.52) 0%, rgba(1,34,43,.78) 34%, rgba(1,25,32,.92) 100%),
+    var(--plate-enamel);
+  background-size: auto, auto, 520px auto;
+  background-repeat: no-repeat, no-repeat, repeat;
+}
+.chooser-card {
+  position: relative;
+  background-color: var(--stock);
+  background-image: var(--tex-cream);
+  background-size: 340px;
+  border: 1px solid var(--card-line);
+  border-radius: var(--r-sheet);
+  box-shadow: var(--bevel), var(--lift-hi);
+  padding: 28px 24px;
+}
+.chooser-card::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 14px; right: 14px; height: 5px;
+  background: var(--plate-chrome) center / cover;
+  border-radius: 0 0 4px 4px;
+  pointer-events: none;
+}
+.back-btn {
+  font: inherit;
+  font-weight: 800;
+  font-size: var(--t-secondary);
+  color: var(--gold-hi);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 6px 4px;
+}
+.day-item h3 { color: var(--cream); }
+.day-item p { color: var(--ground-pale); }
+.day-when { color: var(--cream); }
+.day-move {
+  background-color: var(--card);
+  background-image: var(--tex-cream);
+  background-size: 340px;
+  color: var(--ink);
+  border-radius: var(--r-card);
+  box-shadow: var(--bevel);
+  padding: 12px 14px;
+}
+.day-move p { color: var(--ink-soft); }
+.call-status { color: var(--cream); }
+.call-heard { color: var(--ground-dim); }
+.call-hero img { box-shadow: 0 0 0 2px var(--butter), 0 6px 16px rgba(0,0,0,.4); }
+.call-mic {
+  background: var(--btn-enamel);
+  background-color: #0F5257;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.5), inset 0 -3px 7px rgba(0,0,0,.35),
+    0 12px 26px -8px rgba(1,49,62,.55);
+}
+.call-mic.recording { background: var(--cherry); }
+.voice-opt, .look-pick {
+  background-color: var(--card);
+  background-image: var(--tex-cream);
+  background-size: 340px;
+  border-color: var(--card-line);
+  box-shadow: var(--bevel);
+}
+.voice-opt.selected, .look-pick.selected {
+  border-color: var(--teal);
+  background-color: var(--teal-soft);
+}
+.custom-step-tab {
+  background-color: var(--stock);
+  background-image: var(--tex-cream);
+  background-size: 340px;
+  border-color: var(--card-line);
+  box-shadow: var(--bevel);
+}
+
+/* ---------- Motion: the charter -----------------------------------
+   Content swaps instantly (fadeTo in client/main.ts); the frame
+   cross-fades around it — the room art slides over --t-world, and
+   the incoming view's panels arrive in one 600ms fade-and-settle
+   beat, in place, no dead air, nothing popping. Panels opening
+   (the Store's groups, the thread menu) fade and settle over
+   400ms instead of snapping. Presses answer in 150ms of depth
+   (--t-press, already on the buttons). */
+.view.view-enter { animation: showroom-view-in var(--t-view) var(--ease); }
+@keyframes showroom-view-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes showroom-arrive {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .view.view-enter .card, .view.view-enter .machine, .view.view-enter .poster-row,
+  .view.view-enter .seal-strip, .view.view-enter .thread-hero, .view.view-enter .messages,
+  .view.view-enter .composer-dock, .view.view-enter .day-strip, .view.view-enter .pinned-list,
+  .view.view-enter .switchboard-strip, .view.view-enter .chooser-card {
+    animation: showroom-arrive 600ms var(--ease) both;
+  }
+  .view.view-enter .store-group[open] > :not(summary),
+  .view.view-enter .machine-list[open] > :not(summary) {
+    animation: showroom-arrive 400ms var(--ease) both;
+  }
+  details.thread-menu[open] .thread-menu-list { animation: showroom-arrive 400ms var(--ease) both; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .view.view-enter { animation: none; }
+}
+
+/* ---------- Photon looks keep their own skin ----------------------
+   The Showroom's thread surfaces step aside inside a look thread,
+   exactly as the reskin's and Fix #1's did: the head reads in the
+   skin's ink, the hero is the skin's portrait again, the letter
+   sheet and the enamel composer return to the skin's own card, and
+   the head's chips wear the flat in-look button. */
+.thread.look-signal-red .thread-title h2, .thread.look-ledger-lake .thread-title h2,
+.thread.look-night-watch .thread-title h2 { color: var(--ink); text-shadow: none; }
+.thread.look-signal-red .thread-tag, .thread.look-ledger-lake .thread-tag,
+.thread.look-night-watch .thread-tag, .thread.look-signal-red .thread-voice,
+.thread.look-ledger-lake .thread-voice, .thread.look-night-watch .thread-voice,
+.thread.look-signal-red .thread-note, .thread.look-ledger-lake .thread-note,
+.thread.look-night-watch .thread-note { color: var(--ink-soft); }
+.thread.look-signal-red .thread-head .btn.small, .thread.look-ledger-lake .thread-head .btn.small,
+.thread.look-night-watch .thread-head .btn.small,
+.thread.look-signal-red .thread-head .back-btn, .thread.look-ledger-lake .thread-head .back-btn,
+.thread.look-night-watch .thread-head .back-btn,
+.thread.look-signal-red .thread-menu summary, .thread.look-ledger-lake .thread-menu summary,
+.thread.look-night-watch .thread-menu summary {
+  background: var(--card);
+  background-image: none;
+  color: var(--teal);
+  border: 1.5px solid var(--teal);
+  box-shadow: none;
+  text-shadow: none;
+}
+.thread.look-signal-red .thread-hero, .thread.look-ledger-lake .thread-hero,
+.thread.look-night-watch .thread-hero {
+  background: none;
+  border: none;
+  box-shadow: none;
+  margin: 0;
+  padding: 16px 16px 4px;
+  justify-content: center;
+}
+.thread.look-signal-red .thread-hero .portrait, .thread.look-ledger-lake .thread-hero .portrait,
+.thread.look-night-watch .thread-hero .portrait {
+  flex: none;
+  width: 160px;
+  height: 160px;
+  max-width: 44vw;
+  max-height: 44vw;
+  border: none;
+  border-radius: var(--r-card);
+}
+.thread.look-signal-red .messages, .thread.look-ledger-lake .messages,
+.thread.look-night-watch .messages {
+  background: none;
+  border: none;
+  box-shadow: none;
+  border-radius: 0;
+  margin: 0 auto;
+  max-width: calc(var(--measure-prose) + 37px + var(--space-8));
+}
+.thread.look-signal-red .composer-dock, .thread.look-ledger-lake .composer-dock,
+.thread.look-night-watch .composer-dock {
+  background: var(--card);
+  background-image: none;
+  border-top: 1px solid var(--line);
+  box-shadow: none;
+}
+
+/* ---------- High contrast on the enamel chrome --------------------
+   The Reading card's contrast mode, carried onto the new chrome:
+   on the fascia and the tab bar its words go light and hard, as
+   they did on the Neon Counter's dark chrome. */
+html.read-contrast .app-header-tag { color: var(--gold-hi); }
+html.read-contrast .nav-btn { color: #EFE6CE; }
+html.read-contrast .nav-btn.active { color: #FFFFFF; }
+html.read-contrast .google-state { color: #F3E7C8; }
+html.read-contrast .page-title, html.read-contrast .section-title { color: #FFF6E0; }

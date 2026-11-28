@@ -447,6 +447,7 @@ self.addEventListener("fetch", (event) => {
   if (
     url.pathname.startsWith("/supernovas/") ||
     url.pathname.startsWith("/novas/") ||
+    url.pathname.startsWith("/fonts/") ||
     url.pathname.startsWith("/brand/") ||
     url.pathname.startsWith("/chat-bg/") ||
     url.pathname.startsWith("/icons/")

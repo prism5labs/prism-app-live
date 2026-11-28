@@ -1393,9 +1393,13 @@ function renderChatThread(): string {
   // The class lives on this section only — the brand bar and bottom
   // nav keep the house palette (readability spec §3A.6).
   const look = isAtom ? null : lookSetById(customFor(p.name).lookSet || "");
-  // A streaming reply shows three dots until the first words land.
+  // A streaming reply shows the waiting atom — a small orbiting
+  // mark in the showroom's brass, with the face's own "on it" line —
+  // until the first words land, so the conversation never sits
+  // silent after the owner writes. It fades out as the reply begins
+  // (appendStreamingText), per the FADE RULE.
   const botMsg = (text: string, streaming = false) =>
-    `<div class="msg bot${streaming ? " streaming" : ""}">${portraitImg(28)}<div><p>${text ? esc(text) : '<span class="typing"><span></span><span></span><span></span></span>'}</p></div></div>`;
+    `<div class="msg bot${streaming ? " streaming" : ""}">${portraitImg(28)}<div><p>${text ? esc(text) : `<span class="waiting" role="status"><span class="atom" aria-hidden="true"><span class="atom-ring"><span class="atom-electron"></span></span><span class="atom-core"></span></span><span class="waiting-line">${esc(face)} is on it…</span></span>`}</p></div></div>`;
   const msgs = threadMessages.length
     ? threadMessages
         .map((m: any) =>
@@ -1645,8 +1649,14 @@ function streamingBubbleText(): HTMLElement | null {
 function appendStreamingText(text: string) {
   const p = streamingBubbleText();
   if (!p) return;
-  const dots = p.querySelector(".typing");
-  if (dots) dots.remove();
+  // The waiting atom fades out slowly as the first words land —
+  // never a snap (FADE RULE). The words arrive beneath it while it
+  // goes, and the mark leaves the DOM once the fade has run.
+  const waiting = p.querySelector(".waiting");
+  if (waiting) {
+    waiting.classList.add("waiting-out");
+    setTimeout(() => waiting.remove(), 700);
+  }
   p.appendChild(document.createTextNode(text));
   scrollMessages();
 }
@@ -1697,8 +1707,8 @@ async function sendChat(text: string): Promise<string | null> {
   threadMessages = [...threadMessages, { role: "user", content: text }];
   render();
   scrollMessages();
-  // The reply bubble appears at once with three dots, so the app never
-  // looks dead while the brain thinks. Tokens fill it in as they arrive.
+  // The reply bubble appears at once with the waiting atom, so the app
+  // never looks dead while the brain thinks. Tokens fill it in as they arrive.
   const streaming = { role: "assistant", content: "", streaming: true };
   threadMessages = [...threadMessages, streaming];
   render();
@@ -2924,6 +2934,15 @@ function kindGroups(kind: "Spark" | "Plug"): string {
   }).join("");
 }
 
+// The 14-day money-back seal (Atomic Showroom design, Nov 28, 2026):
+// the promise the pricing explainer already makes in plain words,
+// struck as a seal strip and set where a buyer hesitates — under the
+// tier rows, and under each machine. The Starburst is the seal, as
+// everywhere else in the house.
+function sealStripHtml(line: string): string {
+  return `<div class="seal-strip"><img src="/brand/starburst.jpg" alt="" loading="lazy" decoding="async"><div><div class="seal-line1">14-day money-back promise</div><div class="seal-line2">${line}</div></div></div>`;
+}
+
 function renderStore(): string {
   const ownedProducts: string[] = state?.ownedProducts || [];
   const ownedSupernovas: string[] = state?.ownedSupernovas || [];
@@ -3015,11 +3034,13 @@ function renderStore(): string {
       <summary><span class="summary-title">Meet the Supernovas</span><span class="fine">12 Supernovas · tap to hide</span></summary>
       <p class="page-lede">Each of the twelve is a Supernova on its own — spin the drum to the one you want, then press DISPENSE and it drops into the tray below, ready to buy.</p>
       ${machineHtml("store-supernovas", { title: "SUPERNOVAS", priceLine: "$499 one-time", listLabel: "See all 12 Supernovas", dispenseAction: "machine-dispense", kind: "photon", items: photonItems })}
+      ${sealStripHtml("Dispense her, live with her a fortnight — if she isn't for you, we refund you in full.")}
     </details>`;
   const atomsGroup = `<details class="store-group" id="store-novas" ${storeOpen.novas ? "open" : ""}>
       <summary><span class="summary-title">Meet the Novas</span><span class="fine">12 Novas · tap to hide</span></summary>
       <p class="page-lede">Each of the twelve is a Nova on its own — spin the drum to the one you want, then press DISPENSE and it drops into the tray below, ready to buy.</p>
       ${machineHtml("store-novas", { title: "NOVAS", priceLine: "$79 outright · or $10/month", listLabel: "See all 12 Novas", dispenseAction: "machine-dispense", kind: "atom", items: atomItems })}
+      ${sealStripHtml("Dispense her, live with her a fortnight — if she isn't for you, we refund you in full.")}
     </details>`;
   const upkeepCard = `    <div class="card upkeep-card" id="store-upkeep"><button class="poster-btn upkeep-poster-btn" data-action="tier-info" data-tier="upkeep" aria-label="More about Upkeep"><img src="/brand/starburst.jpg" alt="" loading="lazy" decoding="async"></button><div><h2>Upkeep</h2><p>${esc(UPKEEP_COPY.body)}</p><p class="price">$29.00/month <span class="fine">($29.87 at checkout)</span></p><div class="row">${buyButton(buyUrl(UPKEEP.url, "upkeep"), "$29.87", state?.upkeep === true)}<button class="btn small more-info" data-action="tier-info" data-tier="upkeep">More info</button></div></div></div>`;
   return `
@@ -3061,6 +3082,7 @@ function renderStore(): string {
 
     <h2 class="section-title">${isPersonal ? "Nova" : "Launches"}</h2>
     ${isPersonal ? novaRow : supernovaRow + satelliteRow}
+    ${sealStripHtml("On every Launch. If it isn't for you, say so within 14 days and we refund you — plain as that.")}
     ${isPersonal ? personalUpkeepCard : ""}
     ${isPersonal ? atomsGroup : photonsGroup}
     ${isPersonal ? "" : upkeepCard}
@@ -3660,35 +3682,30 @@ function syncAppBackground(): void {
   nextBackground(dir);
 }
 
-// A view change (tab, thread, customizer, call screen, briefing) fades
-// in gently instead of cutting in: the app reads as one coherent thing,
-// not pieces stuck together. Same-view re-renders — data arriving, chat
-// streaming — swap instantly, so nothing flickers while it works. The
-// animation lives in styles.css (.view-enter) and is off under
-// prefers-reduced-motion. The fade is slow and symmetric — 600ms out
-// and 600ms in (--t-view) by the fade rule (Nov 19, 2026) and the
-// readability spec §2.5 (Nov 21, 2026): nothing may feel like a video
-// popping up.
+// A view change (tab, thread, customizer, call screen, briefing) is
+// one beat, never two: the Atomic Showroom motion charter (Nov 28,
+// 2026) — content swaps instantly, and the *frame* cross-fades around
+// it. The incoming view's panels fade and settle over 600ms
+// (.view-enter in styles.css), the room art slides and cross-fades
+// behind them (syncAppBackground), and nothing ever sits on dead air
+// waiting for an empty screen to finish leaving. The old model —
+// 600ms out, a beat of nothing, 600ms in — is retired: it read as
+// lag, and the fade rule was never a licence for dead air. Same-view
+// re-renders — data arriving, chat streaming — skip this entirely
+// and stay instant, so nothing flickers while it works. Everything
+// here is off under prefers-reduced-motion.
 
-// A tab switch fades the old view out slowly first (fadeTo, below),
-// then the new view fades in — the fade rule, both directions. A
-// second tap while fading cancels the first fade, so fast tapping
-// never strands the view half-faded. Same-view renders skip this
-// entirely and stay instant.
+// A tab switch swaps at once (fadeTo, below); the settle of the new
+// view carries the fade. The name stays from the old model — every
+// caller still means "take me there, gracefully".
 let navFadeTimer: number | null = null;
 function fadeTo(fn: () => void, after?: () => void): void {
-  const v = view();
   if (navFadeTimer) {
     window.clearTimeout(navFadeTimer);
     navFadeTimer = null;
   }
-  v.classList.add("view-leaving");
-  navFadeTimer = window.setTimeout(() => {
-    navFadeTimer = null;
-    v.classList.remove("view-leaving");
-    fn();
-    if (after) after();
-  }, 600);
+  fn();
+  if (after) after();
 }
 let lastViewKey = "";
 function viewKey(): string {
@@ -4075,9 +4092,9 @@ document.addEventListener("click", async (e) => {
         if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
       }
     };
-    // A real tab change fades the old view out slowly first (the fade
-    // rule), then the new view fades in — no chop between places.
-    // Staying on the same tab switches at once.
+    // A real tab change swaps at once and the new view settles in
+    // (the Showroom charter, see fadeTo) — no chop, no dead air.
+    // Staying on the same tab switches at once too.
     if (next !== tab) fadeTo(doSwitch);
     else doSwitch();
   } else if (action === "email-open") {
@@ -4311,9 +4328,9 @@ document.addEventListener("click", async (e) => {
     closeCard();
   } else if (action === "goto-messenger") {
     // The Connections card's "Connect a Facebook Page": jump to the
-    // Messenger section, where the Page token goes in. The fade-out
-    // runs first (see fadeTo), and the scroll happens once the new
-    // view has landed, so the section is there to scroll to.
+    // Messenger section, where the Page token goes in. The swap runs
+    // first (see fadeTo), and the scroll happens once the new view
+    // is rendered, so the section is there to scroll to.
     fadeTo(
       () => {
         tab = "connected";
