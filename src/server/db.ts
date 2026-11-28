@@ -308,6 +308,56 @@ try {
   console.error("atom backstory pronoun migration failed:", err);
 }
 
+// --- Atom rename, Nov 27, 2026 (Jude -> Vera) ---
+// Nova Jude is now Nova Vera, at Neil's order: the portrait is a
+// woman, so the name and the pronouns (she/her) now match her.
+// Same treatment as the Nov 22 renames above: threads, messages,
+// customizations, contacts, pinned faces and atom ownership rows
+// keyed "Jude" are carried to "Vera". Idempotent: after the first
+// run no rows carry the old name, so the updates match nothing.
+// Vera never existed as a persona before this deploy, so no row
+// can collide. Any failure is caught and logged; it must never
+// stop the server starting.
+try {
+  db.query(`UPDATE threads SET photon = ? WHERE photon = ?`).run("Vera", "Jude");
+  db.query(`UPDATE messages SET photon = ? WHERE photon = ?`).run("Vera", "Jude");
+  db.query(`UPDATE customizations SET photon = ? WHERE photon = ?`).run("Vera", "Jude");
+  db.query(`UPDATE contacts SET photon = ? WHERE photon = ?`).run("Vera", "Jude");
+  db.query(`UPDATE OR IGNORE pinned_faces SET photon = ? WHERE photon = ?`).run("Vera", "Jude");
+  db.query(`DELETE FROM pinned_faces WHERE photon = ?`).run("Jude");
+  db.query(`UPDATE owned SET ref = ? WHERE kind = 'atom' AND ref = ?`).run("Vera", "Jude");
+} catch (err) {
+  console.error("atom rename (Jude -> Vera) migration failed:", err);
+}
+
+// --- Atom backstory carry for the Vera rename, Nov 27, 2026 ---
+// Stored atom_backstories rows keyed "Jude" (or, on the oldest
+// accounts, still "June") are carried to "Vera" with the current
+// template text — the Vera story reads she/her throughout, matching
+// her declared pronouns in src/shared/atoms.ts. Existing Vera rows
+// are refreshed to the current template. A stale old-name row is
+// removed when the account already holds a Vera row. Idempotent.
+// The guard mirrors the pronoun-correction block above: on a
+// brand-new database the table may not exist yet, and then there
+// are no stored rows to carry.
+try {
+  const _hasAtomBackstories2 = db
+    .query(`SELECT COUNT(*) AS n FROM sqlite_master WHERE type = 'table' AND name = 'atom_backstories'`)
+    .get() as { n: number };
+  if (_hasAtomBackstories2.n === 1) {
+    const _veraText = ATOM_BACKSTORIES["Vera"];
+    if (_veraText) {
+      db.query(`UPDATE atom_backstories SET template = ? WHERE atom = 'Vera'`).run(_veraText);
+      db.query(`UPDATE OR IGNORE atom_backstories SET atom = 'Vera', template = ? WHERE atom = 'Jude'`).run(_veraText);
+      db.query(`DELETE FROM atom_backstories WHERE atom = 'Jude'`).run();
+      db.query(`UPDATE OR IGNORE atom_backstories SET atom = 'Vera', template = ? WHERE atom = 'June'`).run(_veraText);
+      db.query(`DELETE FROM atom_backstories WHERE atom = 'June'`).run();
+    }
+  }
+} catch (err) {
+  console.error("atom backstory (Vera) migration failed:", err);
+}
+
 // --- Side column added Nov 19, 2026 (Business or Personal) ---
 // The first-open chooser's choice lives on the ACCOUNT, in the profile
 // row, so the app and the website follow it together for a signed-in

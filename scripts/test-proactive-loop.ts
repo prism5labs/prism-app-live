@@ -9,7 +9,7 @@
 //       Photon gets no thread message and no crash.
 //   (d) Nova: an account with Nova access + check-ins on receives
 //       exactly one Ruby thread message per day (sender run twice);
-//       an account without Nova access receives none; Jude's nudge
+//       an account without Nova access receives none; Vera's nudge
 //       stops after 3 days (pre-seeded seen_state).
 // No real Google/Twilio calls: both providers are unconfigured in the
 // test env, so the channel functions return [] before any network use.
@@ -178,17 +178,17 @@ await runCheck("test-proactive-nova");
 thread = await api("/api/threads/Ruby?accountId=test-proactive-nova");
 const rubyMsgs = (thread.messages || []).filter((m: any) => m.role === "assistant");
 check("(d) Nova account: exactly one Ruby check-in after two cycles", rubyMsgs.length === 1, JSON.stringify(thread.messages).slice(0, 300));
-thread = await api("/api/threads/Jude?accountId=test-proactive-nova");
-const juneMsgs = (thread.messages || []).filter((m: any) => m.role === "assistant");
-check("(d) Nova account: exactly one Jude nudge on day one", juneMsgs.length === 1, JSON.stringify(thread.messages).slice(0, 300));
+thread = await api("/api/threads/Vera?accountId=test-proactive-nova");
+const veraMsgs = (thread.messages || []).filter((m: any) => m.role === "assistant");
+check("(d) Nova account: exactly one Vera nudge on day one", veraMsgs.length === 1, JSON.stringify(thread.messages).slice(0, 300));
 
 // --- (d) no Nova access: nothing delivered ---
 await api("/api/state?accountId=test-proactive-plain");
 await runCheck("test-proactive-plain");
 thread = await api("/api/threads/Ruby?accountId=test-proactive-plain");
 check("(d) non-Nova account: no Ruby message", (thread.messages || []).length === 0, JSON.stringify(thread).slice(0, 200));
-thread = await api("/api/threads/Jude?accountId=test-proactive-plain");
-check("(d) non-Nova account: no Jude message", (thread.messages || []).length === 0, JSON.stringify(thread).slice(0, 200));
+thread = await api("/api/threads/Vera?accountId=test-proactive-plain");
+check("(d) non-Nova account: no Vera message", (thread.messages || []).length === 0, JSON.stringify(thread).slice(0, 200));
 
 // --- (d) nudge stops after 3 days ---
 await api("/api/state?accountId=test-proactive-nudge");
@@ -197,8 +197,8 @@ seedSeen("test-proactive-nudge", "nova-nudge", "2026-11-18");
 seedSeen("test-proactive-nudge", "nova-nudge", "2026-11-19");
 seedSeen("test-proactive-nudge", "nova-nudge", "2026-11-20");
 await runCheck("test-proactive-nudge");
-thread = await api("/api/threads/Jude?accountId=test-proactive-nudge");
-check("(d) nudge: no Jude message after 3 prior days", (thread.messages || []).length === 0, JSON.stringify(thread).slice(0, 200));
+thread = await api("/api/threads/Vera?accountId=test-proactive-nudge");
+check("(d) nudge: no Vera message after 3 prior days", (thread.messages || []).length === 0, JSON.stringify(thread).slice(0, 200));
 
 await stopApp(proc);
 

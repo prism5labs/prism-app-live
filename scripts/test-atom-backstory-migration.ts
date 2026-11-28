@@ -12,7 +12,11 @@
 //   acct-new-keys   — Jude + Pierce rows holding the v54 (pre-v55) text.
 //   acct-both       — a June row AND a Jude row for one account (the
 //                     collision case), plus a lone Pearl row.
-//   acct-current    — Jude + Pierce rows already at the corrected text.
+//   acct-current    — Vera + Pierce rows already at the corrected text.
+// Since Nov 27, 2026 the lamp Atom is Vera (renamed from Jude, with
+// she/her pronouns), so every June/Jude lamp row must end up keyed
+// "Vera" holding the current Vera template; no June or Jude rows
+// survive. Pierce expectations are unchanged from the Nov 22 pass.
 //   acct-cleo-only  — a lone Cleo row (pre-v54 text): the final sweep
 //                     carries it to Clive with the current template.
 //   acct-cleo-both  — a Cleo row AND a corrected Clive row: the stale
@@ -79,8 +83,8 @@ function seed() {
   ins.run("acct-both", "June", OLD_JUNE, NOW);
   ins.run("acct-both", "Jude", OLD_JUDE, NOW);
   ins.run("acct-both", "Pearl", OLD_PEARL, NOW);
-  // acct-current: already corrected.
-  ins.run("acct-current", "Jude", ATOM_BACKSTORIES["Jude"], NOW);
+  // acct-current: already corrected (the lamp row under its Nov 27 name).
+  ins.run("acct-current", "Vera", ATOM_BACKSTORIES["Vera"], NOW);
   ins.run("acct-current", "Pierce", ATOM_BACKSTORIES["Pierce"], NOW);
   // acct-cleo-only: a lone pre-v54 Cleo row.
   ins.run("acct-cleo-only", "Cleo", OLD_CLEO, NOW);
@@ -104,6 +108,7 @@ function assertMigrated(label: string) {
   const rows = readRows();
   const byKey = new Map(rows.map((r) => [`${r.account_id}/${r.atom}`, r.template]));
   check(`${label}: no June rows survive`, !rows.some((r) => r.atom === "June"));
+  check(`${label}: no Jude rows survive`, !rows.some((r) => r.atom === "Jude"));
   check(`${label}: no Pearl rows survive`, !rows.some((r) => r.atom === "Pearl"));
   check(`${label}: no Cleo rows survive`, !rows.some((r) => r.atom === "Cleo"));
   check(`${label}: total row count is 12`, rows.length === 12, `got ${rows.length}`);
@@ -117,8 +122,8 @@ function assertMigrated(label: string) {
   );
   for (const acct of ["acct-old-keys", "acct-new-keys", "acct-both", "acct-current"]) {
     check(
-      `${label}: ${acct} Jude row holds the corrected template`,
-      byKey.get(`${acct}/Jude`) === ATOM_BACKSTORIES["Jude"],
+      `${label}: ${acct} Vera row holds the corrected template`,
+      byKey.get(`${acct}/Vera`) === ATOM_BACKSTORIES["Vera"],
     );
     check(
       `${label}: ${acct} Pierce row holds the corrected template`,
@@ -133,9 +138,9 @@ function assertMigrated(label: string) {
     `${label}: Clive control row untouched`,
     byKey.get("acct-old-keys/Clive") === ATOM_BACKSTORIES["Clive"],
   );
-  const jude = byKey.get("acct-old-keys/Jude") || "";
+  const vera = byKey.get("acct-old-keys/Vera") || "";
   const pierce = byKey.get("acct-old-keys/Pierce") || "";
-  check(`${label}: migrated Jude text reads they/them`, jude.includes("their whole job") && !jude.includes("her whole job"));
+  check(`${label}: migrated Vera text reads she/her`, vera.includes("her whole job") && !vera.includes("their whole job"));
   check(`${label}: migrated Pierce text reads he/him`, pierce.includes("He never let") && !pierce.includes("She never let"));
 }
 
@@ -161,7 +166,7 @@ async function startApp() {
 }
 
 check("old fixtures really are the old wording", OLD_JUDE.includes("her whole job") && OLD_PIERCE.includes("She never let"));
-check("corrected Jude template differs from old", ATOM_BACKSTORIES["Jude"] !== OLD_JUDE);
+check("corrected Vera template differs from old Jude text", ATOM_BACKSTORIES["Vera"] !== OLD_JUDE);
 check("corrected Pierce template differs from old", ATOM_BACKSTORIES["Pierce"] !== OLD_PIERCE);
 check("old Cleo fixture really is the old key text", OLD_CLEO.startsWith("Cleo ran") && OLD_CLEO !== ATOM_BACKSTORIES["Clive"]);
 

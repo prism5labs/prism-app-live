@@ -319,7 +319,14 @@
 // One over Libre Franklin, the red kept for labels. CSS,
 // fonts link, header mark and three small brand plates only;
 // no behaviour changes, the opening film untouched.
-const CACHE = "prism5-v86";
+// v87: Nova Jude is now Nova Vera (Nov 27, 2026, Neil's order) —
+// the lantern Nova keeps her portrait, her role and her lighthouse
+// story; her name and her pronouns (she/her) change everywhere:
+// roster, backstory, nudge sender, portrait filenames, and a
+// server migration carries existing threads, ownership and stored
+// backstory rows from Jude to Vera. The cache bump makes existing
+// installs fetch the new bundle instead of serving the cached one.
+const CACHE = "prism5-v87";
 // Images (portraits, thumbnails, brand art, chat backgrounds, icons)
 // live in their own cache whose name does NOT change with the shell
 // version. Before v52 every shell bump deleted the one cache on

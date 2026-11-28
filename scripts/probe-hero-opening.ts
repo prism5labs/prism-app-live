@@ -102,7 +102,7 @@ async function waitFor(fn: () => boolean, timeoutMs = 10000): Promise<boolean> {
 const EXPECTED = [
   "Juniper", "Encore", "Zero", "Proof", "Barnstormer", "Blueprint",
   "Calendra", "Shopbell", "Keystone", "Vesper", "Goldstar",
-  "Mabel", "Hazel", "Willa", "Ruby", "Jude", "Sadie",
+  "Mabel", "Hazel", "Willa", "Ruby", "Vera", "Sadie",
   "Bea", "Flora", "Pierce", "Iris", "Clive", "Nora",
 ];
 

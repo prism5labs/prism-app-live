@@ -152,13 +152,13 @@
       "rawGeneration": "media-generation-hero-ruby-raw-0-9dfadd6b-9255-49e5-8120-01ea297c711d.webp"
     },
     {
-      "name": "Jude",
+      "name": "Vera",
       "kind": "Nova",
-      "file": "/heroes/Jude.webp",
+      "file": "/heroes/Vera.webp",
       "width": 560,
       "height": 1146,
       "bytes": 107560,
-      "sourcePortrait": "/atoms/Jude.png",
+      "sourcePortrait": "/atoms/Vera.png",
       "rawGeneration": "media-generation-hero-jude-raw-0-e4308bf9-dfa5-4132-8b0f-f903387476f6.webp"
     },
     {
@@ -255,7 +255,7 @@
       "Hazel",
       "Willa",
       "Ruby",
-      "Jude",
+      "Vera",
       "Iris",
       "Sadie",
       "Bea",

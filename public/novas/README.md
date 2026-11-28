@@ -2,7 +2,7 @@
 
 Drop a real portrait WebP here, one per Nova, named exactly:
 
-- `Mabel.webp`, `Hazel.webp`, `Willa.webp`, `Ruby.webp`, `Jude.webp`,
+- `Mabel.webp`, `Hazel.webp`, `Willa.webp`, `Ruby.webp`, `Vera.webp`,
   `Sadie.webp`, `Bea.webp`, `Flora.webp`, `Pierce.webp`, `Iris.webp`,
   `Clive.webp`, `Nora.webp`
 
@@ -17,7 +17,7 @@ the same family as the Supernova portraits — faceted deep-teal armor with
 chrome trim and red piping, young faces with fifties hair, each keeping
 its role's costume, emblem, and prop, with gold rank bars and serial
 N-01..N-12 — Mabel (letters and red pencil), Hazel (pocket diary),
-Willa (morning paper and mug), Ruby (telephone handset), Jude (lantern),
+Willa (morning paper and mug), Ruby (telephone handset), Vera (lantern),
 Sadie (hourglass), Bea (journal and lamp), Flora (apron and house key),
 Pierce (ledger book), Iris (card catalog box), Clive (clipboard), Nora
 (compass). Known inconsistency (Nov 19, 2026): the corps line varies —
@@ -26,3 +26,8 @@ slated for a later polish pass. If a portrait is ever replaced, drop
 the new file here with the same name and redeploy; the service-worker
 cache version must be bumped too, or existing installs will keep
 serving the cached portrait.
+
+Rename note (Nov 27, 2026): the lantern Nova is Vera — she was Jude
+until Nov 27, 2026 (and June before Nov 22, 2026). The portrait file
+is unchanged; only its name (here, in thumbs/, and in heroes/)
+changed, at Neil's order, with her pronouns set to she/her.
